@@ -720,7 +720,7 @@ struct xhci_request {
 
     volatile enum xhci_request_status status;
 
-    struct list_head list;
+    struct list_node list;
     void (*callback)(struct xhci_device *, struct xhci_request *);
     void *private;
 };

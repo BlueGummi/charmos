@@ -51,8 +51,8 @@ struct clock_evdev {
     fx32_32_t mult; /* Tick -> NS */
 
     bool in_global_list;
-    struct list_head list_internal; /* Used in global list */
-    struct list_head group_list;    /* struct clock_evdev_group */
+    struct list_node list_internal; /* Used in global list */
+    struct list_node group_list;    /* struct clock_evdev_group */
     cpu_id_t bound_to_cpu;          /* CPU_ID_NONE/!EVDEV_PERCPU = no binding */
     struct cpu_mask cpu_mask;
 
@@ -71,7 +71,7 @@ struct clock_evdev_group {
                                          cpu_id_t cpu);
 
     enum clock_evdev_group_flags flags;
-    struct list_head list_internal; /* Global list as well */
+    struct list_node list_internal; /* Global list as well */
 };
 
 struct clock_evdev_group *clock_evdev_group_create(const char *fmt, ...)
@@ -88,7 +88,7 @@ static inline void clock_evdev_group_add(struct clock_evdev_group *cedg,
     if (!ced->in_global_list)
         clock_evdev_register(ced);
 
-    list_add_tail(&ced->group_list, &cedg->clock_evdevs);
+    list_head_push_back(&cedg->clock_evdevs, &ced->group_list);
     cedg->clock_evdev_count++;
 }
 

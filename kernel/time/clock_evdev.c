@@ -12,7 +12,7 @@ struct clock_evdev_group *clock_evdev_group_create(const char *name, ...) {
     if (!cedg)
         return NULL;
 
-    INIT_LIST_HEAD(&cedg->clock_evdevs);
+    list_head_init(&cedg->clock_evdevs);
     va_list args;
     va_start(args, name);
     int ret = ERR_GUARD(vasprintf(&cedg->name, name, args), ERR_NO_MEM);

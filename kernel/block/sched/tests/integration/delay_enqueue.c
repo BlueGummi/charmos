@@ -56,7 +56,7 @@ TEST_DEFINE_INTEGRATION(bio_sched, delay_enqueue,
         rq->buffer = buf;
         rq->priority = prng_next() % BIO_SCHED_LEVELS;
         rq->write = false;
-        INIT_LIST_HEAD(&rq->list);
+        list_node_init(&rq->list);
 
         rqs[i] = rq;
         buffers[i] = buf;

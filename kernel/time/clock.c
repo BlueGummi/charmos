@@ -46,7 +46,7 @@ struct clock *clock_get_best(void) {
     struct clock *best = NULL;
     enum clock_rating best_rating = CLOCK_RATING_UNSUITABLE;
 
-    struct list_head *pos;
+    struct list_node *pos;
     enum irql irql = spin_lock(&clock_global.clocks.lock);
     list_for_each(pos, &clock_global.clocks.list) {
         struct clock *c = container_of(pos, struct clock, list_internal);
@@ -64,7 +64,7 @@ struct clock *clock_get_best(void) {
 
 struct clock *clock_get_by_name(const char *name) {
     struct clock *found = NULL;
-    struct list_head *pos;
+    struct list_node *pos;
     enum irql irql = spin_lock(&clock_global.clocks.lock);
     list_for_each(pos, &clock_global.clocks.list) {
         struct clock *c = container_of(pos, struct clock, list_internal);

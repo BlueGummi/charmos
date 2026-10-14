@@ -33,7 +33,7 @@ static size_t migratable_in_tree(size_t caller, struct rbt *rbt) {
 }
 
 static size_t migratable_in_list(size_t caller, struct list_head *tq) {
-    struct list_head *ln;
+    struct list_node *ln;
     size_t agg = 0;
     list_for_each(ln, tq) {
         struct thread *t = thread_from_rq_list_node(ln);
@@ -131,7 +131,7 @@ static size_t migrate_from_prio_class(struct scheduler *to,
             scheduler_get_this_thread_queue(from, class);
         struct list_head *to_queue = scheduler_get_this_thread_queue(to, class);
 
-        struct list_head *ln, *tmp;
+        struct list_node *ln, *tmp;
         list_for_each_safe(ln, tmp, from_queue) {
             if (migrated >= nthreads)
                 break;
@@ -139,10 +139,10 @@ static size_t migrate_from_prio_class(struct scheduler *to,
             struct thread *t = thread_from_rq_list_node(ln);
             if (can_push_thread(to->core_id, t)) {
 
-                list_del_init(ln);
+                list_node_delete_init(ln);
                 scheduler_decrement_thread_count(from, t);
 
-                list_add_tail(ln, to_queue);
+                list_head_push_back(to_queue, ln);
                 scheduler_increment_thread_count(to, t);
 
                 migrated++;

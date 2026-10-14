@@ -69,7 +69,7 @@ void mutex_simple_set_chk_flags(struct mutex_simple *m,
                                 enum lock_chk_flags flags) {
     enforce(m->chk.initialized);
     enforce(m->owner == NULL);
-    enforce(list_empty(&m->waiters.waiters));
+    enforce(list_head_empty(&m->waiters.waiters));
     enforce(!spinlock_locked(&m->waiters.lock));
     enforce(!spinlock_locked(&m->lock));
     enforce(!atomic_load_rlx(&m->chk.used));
@@ -82,7 +82,7 @@ void mutex_simple_reinit_chk(struct mutex_simple *m,
                              enum lock_chk_flags flags) {
     enforce(m->chk.initialized);
     enforce(m->owner == NULL);
-    enforce(list_empty(&m->waiters.waiters));
+    enforce(list_head_empty(&m->waiters.waiters));
     enforce(!spinlock_locked(&m->waiters.lock));
     enforce(!spinlock_locked(&m->lock));
     mutex_simple_init_chk_full(m, class, flags);
@@ -193,7 +193,7 @@ void mutex_simple_init_chk_full(struct mutex_simple *m,
                                 const struct lock_chk_class *class,
                                 enum lock_chk_flags flags) {
     m->owner = NULL;
-    INIT_LIST_HEAD(&m->waiters.waiters);
+    list_head_init(&m->waiters.waiters);
     spinlock_init(&m->waiters.lock, LOCK_UNCHKD);
     spinlock_init(&m->lock, LOCK_UNCHKD);
     mutex_simple_chk_state_init(m, class, flags);

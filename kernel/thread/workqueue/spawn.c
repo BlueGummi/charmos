@@ -43,7 +43,7 @@ static void release_spawner(struct workqueue *p) {
 
 static void worker_init(struct workqueue *queue, struct worker *w,
                         struct thread *t) {
-    INIT_LIST_HEAD(&w->list_node);
+    list_node_init(&w->list_node);
     w->thread = t;
     w->present = true;
     w->workqueue = queue;

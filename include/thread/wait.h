@@ -28,7 +28,7 @@ struct thread_wait_block {
      * something like Windows' MAXIMUM_WAIT_OBJECTS, so we can go for
      * a singularly linked list, save 8 bytes, at the cost of an
      * absolute maximum + maybe minor slowdowns (?) */
-    struct list_head object_link;
+    struct list_node object_link;
     struct thread *thread;
     void *object;
     uint16_t key;

@@ -278,7 +278,7 @@ static void xhci_work_port_disconnect(void *arg1) {
             }
 
             if (slot) {
-                list_del_init(&dev->hc_list);
+                list_node_delete_init(&dev->hc_list);
                 d->num_devices--;
 
                 spin_unlock(&d->lock, irql);
@@ -361,8 +361,8 @@ xhci_finished_requests_pop_front(struct xhci_device *dev) {
     enum irql irql = spin_lock_high(&dev->lock);
 
     struct xhci_request *ret = NULL;
-    struct list_head    *lh =
-        list_pop_front_init(&dev->requests[XHCI_REQ_LIST_PROCESSED]);
+    struct list_node    *lh =
+        list_head_pop_front_init(&dev->requests[XHCI_REQ_LIST_PROCESSED]);
     if (!lh)
         goto out;
 
@@ -377,8 +377,8 @@ static struct xhci_request *
 xhci_waiting_requests_pop_front(struct xhci_device *dev) {
     enum irql            irql = spin_lock_high(&dev->lock);
     struct xhci_request *ret  = NULL;
-    struct list_head    *lh =
-        list_pop_front_init(&dev->requests[XHCI_REQ_LIST_WAITING]);
+    struct list_node    *lh =
+        list_head_pop_front_init(&dev->requests[XHCI_REQ_LIST_WAITING]);
 
     if (!lh)
         goto out;
@@ -483,7 +483,7 @@ void xhci_request_move(struct xhci_device *dev, struct xhci_request *req,
     enforce(req->list_owner != new_list);
     /* remove from old list */
     if (req->list_owner != XHCI_REQ_LIST_NONE) {
-        list_del_init(&req->list);
+        list_node_delete_init(&req->list);
 
         if (req->list_owner == XHCI_REQ_LIST_OUTGOING) {
             req->command->ring->outgoing -= req->command->num_trbs;
@@ -495,7 +495,7 @@ void xhci_request_move(struct xhci_device *dev, struct xhci_request *req,
     if (new_list == XHCI_REQ_LIST_NONE)
         return;
 
-    list_add_tail(&req->list, &dev->requests[new_list]);
+    list_head_push_back(&dev->requests[new_list], &req->list);
 }
 
 static void xhci_disconnect_requests_on_port(struct xhci_device *dev,

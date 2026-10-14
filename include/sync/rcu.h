@@ -17,7 +17,7 @@ struct rcu_cb;
 typedef void (*rcu_fn)(struct rcu_cb *);
 
 struct rcu_cb {
-    struct list_head list;
+    struct list_node list;
     rcu_fn fn;
 
     /* TODO: as debug flags get better, move away from raw TEST_ENABLED */

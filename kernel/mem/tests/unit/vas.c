@@ -42,7 +42,7 @@ static bool arena_valid(struct vas_arena *arena, vaddr_t base, vaddr_t limit,
     vaddr_t end = base;
     struct vas_segment *prev = NULL;
     struct rbt_node *node = rbt_first(&arena->tree);
-    struct list_head *pos;
+    struct list_node *pos;
     list_for_each(pos, &arena->all_segs) {
         struct vas_segment *seg = list_entry(pos, struct vas_segment, seg_node);
         if (!seg->length || seg->start < end || seg->start >= limit ||
@@ -74,7 +74,7 @@ static bool arena_valid(struct vas_arena *arena, vaddr_t base, vaddr_t limit,
                 return false;
             *enrolled += seg->length;
         }
-        if (type != VAS_SEG_FREE && !list_empty(&seg->bin_node))
+        if (type != VAS_SEG_FREE && list_node_is_linked(&seg->bin_node))
             return false;
         prev = seg;
         node = rbt_next(node);
@@ -125,7 +125,7 @@ static bool vas_valid(struct vas *vas, size_t expected_live) {
                          &enrolled))
             return false;
         free_bytes += arena->total_free;
-        struct list_head *pos;
+        struct list_node *pos;
         list_for_each(pos, &arena->all_segs) {
             struct vas_segment *seg =
                 list_entry(pos, struct vas_segment, seg_node);

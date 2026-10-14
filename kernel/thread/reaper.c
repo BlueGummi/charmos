@@ -44,14 +44,14 @@ void reaper_thread_main(void *unused) {
             semaphore_wait(&reaper->sem);
 
         struct list_head local;
-        INIT_LIST_HEAD(&local);
+        list_head_init(&local);
 
         enum irql tlist = spin_lock_high(&reaper->list.lock);
-        list_splice_init(&reaper->list.list, &local);
+        list_head_splice_back_init(&local, &reaper->list.list);
         spin_unlock(&reaper->list.lock, tlist);
 
-        struct list_head *lh;
-        while ((lh = list_pop_front_init(&local)) != NULL) {
+        struct list_node *lh;
+        while ((lh = list_head_pop_front_init(&local)) != NULL) {
             struct thread *t = container_of(lh, struct thread, reaper_list);
 
             enforce(refcount_read(&t->refcount) == 0);

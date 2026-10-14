@@ -160,7 +160,7 @@ TEST_DEFINE_UNIT(completion, wait_timeout_standard) {
 
 TEST_DEFINE_UNIT(completion, static_init) {
     struct completion c = COMPLETION_INIT(c, COMPLETION_INIT_NORMAL);
-    TEST_ASSERT(list_empty(&c.cv.waiters.waiters));
+    TEST_ASSERT(list_head_empty(&c.cv.waiters.waiters));
     TEST_ASSERT(!completion_try_wait(&c));
     complete(&c);
     TEST_ASSERT(completion_try_wait(&c));

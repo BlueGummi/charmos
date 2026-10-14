@@ -329,7 +329,7 @@ struct usb_driver {
 };
 
 struct usb_device {
-    struct list_head hc_list;
+    struct list_node hc_list;
     atomic(enum usb_dev_status) status;
     char manufacturer[128];
     char product[128];

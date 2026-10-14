@@ -213,7 +213,7 @@ struct watchdog_percpu_response {
  * 3. Recursion discouraged
  */
 struct watchdog_callback {
-    struct list_head list;
+    struct list_node list;
     void (*fn)(struct watchdog_callback *);
     void *private;
 };

@@ -241,8 +241,8 @@ static struct thread *thread_init(struct thread *thread,
     thread_update_effective_priority(thread);
 
     climb_thread_init(thread);
-    INIT_LIST_HEAD(&thread->io_wait_tokens);
-    INIT_LIST_HEAD(&thread->thread_list);
+    list_head_init(&thread->io_wait_tokens);
+    list_node_init(&thread->thread_list);
 
     for (size_t i = 0; i < APC_TYPE_COUNT; i++)
         apc_queue_init(&thread->apc_head[i]);
@@ -250,10 +250,10 @@ static struct thread *thread_init(struct thread *thread,
     apc_queue_init(&thread->event_apcs);
     apc_queue_init(&thread->to_exec_event_apcs);
 
-    INIT_LIST_HEAD(&thread->rq_list_node);
-    INIT_LIST_HEAD(&thread->wq_list_node);
-    INIT_LIST_HEAD(&thread->rcu_list_node);
-    INIT_LIST_HEAD(&thread->reaper_list);
+    list_node_init(&thread->rq_list_node);
+    list_node_init(&thread->wq_list_node);
+    list_node_init(&thread->rcu_list_node);
+    list_node_init(&thread->reaper_list);
     rbt_init_node(&thread->rq_tree_node);
     rbt_init_node(&thread->wq_tree_node);
     crash_perthread_init(thread);
@@ -401,24 +401,24 @@ void thread_put(struct thread *t) {
 }
 
 void thread_queue_init(struct thread_queue *q) {
-    INIT_LIST_HEAD(&q->list);
+    list_head_init(&q->list);
     spinlock_init(&q->lock);
 }
 
 void thread_queue_push_back(struct thread_queue *q, struct thread *t) {
     enum irql irql = spin_lock_high(&q->lock);
-    list_add_tail(&t->wq_list_node, &q->list);
+    list_head_push_back(&q->list, &t->wq_list_node);
     spin_unlock(&q->lock, irql);
 }
 
 bool thread_queue_remove(struct thread_queue *q, struct thread *t) {
     enum irql irql = spin_lock_high(&q->lock);
-    struct list_head *pos;
+    struct list_node *pos;
 
     list_for_each(pos, &q->list) {
         struct thread *thread = thread_from_wq_list_node(pos);
         if (thread == t) {
-            list_del_init(&t->wq_list_node);
+            list_node_delete_init(&t->wq_list_node);
             spin_unlock(&q->lock, irql);
             return true;
         }
@@ -430,7 +430,7 @@ bool thread_queue_remove(struct thread_queue *q, struct thread *t) {
 
 struct thread *thread_queue_pop_front(struct thread_queue *q) {
     enum irql irql = spin_lock_high(&q->lock);
-    struct list_head *lhead = list_pop_front_init(&q->list);
+    struct list_node *lhead = list_head_pop_front_init(&q->list);
     spin_unlock(&q->lock, irql);
     if (!lhead)
         return NULL;

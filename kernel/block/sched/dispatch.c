@@ -16,7 +16,7 @@ static inline bool should_early_dispatch(struct bio_scheduler *sched) {
 static bool try_dispatch_queue_head(struct bio_scheduler *sched,
                                     struct bio_rqueue *q)
     TSA_MUST_HOLD(&sched->lock) {
-    if (list_empty(&q->list))
+    if (list_head_empty(&q->list))
         return false;
 
     struct bio_request *head =
@@ -36,16 +36,11 @@ static void dispatch_queue(struct block_device *disk, struct bio_rqueue *q) {
 
     /* Move the entire list out of the queue under lock */
     struct list_head tmp_list;
-    INIT_LIST_HEAD(&tmp_list);
-    if (!list_empty(&q->list)) {
-        tmp_list.next = q->list.next;
-        tmp_list.prev = q->list.prev;
-        tmp_list.next->prev = &tmp_list;
-        tmp_list.prev->next = &tmp_list;
-    }
+    list_head_init(&tmp_list);
+    list_head_splice_back_init(&tmp_list, &q->list);
 
     /* Reset the queue */
-    INIT_LIST_HEAD(&q->list);
+    list_head_init(&q->list);
     disk->scheduler->total_requests -= q->request_count;
     q->request_count = 0;
 
@@ -54,7 +49,7 @@ static void dispatch_queue(struct block_device *disk, struct bio_rqueue *q) {
     /* Dispatch requests from the copied list */
     struct bio_request *req, *tmp;
     list_for_each_entry_safe(req, tmp, &tmp_list, list) {
-        list_del(&req->list); /* remove from tmp_list */
+        list_node_delete(&req->list); /* remove from tmp_list */
         disk->submit_bio_async(disk, req);
     }
 }

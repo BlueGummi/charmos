@@ -28,7 +28,7 @@ void avc_link(struct vma_range *vma_range, struct anon_vma *av,
     avc->itnode.interval.high = avc_last(avc);
     anon_vma_write_lock(av);
 
-    list_add_tail(&avc->same_vma_range, &vma_range->anon_vma_chain);
+    list_head_push_back(&vma_range->anon_vma_chain, &avc->same_vma_range);
     rbit_insert(&av->tree, &avc->itnode);
     anon_vma_unlock(av);
 }
@@ -36,7 +36,7 @@ void avc_link(struct vma_range *vma_range, struct anon_vma *av,
 void avc_unlink(struct anon_vma_chain *avc) {
     struct anon_vma *av = avc->anon_vma;
     anon_vma_write_lock(av);
-    list_del(&avc->same_vma_range);
+    list_node_delete(&avc->same_vma_range);
     rbit_delete(&av->tree, &avc->itnode);
     anon_vma_unlock(av);
 }

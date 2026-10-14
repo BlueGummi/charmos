@@ -20,7 +20,7 @@ void bio_sched_enqueue_internal(struct bio_scheduler *sched,
     enum bio_request_priority prio = req->priority;
     struct bio_rqueue *q = &sched->queues[prio];
 
-    list_add_tail(&req->list, &q->list);
+    list_head_push_back(&q->list, &req->list);
 
     q->dirty = true;
     q->request_count++;
@@ -33,7 +33,7 @@ void bio_sched_dequeue_internal(struct bio_scheduler *sched,
     enum bio_request_priority prio = req->priority;
     struct bio_rqueue *q = &sched->queues[prio];
 
-    list_del_init(&req->list);
+    list_node_delete_init(&req->list);
 
     q->dirty = true;
     q->request_count--;

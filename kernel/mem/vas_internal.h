@@ -52,8 +52,8 @@ struct vas_segment {
     atomic(enum vas_segment_type) type;
     struct vas_mag_slot *mag_slot; /* Immutable while LIVE/CACHED */
     struct rbt_node node;
-    struct list_head seg_node;
-    struct list_head bin_node;
+    struct list_node seg_node;
+    struct list_node bin_node;
 };
 
 struct vas_arena {

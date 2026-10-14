@@ -550,7 +550,7 @@ void log_sites_init(void) {
 
     for (struct log_site *s = __skernel_log_sites; s < __ekernel_log_sites;
          s++) {
-        INIT_LIST_HEAD(&s->list);
+        list_node_init(&s->list);
         refcount_init(&s->refcount, 1);
         struct log_ringbuf *lrb = &s->rb;
         enforce(s->capacity);
@@ -613,7 +613,7 @@ struct log_site *log_site_create(struct log_site_options opts) {
     refcount_init(&ret->refcount, 1);
     ret->dropped = 0;
     ret->flags = opts.flags;
-    INIT_LIST_HEAD(&ret->list);
+    list_node_init(&ret->list);
     for (size_t i = 0; i < opts.capacity; i++) {
         atomic_store_release(&slots[i].seq, i);
     }

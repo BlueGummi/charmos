@@ -26,7 +26,7 @@ static void enqueue_request(struct nvme_device *dev, struct nvme_request *req) {
 
     enum irql irql = spin_lock_high(&q->lock);
 
-    list_add_tail(&req->list_node, &q->list);
+    list_head_push_back(&q->list, &req->list_node);
 
     spin_unlock(&q->lock, irql);
 
@@ -180,7 +180,7 @@ static bool rw_sync(struct block_device *disk, uint64_t lba, uint8_t *buffer,
     req.buffer              = buffer;
     req.sector_count        = count;
     req.remaining_parts     = 1;
-    INIT_LIST_HEAD(&req.list_node);
+    list_node_init(&req.list_node);
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     req.has_waiter = true;

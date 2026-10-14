@@ -331,7 +331,7 @@ struct xhci_device *xhci_device_create(void cc_mem_io *mmio) {
         (void cc_mem_io *) ((uint8_t cc_mem_io *) runtime_regs + 0x20);
 
     for (size_t i = 0; i < XHCI_REQ_LIST_MAX; i++) {
-        INIT_LIST_HEAD(&dev->requests[i]);
+        list_head_init(&dev->requests[i]);
     }
 
     dev->num_devices = 0;
@@ -340,7 +340,7 @@ struct xhci_device *xhci_device_create(void cc_mem_io *mmio) {
     dev->cap_regs    = cap;
     dev->op_regs     = op;
     dev->ports       = cap->hcs_params1 & 0xff;
-    INIT_LIST_HEAD(&dev->devices);
+    list_head_init(&dev->devices);
     semaphore_init(&dev->port_disconnect, 0, SEMAPHORE_INIT_IRQ_DISABLE);
     semaphore_init(&dev->port_connect, 0, SEMAPHORE_INIT_IRQ_DISABLE);
     semaphore_init(&dev->sem, 0, SEMAPHORE_INIT_IRQ_DISABLE);
@@ -441,7 +441,7 @@ enum usb_error xhci_port_init(struct xhci_port *p) {
     usb->driver_private = dev;
 
     refcount_init(&usb->refcount, 1);
-    INIT_LIST_HEAD(&usb->hc_list);
+    list_node_init(&usb->hc_list);
 
     struct xhci_slot *this_slot = xhci_get_slot(dev, slot_id);
     memcpy(this_slot, &temp_slot, sizeof(struct xhci_slot));
@@ -452,7 +452,7 @@ enum usb_error xhci_port_init(struct xhci_port *p) {
     this_slot->port = p;
     this_slot->udev = usb;
 
-    list_add_tail(&usb->hc_list, &dev->devices);
+    list_head_push_back(&dev->devices, &usb->hc_list);
     dev->num_devices++;
     usb->slot = this_slot;
 

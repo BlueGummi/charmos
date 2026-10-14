@@ -17,7 +17,7 @@ TEST_DEFINE_UNIT(wait_block, caller_storage_wait_any) {
     TEST_ASSERT(thread_wait_satisfy(&blocks[4],
                                     THREAD_WAKE_REASON_BLOCKING_MANUAL, NULL));
     for (size_t i = 0; i < 6; i++) {
-        TEST_ASSERT(list_empty(&headers[i].waiters));
+        TEST_ASSERT(list_head_empty(&headers[i].waiters));
         TEST_ASSERT_EQ(blocks[i].state, i == 4 ? THREAD_WAIT_BLOCK_SATISFIED
                                                : THREAD_WAIT_BLOCK_INACTIVE);
     }
@@ -36,7 +36,7 @@ TEST_DEFINE_UNIT(wait_block, io_boost_and_cancel) {
     io_wait_complete(&token);
     TEST_ASSERT_EQ(t->perceived_prio_class, THREAD_PRIO_CLASS_URGENT);
     TEST_ASSERT(io_wait_token_active(&token));
-    TEST_ASSERT(list_empty(&request.waiters));
+    TEST_ASSERT(list_head_empty(&request.waiters));
     io_wait_end(&token, IO_WAIT_END_NO_OP);
     TEST_ASSERT_EQ(t->perceived_prio_class, base);
     TEST_ASSERT(!io_wait_token_active(&token));
@@ -44,7 +44,7 @@ TEST_DEFINE_UNIT(wait_block, io_boost_and_cancel) {
     /* Submission failed before yield and cancellation must restore RUNNING */
     io_wait_begin(&token, &request);
     io_wait_end(&token, IO_WAIT_END_NO_OP);
-    TEST_ASSERT(list_empty(&request.waiters));
+    TEST_ASSERT(list_head_empty(&request.waiters));
     TEST_ASSERT_EQ(thread_get_state(t), THREAD_STATE_RUNNING);
     TEST_ASSERT_NULL(t->active_wait_blocks);
     return TEST_SUCCESS;
@@ -88,8 +88,8 @@ TEST_DEFINE_UNIT(wait_block, mt_wait_any) {
         thread_join(wakers[i]);
     TEST_ASSERT_LT(key, 2);
     TEST_ASSERT_EQ(atomic_load(&wins), 1);
-    TEST_ASSERT(list_empty(&headers[0].waiters));
-    TEST_ASSERT(list_empty(&headers[1].waiters));
+    TEST_ASSERT(list_head_empty(&headers[0].waiters));
+    TEST_ASSERT(list_head_empty(&headers[1].waiters));
     return TEST_SUCCESS;
 }
 
@@ -144,7 +144,7 @@ TEST_DEFINE_UNIT(wait_block, apc_preserves_registration) {
     apc_put(&apc);
     TEST_ASSERT(!atomic_load(&c.lost_registration));
     TEST_ASSERT_EQ(atomic_load(&c.delivered), 5);
-    TEST_ASSERT(list_empty(&c.header.waiters));
+    TEST_ASSERT(list_head_empty(&c.header.waiters));
     return TEST_SUCCESS;
 }
 
@@ -155,7 +155,7 @@ TEST_DEFINE_UNIT(wait_block, uninterruptible_latches_alert) {
     thread_wait_prepare_one(&header, &header, THREAD_WAIT_UNINTERRUPTIBLE,
                             THREAD_BLOCK_REASON_MANUAL);
     thread_alert(t);
-    bool linked = !list_empty(&header.waiters);
+    bool linked = !list_head_empty(&header.waiters);
     thread_wait_satisfy(&t->wait_blocks[0], THREAD_WAKE_REASON_SLEEP_MANUAL,
                         NULL);
     struct thread_wait_result result = thread_wait_complete();
@@ -202,8 +202,8 @@ TEST_DEFINE_UNIT(wait_block, alert_wait_any_and_single_permit) {
     struct thread_wait_result first = thread_wait_complete();
     TEST_ASSERT_EQ(first.status, THREAD_WAIT_ALERTED);
     TEST_ASSERT_EQ(first.key, THREAD_WAIT_KEY_NONE);
-    TEST_ASSERT(list_empty(&headers[0].waiters));
-    TEST_ASSERT(list_empty(&headers[1].waiters));
+    TEST_ASSERT(list_head_empty(&headers[0].waiters));
+    TEST_ASSERT(list_head_empty(&headers[1].waiters));
 
     thread_wait_prepare(objects, 2, NULL, THREAD_WAIT_INTERRUPTIBLE,
                         THREAD_BLOCK_REASON_MANUAL);
@@ -212,7 +212,7 @@ TEST_DEFINE_UNIT(wait_block, alert_wait_any_and_single_permit) {
     struct thread_wait_result second = thread_wait_complete();
     TEST_ASSERT(still_waiting); /* The two earlier alerts coalesced */
     TEST_ASSERT_EQ(second.status, THREAD_WAIT_ALERTED);
-    TEST_ASSERT(list_empty(&headers[0].waiters));
-    TEST_ASSERT(list_empty(&headers[1].waiters));
+    TEST_ASSERT(list_head_empty(&headers[0].waiters));
+    TEST_ASSERT(list_head_empty(&headers[1].waiters));
     return TEST_SUCCESS;
 }

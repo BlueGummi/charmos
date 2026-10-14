@@ -150,7 +150,7 @@ climb_pressure_scale_indirect(climb_pressure_t direct) {
 
 static size_t climb_count_handles(struct climb_thread_state *cts) {
     size_t agg = 0;
-    struct list_head *iter;
+    struct list_node *iter;
     list_for_each(iter, &cts->handles)
         agg++;
     return agg;
@@ -207,9 +207,9 @@ static void apply_handle_pressures(struct thread *t, struct climb_handle *ch) {
 
 /* This assumes that the thread is already properly locked/protected */
 static void apply_handle(struct thread *t, struct climb_handle *ch) {
-    enforce(list_empty(&ch->list));
+    enforce(!list_node_is_linked(&ch->list));
 
-    list_add_tail(&ch->list, &t->climb_state.handles);
+    list_head_push_back(&t->climb_state.handles, &ch->list);
     apply_handle_pressures(t, ch);
     struct climb_thread_state *cts = &t->climb_state;
 
@@ -262,12 +262,12 @@ static void remove_handle(struct thread *t, struct climb_handle *ch) {
     }
 
     ch->applied_pressure_internal = 0;
-    list_del_init(&ch->list);
+    list_node_delete_init(&ch->list);
 
     climb_info("Remove handle on %p (thread %p), %zu left", cts, t,
                climb_count_handles(cts));
 
-    if (list_empty(&cts->handles)) {
+    if (list_head_empty(&cts->handles)) {
         /* This thread is done, let it decay now */
         if (cts->on_climb_tree) {
             cts->pressure_periods = -1;
@@ -354,7 +354,7 @@ void climb_handle_apply_locked(struct thread *t, struct climb_handle *h) {
 
 void climb_handle_remove(struct climb_handle *h) {
     if (h->applied_pressure_internal == 0) {
-        enforce(list_empty(&h->list));
+        enforce(!list_node_is_linked(&h->list));
         return;
     }
 
@@ -366,7 +366,7 @@ void climb_handle_remove(struct climb_handle *h) {
 
 void climb_handle_remove_locked(struct climb_handle *h) {
     if (h->applied_pressure_internal == 0) {
-        enforce(list_empty(&h->list));
+        enforce(!list_node_is_linked(&h->list));
         return;
     }
 
@@ -557,7 +557,7 @@ void climb_thread_init(struct thread *t) {
     cts->boost_ewma = FX(0);
     cts->wanted_boost = 0;
     cts->pressure_periods = 0;
-    INIT_LIST_HEAD(&cts->handles);
+    list_head_init(&cts->handles);
     cts->direct_pressure = 0;
     cts->indirect_pressure = 0;
     rbt_init_node(&cts->climb_node);
@@ -568,7 +568,7 @@ void climb_thread_init(struct thread *t) {
     ch->given_by = t;
     ch->given_to = NULL;
     ch->pressure_source = NULL;
-    INIT_LIST_HEAD(&ch->list);
+    list_node_init(&ch->list);
 }
 
 void climb_post_migrate_hook(struct thread *t, size_t old_cpu, size_t new_cpu) {

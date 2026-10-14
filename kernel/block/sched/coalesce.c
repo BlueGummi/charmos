@@ -73,7 +73,7 @@ static bool check_higher_queue(struct bio_scheduler *sched,
 static bool coalesce_adjacent_queues(struct block_device *disk,
                                      struct bio_rqueue *lower,
                                      struct bio_rqueue *higher) {
-    if (list_empty(&lower->list) || list_empty(&higher->list))
+    if (list_head_empty(&lower->list) || list_head_empty(&higher->list))
         return false;
 
     if (!lower->dirty || !higher->dirty)
@@ -105,7 +105,7 @@ static bool coalesce_adjacent_queues(struct block_device *disk,
 /* Coalesce requests inside a single priority queue */
 static bool coalesce_priority_queue(struct block_device *disk,
                                     struct bio_rqueue *queue) {
-    if (list_empty(&queue->list))
+    if (list_head_empty(&queue->list))
         return false;
 
     if (!queue->dirty)

@@ -16,7 +16,7 @@ static void deliver_alert_locked(struct thread *t);
 
 void thread_wait_header_init(struct thread_wait_header *header) {
     spinlock_init(&header->lock);
-    INIT_LIST_HEAD(&header->waiters);
+    list_head_init(&header->waiters);
 }
 
 void thread_wait_init(struct thread *t) {
@@ -31,7 +31,7 @@ void thread_wait_init(struct thread *t) {
 
     for (size_t i = 0; i < THREAD_NUM_WAIT_BLOCKS; i++) {
         t->wait_blocks[i] = (struct thread_wait_block){0};
-        INIT_LIST_HEAD(&t->wait_blocks[i].object_link);
+        list_node_init(&t->wait_blocks[i].object_link);
     }
 }
 
@@ -91,7 +91,7 @@ static void prepare_wait(const struct thread_wait_object *objects, size_t count,
                                         .epoch = t->wait_epoch};
 
         enum irql hirql = spin_lock_high(&b->header->lock);
-        list_add_tail(&b->object_link, &b->header->waiters);
+        list_head_push_back(&b->header->waiters, &b->object_link);
         spin_unlock(&b->header->lock, hirql);
     }
 
@@ -129,7 +129,7 @@ static void unlink_blocks(struct thread *t, uint16_t got) {
 
         enum irql irql = spin_lock_high(&b->header->lock);
 
-        list_del_init(&b->object_link);
+        list_node_delete_init(&b->object_link);
         b->state =
             i == got ? THREAD_WAIT_BLOCK_SATISFIED : THREAD_WAIT_BLOCK_INACTIVE;
 
@@ -189,7 +189,7 @@ struct thread *thread_wait_header_satisfy(struct thread_wait_header *header,
     while (true) {
         enum irql irql = spin_lock_high(&header->lock);
 
-        if (list_empty(&header->waiters)) {
+        if (list_head_empty(&header->waiters)) {
             spin_unlock(&header->lock, irql);
             return NULL;
         }

@@ -38,7 +38,7 @@ static struct idt_ptr idtps = {0};
 static void irq_execute_vector_handlers(irq_t vector,
                                         struct irq_context *irq_ctx) {
     struct irq_desc *desc = &irq_table[vector];
-    if (!desc->present || list_empty(&irq_table[vector].actions))
+    if (!desc->present || list_head_empty(&irq_table[vector].actions))
         panic("Unhandled ISR vector: %u", vector);
 
     /* HACK: There is this specific use of smp_enable_all_ticks() in bringup
@@ -54,7 +54,7 @@ static void irq_execute_vector_handlers(irq_t vector,
     struct irq_chip *chip = desc->chip;
 
     bool handled = false;
-    struct list_head *lh;
+    struct list_node *lh;
     list_for_each(lh, &desc->actions) {
         struct irq_action *act = container_of(lh, struct irq_action, list);
         if (act->handler(act->data, vector, irq_ctx) == IRQ_HANDLED) {
@@ -185,10 +185,10 @@ void irq_register(char *name, uint8_t vector, irq_handler_t handler, void *ctx,
     struct irq_action *act = nofail_vnew(act, ALLOC_ZERO);
 
     act->handler = handler;
-    INIT_LIST_HEAD(&act->list);
+    list_node_init(&act->list);
     act->data = ctx;
 
-    list_add_tail(&act->list, &me->actions);
+    list_head_push_back(&me->actions, &act->list);
     if (!me->name)
         me->name = name;
 
@@ -252,7 +252,7 @@ int32_t irq_alloc_entry() {
 static void irq_desc_clear(struct irq_desc *desc) {
     cpu_mask_set_all(&desc->masked_cpus);
     cpu_mask_set_all(&desc->affinity);
-    INIT_LIST_HEAD(&desc->actions);
+    list_head_init(&desc->actions);
     desc->present = false;
     desc->allocated = false;
     desc->enabled = false;
@@ -272,7 +272,7 @@ void irq_free_entry(int32_t entry) {
 
     struct irq_action *iter, *tmp;
     list_for_each_entry_safe(iter, tmp, &desc->actions, list) {
-        list_del_init(&iter->list);
+        list_node_delete_init(&iter->list);
         vfree(iter);
     }
 

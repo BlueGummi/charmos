@@ -45,7 +45,7 @@ enum irq_flags {
 struct irq_action {
     irq_handler_t handler;
     void *data;
-    struct list_head list;
+    struct list_node list;
 };
 
 struct irq_chip {

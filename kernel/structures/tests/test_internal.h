@@ -18,9 +18,11 @@
 
 #include <structures/cpu_mask.h>
 #include <structures/id_space.h>
+#include <structures/list.h>
 #include <structures/mpmc_queue.h>
 #include <structures/spsc_fifo.h>
 
+TEST_GROUP_EXTERN(list);
 TEST_GROUP_EXTERN(minheap);
 TEST_GROUP_EXTERN(rbt);
 TEST_GROUP_EXTERN(rbit);

@@ -18,7 +18,7 @@ struct slab_size_constant {
     const char *name;
     size_t size;
     size_t align;
-    struct list_head list;
+    struct list_node list;
     struct {
         struct slab_elcm_candidate cand;
     } internal;
@@ -30,7 +30,7 @@ struct slab_size_constant {
         .name = #n,                                                            \
         .size = s,                                                             \
         .align = a,                                                            \
-        .list = LIST_HEAD_INIT(slab_size_constant_##n.list),                   \
+        .list = LIST_NODE_INIT(slab_size_constant_##n.list),                   \
         .internal = {{0}},                                                     \
     }
 

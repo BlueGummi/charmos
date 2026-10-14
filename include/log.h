@@ -121,7 +121,7 @@ struct log_site_options {
 };
 
 struct log_site {
-    struct list_head list;
+    struct list_node list;
     char *name;
     struct log_ringbuf rb;
     uint32_t enabled_mask; /* Governs what actually goes in the site */

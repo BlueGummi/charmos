@@ -57,7 +57,7 @@ struct folio {
     mapcount_t mapcount;
     void *mapping; /* tagged, anon_vma or file_vma_range */
     pgoff_t index;
-    struct list_head lru; /* reclaim linkage */
+    struct list_node lru; /* reclaim linkage */
 };
 uint32_t page_get_folio_index(struct page *p);
 bool page_is_folio_head(struct page *p);

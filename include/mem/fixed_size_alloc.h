@@ -26,7 +26,7 @@
  * empty zone. the fixed size node trails to link it all up
  */
 struct fixed_size_node {
-    struct list_head list_node;
+    struct list_node list_node;
 };
 static_assert(offsetof(struct fixed_size_node, list_node) == 0);
 
@@ -34,7 +34,7 @@ struct fixed_size_page_hdr {
     domain_id_t domain; /* DOMAIN_ID_NONE means it isn't perdomain */
     size_t free_count;
     size_t total;
-    struct list_head page_list;
+    struct list_node page_list;
 };
 
 struct fixed_size_range_attributes {

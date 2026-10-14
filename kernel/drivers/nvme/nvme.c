@@ -132,9 +132,9 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
         nvme_alloc_io_queues(nvme, i);
     }
 
-    INIT_LIST_HEAD(&nvme->finished_requests.list);
-    INIT_LIST_HEAD(&nvme->waiting_requests.list);
-    INIT_LIST_HEAD(&nvme->work.list_node);
+    list_head_init(&nvme->finished_requests.list);
+    list_head_init(&nvme->waiting_requests.list);
+    list_node_init(&nvme->work.list_node);
     nvme->work.args = WORK_ARGS(nvme, NULL);
     nvme->work.func = nvme_work;
     spinlock_init(&nvme->waiting_requests.lock);

@@ -131,7 +131,7 @@ struct device {
     struct device *parent;
     struct list_head children;  /* Children list */
     struct rbt_node tree_node;  /* global device tree indexing  */
-    struct list_head list_node; /* List node to attach to parent 'children' */
+    struct list_node list_node; /* List node to attach to parent 'children' */
 
     struct device_ops *ops;
     struct device_driver *driver;

@@ -27,7 +27,7 @@ void vma_range_init(struct vma_range *vma_range, struct mm *mm, vaddr_t start,
     vma_range->prot = prot;
     vma_range->anon_vma = NULL;
     vma_range->mm = mm;
-    INIT_LIST_HEAD(&vma_range->anon_vma_chain);
+    list_head_init(&vma_range->anon_vma_chain);
 }
 
 struct vma_range *vma_range_alloc(struct mm *mm, vaddr_t start, vaddr_t end,
@@ -41,7 +41,7 @@ struct vma_range *vma_range_alloc(struct mm *mm, vaddr_t start, vaddr_t end,
 }
 
 void vma_range_free(struct vma_range *vma_range) {
-    enforce(list_empty(&vma_range->anon_vma_chain));
+    enforce(list_head_empty(&vma_range->anon_vma_chain));
     FSR_PERDOMAIN_FREE(vma_range, vma_range);
 }
 

@@ -9,17 +9,22 @@
 #include <structures/list.h>
 #include <sync/rcu.h>
 
-static inline void INIT_LIST_HEAD_RCU(struct list_head *list) {
-    ca_write_once(list->next, list);
-    ca_write_once(list->prev, list);
+static inline void list_node_init_rcu(struct list_node *n) {
+    ca_write_once(n->next, n);
+    ca_write_once(n->prev, n);
 }
 
-#define list_next_rcu(list) (*((struct list_head **) &(list)->next))
-#define list_bidir_prev_rcu(list) (*((struct list_head **) &(list)->prev))
-#define list_tail_rcu(head) (*((struct list_head **) &(head)->prev))
+static inline void list_head_init_rcu(struct list_head *h) {
+    list_node_init_rcu(&h->root);
+}
 
-static inline void __list_add_rcu(struct list_head *new, struct list_head *prev,
-                                  struct list_head *next) {
+#define list_next_rcu(list) (*((struct list_node **) &(list)->next))
+#define list_bidir_prev_rcu(list) (*((struct list_node **) &(list)->prev))
+#define list_tail_rcu(head) (*((struct list_node **) &(list_root(head))->prev))
+
+static inline void list_node_link_between_rcu(struct list_node *new,
+                                              struct list_node *prev,
+                                              struct list_node *next) {
     list_add_check(new, prev, next);
 
     new->next = next;
@@ -28,30 +33,33 @@ static inline void __list_add_rcu(struct list_head *new, struct list_head *prev,
     next->prev = new;
 }
 
-static inline void list_add_rcu(struct list_head *new, struct list_head *head) {
-    __list_add_rcu(new, head, head->next);
+static inline void list_head_push_front_rcu(struct list_head *h,
+                                            struct list_node *n) {
+    list_node_link_between_rcu(n, &h->root, h->root.next);
 }
 
-static inline void list_add_tail_rcu(struct list_head *new,
-                                     struct list_head *head) {
-    __list_add_rcu(new, head->prev, head);
+static inline void list_head_push_back_rcu(struct list_head *h,
+                                           struct list_node *n) {
+    list_node_link_between_rcu(n, h->root.prev, &h->root);
 }
 
-static inline void list_del_rcu(struct list_head *entry) {
-    list_del_check(entry);
+/* TODO: Consider poisoning (not just NULL) and also maybe using
+ * an address_space for RCU lists */
+static inline void list_node_delete_rcu(struct list_node *n) {
+    list_del_check(n);
 
-    __list_del(entry->prev, entry->next);
-    entry->prev = NULL;
+    list_node_unlink_between(n->prev, n->next);
+    n->prev = NULL;
 }
 
-static inline void list_bidir_del_rcu(struct list_head *entry) {
-    list_del_check(entry);
+static inline void list_node_delete_bidir_rcu(struct list_node *n) {
+    list_del_check(n);
 
-    __list_del(entry->prev, entry->next);
+    list_node_unlink_between(n->prev, n->next);
 }
 
-static inline void list_replace_rcu(struct list_head *old,
-                                    struct list_head *new) {
+static inline void list_node_replace_rcu(struct list_node *old,
+                                         struct list_node *new) {
     new->next = old->next;
     new->prev = old->prev;
     rcu_assign_pointer(list_next_rcu(new->prev), new);
@@ -59,13 +67,13 @@ static inline void list_replace_rcu(struct list_head *old,
     old->prev = NULL;
 }
 
-static inline void __list_splice_rcu(const struct list_head *list,
-                                     struct list_head *prev,
-                                     struct list_head *next) {
+static inline void list_splice_between_rcu(const struct list_node *list,
+                                           struct list_node *prev,
+                                           struct list_node *next) {
     list_splice_check(list, prev, next);
 
-    struct list_head *first = list->next;
-    struct list_head *last = list->prev;
+    struct list_node *first = list->next;
+    struct list_node *last = list->prev;
 
     last->next = next;
     first->prev = prev;
@@ -73,20 +81,21 @@ static inline void __list_splice_rcu(const struct list_head *list,
     rcu_assign_pointer(list_next_rcu(prev), first);
 }
 
-static inline void list_splice_rcu(struct list_head *list,
-                                   struct list_head *head) {
-    if (!list_empty(list))
-        __list_splice_rcu(list, head, head->next);
+/* copy src onto the front of dst */
+static inline void list_head_splice_front_rcu(struct list_head *dst,
+                                              struct list_head *src) {
+    if (!list_head_empty(src))
+        list_splice_between_rcu(&src->root, &dst->root, dst->root.next);
 }
 
-static inline void __list_splice_init_rcu(struct list_head *list,
-                                          struct list_head *prev,
-                                          struct list_head *next,
-                                          void (*sync)(void)) {
-    struct list_head *first = list->next;
-    struct list_head *last = list->prev;
+static inline void list_splice_between_init_rcu(struct list_node *list,
+                                                struct list_node *prev,
+                                                struct list_node *next,
+                                                void (*sync)(void)) {
+    struct list_node *first = list->next;
+    struct list_node *last = list->prev;
 
-    INIT_LIST_HEAD_RCU(list);
+    list_node_init_rcu(list);
 
     if (sync)
         sync();
@@ -97,18 +106,20 @@ static inline void __list_splice_init_rcu(struct list_head *list,
     next->prev = last;
 }
 
-static inline void list_splice_init_rcu(struct list_head *list,
-                                        struct list_head *head,
-                                        void (*sync)(void)) {
-    if (!list_empty(list))
-        __list_splice_init_rcu(list, head, head->next, sync);
+static inline void list_head_splice_front_init_rcu(struct list_head *dst,
+                                                   struct list_head *src,
+                                                   void (*sync)(void)) {
+    if (!list_head_empty(src))
+        list_splice_between_init_rcu(&src->root, &dst->root, dst->root.next,
+                                     sync);
 }
 
-static inline void list_splice_tail_init_rcu(struct list_head *list,
-                                             struct list_head *head,
-                                             void (*sync)(void)) {
-    if (!list_empty(list))
-        __list_splice_init_rcu(list, head->prev, head, sync);
+static inline void list_head_splice_back_init_rcu(struct list_head *dst,
+                                                  struct list_head *src,
+                                                  void (*sync)(void)) {
+    if (!list_head_empty(src))
+        list_splice_between_init_rcu(&src->root, dst->root.prev, &dst->root,
+                                     sync);
 }
 
 #define list_entry_rcu(ptr, type, member)                                      \
@@ -116,35 +127,35 @@ static inline void list_splice_tail_init_rcu(struct list_head *list,
 
 #define list_first_or_null_rcu(ptr, type, member)                              \
     ({                                                                         \
-        struct list_head *__ptr = (ptr);                                       \
-        struct list_head *__next = rcu_dereference(__ptr->next);               \
+        __auto_type __ptr = list_root(ptr);                                    \
+        struct list_node *__next = rcu_dereference(__ptr->next);               \
         cc_likely(__ptr != __next) ? list_entry(__next, type, member) : NULL;  \
     })
 
 #define list_next_or_null_rcu(head, ptr, type, member)                         \
     ({                                                                         \
-        struct list_head *__head = (head);                                     \
-        struct list_head *__ptr = (ptr);                                       \
-        struct list_head *__next = rcu_dereference(__ptr->next);               \
+        __auto_type __head = list_root(head);                                  \
+        struct list_node *__ptr = (ptr);                                       \
+        struct list_node *__next = rcu_dereference(__ptr->next);               \
         cc_likely(__next != __head) ? list_entry(__next, type, member) : NULL; \
     })
 
 #define list_for_each_rcu(pos, head)                                           \
-    for (pos = rcu_dereference((head)->next); pos != (head);                   \
+    for (pos = rcu_dereference(list_root(head)->next); pos != list_root(head); \
          pos = rcu_dereference(pos->next))
 
 #define list_for_each_entry_rcu(pos, head, member)                             \
-    for (pos = list_entry_rcu((head)->next, typeof(*pos), member);             \
-         &pos->member != (head);                                               \
+    for (pos = list_entry_rcu(list_root(head)->next, typeof(*pos), member);    \
+         &pos->member != list_root(head);                                      \
          pos = list_entry_rcu(pos->member.next, typeof(*pos), member))
 
 #define list_for_each_entry_continue_rcu(pos, head, member)                    \
     for (pos = list_entry_rcu(pos->member.next, typeof(*pos), member);         \
-         &pos->member != (head);                                               \
+         &pos->member != list_root(head);                                      \
          pos = list_entry_rcu(pos->member.next, typeof(*pos), member))
 
 #define list_for_each_entry_from_rcu(pos, head, member)                        \
-    for (; &pos->member != (head);                                             \
+    for (; &pos->member != list_root(head);                                    \
          pos = list_entry_rcu(pos->member.next, typeof(*pos), member))
 
 #define hlist_first_rcu(head) (*((struct hlist_node **) &(head)->first))
@@ -154,7 +165,7 @@ static inline void list_splice_tail_init_rcu(struct list_head *list,
 #define hlist_entry_rcu(ptr, type, member)                                     \
     container_of(rcu_dereference(ptr), type, member)
 
-static inline void __hlist_del(struct hlist_node *n) {
+static inline void hlist_node_unlink(struct hlist_node *n) {
     struct hlist_node *next = n->next;
     struct hlist_node **pprev = n->pprev;
 
@@ -164,13 +175,13 @@ static inline void __hlist_del(struct hlist_node *n) {
 }
 
 static inline void hlist_del_rcu(struct hlist_node *n) {
-    __hlist_del(n);
+    hlist_node_unlink(n);
     n->pprev = NULL;
 }
 
 static inline void hlist_del_init_rcu(struct hlist_node *n) {
     if (!hlist_unhashed(n)) {
-        __hlist_del(n);
+        hlist_node_unlink(n);
         ca_write_once(n->pprev, NULL);
     }
 }
@@ -244,7 +255,7 @@ static inline void hlist_add_behind_rcu(struct hlist_node *n,
         n->next->pprev = &n->next;
 }
 
-#define __hlist_for_each_rcu(pos, head)                                        \
+#define hlist_for_each_node_rcu(pos, head)                                     \
     for (pos = rcu_dereference(hlist_first_rcu(head)); pos;                    \
          pos = rcu_dereference(hlist_next_rcu(pos)))
 

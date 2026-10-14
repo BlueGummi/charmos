@@ -44,29 +44,29 @@ static inline void locked_list_unlock(struct locked_list *ll, enum irql irql)
     locked_list_unlock(ll, __macro_irql);
 
 static inline bool locked_list_empty(struct locked_list *ll) {
-    LOCKED_LIST_DO(ll, bool empty = list_empty(&ll->list));
+    LOCKED_LIST_DO(ll, bool empty = list_head_empty(&ll->list));
     return empty;
 }
 
 static inline void locked_list_add(struct locked_list *ll,
-                                   struct list_head *lh) {
-    LOCKED_LIST_DO(ll, list_add(lh, &ll->list); ll->num_elems++;);
+                                   struct list_node *lh) {
+    LOCKED_LIST_DO(ll, list_head_push_front(&ll->list, lh); ll->num_elems++;);
 }
 
 static inline void locked_list_del(struct locked_list *ll,
-                                   struct list_head *lh) {
-    LOCKED_LIST_DO(ll, list_del_init(lh); ll->num_elems--;);
+                                   struct list_node *lh) {
+    LOCKED_LIST_DO(ll, list_node_delete_init(lh); ll->num_elems--;);
 }
 
 static inline void locked_list_del_locked(struct locked_list *ll,
-                                          struct list_head *lh) {
+                                          struct list_node *lh) {
     enforce(spinlock_locked(&ll->lock));
-    list_del_init(lh);
+    list_node_delete_init(lh);
     ll->num_elems--;
 }
 
-static inline struct list_head *locked_list_pop_front(struct locked_list *ll) {
-    LOCKED_LIST_DO(ll, struct list_head *ret = list_pop_front(&ll->list));
+static inline struct list_node *locked_list_pop_front(struct locked_list *ll) {
+    LOCKED_LIST_DO(ll, struct list_node *ret = list_head_pop_front(&ll->list));
     return ret;
 }
 
@@ -76,7 +76,7 @@ static inline size_t locked_list_num_elems(struct locked_list *ll) {
 }
 
 static inline void locked_list_init(struct locked_list *ll, bool irq_disable) {
-    INIT_LIST_HEAD(&ll->list);
+    list_head_init(&ll->list);
     spinlock_init(&ll->lock);
     ll->num_elems = 0;
     ll->lock_high = irq_disable;

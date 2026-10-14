@@ -29,7 +29,7 @@ void scheduler_add_thread_locked(struct scheduler *sched, struct thread *task) {
         enqueue_to_tree(sched, task);
     } else {
         struct list_head *q = scheduler_get_this_thread_queue(sched, prio);
-        list_add_tail(&task->rq_list_node, q);
+        list_head_push_back(q, &task->rq_list_node);
     }
 
     thread_set_runqueue(task, sched);
@@ -55,7 +55,7 @@ void scheduler_remove_thread_locked(struct scheduler *sched, struct thread *t) {
     if (t->queued_prio_class == THREAD_PRIO_CLASS_TIMESHARE) {
         dequeue_from_tree(sched, t);
     } else {
-        list_del_init(&t->rq_list_node);
+        list_node_delete_init(&t->rq_list_node);
     }
 
     scheduler_decrement_thread_count(sched, t);

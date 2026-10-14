@@ -61,14 +61,14 @@ static bool ts_busy(struct daemon *d) {
 static void daemon_list_add(struct daemon *daemon,
                             struct daemon_thread *thread) {
     enum irql irql = spin_lock(&daemon->lock);
-    list_add(&thread->list_node, &daemon->timesharing_threads);
+    list_head_push_front(&daemon->timesharing_threads, &thread->list_node);
     spin_unlock(&daemon->lock, irql);
 }
 
 static void daemon_list_del(struct daemon *daemon,
                             struct daemon_thread *thread) {
     enum irql irql = spin_lock(&daemon->lock);
-    list_del_init(&thread->list_node);
+    list_node_delete_init(&thread->list_node);
     spin_unlock(&daemon->lock, irql);
 }
 
@@ -162,7 +162,7 @@ struct daemon_thread *daemon_thread_create(struct daemon *daemon) {
         return NULL;
 
     thread->daemon = daemon;
-    INIT_LIST_HEAD(&thread->list_node);
+    list_node_init(&thread->list_node);
 
     struct thread *t = thread_create(
         ("daemon_%s_thread", daemon->name ? daemon->name : "unnamed"),
@@ -260,7 +260,7 @@ struct daemon *daemon_create_full(struct daemon_attributes *attrs,
     semaphore_init(&daemon->bg_sem, 0, SEMAPHORE_INIT_NORMAL);
     semaphore_init(&daemon->ts_sem, 0, SEMAPHORE_INIT_NORMAL);
 
-    INIT_LIST_HEAD(&daemon->timesharing_threads);
+    list_head_init(&daemon->timesharing_threads);
     daemon->timesharing_work = timesharing_work;
     daemon->background_work = background_work;
 

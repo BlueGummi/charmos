@@ -23,7 +23,7 @@ struct work {
     work_function func;
     struct work_args args;
 
-    struct list_head list_node;
+    struct list_node list_node;
 
     atomic_bool enqueued;
     atomic_bool active;
@@ -62,7 +62,7 @@ struct worker {
 
     enum worker_next_action next_action;
 
-    struct list_head list_node;
+    struct list_node list_node;
 };
 
 /* TODO: Get in profiling.h and put these under there */

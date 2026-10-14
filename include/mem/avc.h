@@ -10,7 +10,7 @@
 struct anon_vma_chain {
     struct vma_range *vma_range;
     struct anon_vma *anon_vma;
-    struct list_head same_vma_range; /* on vma_range->anon_vma_chain */
+    struct list_node same_vma_range; /* on vma_range->anon_vma_chain */
     struct rbit_node itnode;         /* in anon_vma->tree      */
 };
 

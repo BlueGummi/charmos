@@ -239,7 +239,7 @@ struct slab {
 
     /* Sorted by gc_enqueue_time_ms */
     struct rbt_node rb;
-    struct list_head list;
+    struct list_node list;
 
     time_ms_t gc_enqueue_time_ms; /* When were we put on the GC list? */
 
@@ -303,7 +303,7 @@ enum slab_chunk_state : uintptr_t {
 };
 
 struct slab_chunk {
-    struct list_head list; /* Either on: free list, partial list, used list */
+    struct list_node list; /* Either on: free list, partial list, used list */
     /* Chunk allocator that owns this */
     struct slab_chunks *owner;
     uintptr_t base_addr : 64 - PAGE_4K_SHIFT;
@@ -702,7 +702,7 @@ static inline void slab_list_del(struct slab *slab) {
     }
 
     enum slab_state state = slab->state;
-    list_del_init(&slab->list);
+    list_node_delete_init(&slab->list);
 
     if (state != SLAB_IN_GC) {
         if (state == SLAB_FREE)
@@ -717,7 +717,7 @@ static inline void slab_list_add(struct slab_cache *cache, struct slab *slab) {
     enum slab_state state = slab->state;
     enforce(state < SLAB_STANDARD_STATE_COUNT);
     slab->parent_cache = cache;
-    list_add_tail(&slab->list, &cache->slabs[state]);
+    list_head_push_back(&cache->slabs[state], &slab->list);
 
     if (state == SLAB_FREE)
         slab_gc_update_ewma(cache);

@@ -65,7 +65,7 @@ struct bio_request {
     void *driver_private;
     void *driver_private2;
 
-    struct list_head list;
+    struct list_node list;
 
     /* everything below this is internally used in scheduler */
 

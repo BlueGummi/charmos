@@ -41,8 +41,8 @@ struct lock_chk_node {
 };
 
 struct lock_chk_edge {
-    struct list_head from_entry;
-    struct list_head to_entry;
+    struct list_node from_entry;
+    struct list_node to_entry;
     struct lock_chk_node *from;
     struct lock_chk_node *to;
     const struct lock_chk_site *first_site;

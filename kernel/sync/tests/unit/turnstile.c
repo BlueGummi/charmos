@@ -15,8 +15,8 @@ TEST_DEFINE_UNIT(turnstile, hash_and_init) {
     TEST_ASSERT_EQ(ts.state, TURNSTILE_STATE_UNUSED);
     TEST_ASSERT_EQ(ts.waiters, 0);
     TEST_ASSERT_NULL(ts.owner);
-    TEST_ASSERT(list_empty(&ts.hash_list));
-    TEST_ASSERT(list_empty(&ts.freelist));
+    TEST_ASSERT(!list_node_is_linked(&ts.hash_list));
+    TEST_ASSERT(list_head_empty(&ts.freelist));
 
     return TEST_SUCCESS;
 }

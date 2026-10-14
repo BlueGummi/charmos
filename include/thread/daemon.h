@@ -19,7 +19,7 @@ enum daemon_thread_command {
 };
 
 struct daemon_thread {
-    struct list_head list_node;
+    struct list_node list_node;
     bool background;
     struct thread *thread;
     struct daemon *daemon; /* What daemon are we attached to? */

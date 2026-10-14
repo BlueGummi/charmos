@@ -147,7 +147,7 @@ static void rcu_unregister_reader(struct thread *t) TSA_NO_ANALYSIS {
     if (leaf) {
         enum irql irql = spin_lock_high(&leaf->lock);
 
-        list_del_init(&t->rcu_list_node);
+        list_node_delete_init(&t->rcu_list_node);
         t->rcu_leaf = NULL;
 
         uint64_t bseq = t->rcu_blocked_seq;
@@ -199,11 +199,6 @@ void rcu_note_context_switch(struct thread *outgoing) TSA_NO_ANALYSIS {
 
     enum irql irql = spin_lock_high(&leaf->lock);
 
-    /* Registration uses the leaf's tracked seq, NOT gp_seq_seen
-     *
-     * Grace period starts initialize leaves before publishing the
-     * sequence, and readers that get switched out in the window
-     * come before the new GP, although this CPU hasn't seen the publish */
     uint64_t lseq = leaf->gp_seq;
     bool leaf_active = leaf->completed_seq != lseq;
 
@@ -211,7 +206,7 @@ void rcu_note_context_switch(struct thread *outgoing) TSA_NO_ANALYSIS {
         !outgoing->rcu_leaf) {
         outgoing->rcu_leaf = leaf;
         outgoing->rcu_blocked_seq = 0;
-        list_add_tail(&outgoing->rcu_list_node, &leaf->blocked);
+        list_head_push_back(&leaf->blocked, &outgoing->rcu_list_node);
 
         uint64_t rseq = outgoing->rcu_read_seq;
         if (leaf_active && rseq < lseq) {
@@ -290,7 +285,7 @@ void rcu_defer(struct rcu_cb *cb, rcu_fn func) {
     cb->gen_when_called = 0;
 #endif
 
-    INIT_LIST_HEAD(&cb->list);
+    list_node_init(&cb->list);
 
     /* Pin + disable interrupts for queue selection */
     enum irql outer = irql_raise(IRQL_HIGH_LEVEL);
@@ -310,7 +305,7 @@ void rcu_defer(struct rcu_cb *cb, rcu_fn func) {
     struct rcu_cpu *q = &rcu.cpus[smp_id(TOPC_IRQL)];
 
     enum irql irql = spin_lock_high(&q->lock);
-    list_add_tail(&cb->list, &q->list);
+    list_head_push_back(&q->list, &cb->list);
     spin_unlock(&q->lock, irql);
 
     irql_lower(outer);
@@ -323,7 +318,7 @@ static void rcu_detach_callbacks(struct list_head *batch) {
         struct rcu_cpu *q = &rcu.cpus[cpu];
 
         enum irql irql = spin_lock_high(&q->lock);
-        list_splice_tail_init(&q->list, batch);
+        list_head_splice_back_init(batch, &q->list);
         spin_unlock(&q->lock, irql);
     }
 }
@@ -333,7 +328,7 @@ static bool rcu_callbacks_pending(void) {
         struct rcu_cpu *q = &rcu.cpus[cpu];
 
         enum irql irql = spin_lock_high(&q->lock);
-        bool empty = list_empty(&q->list);
+        bool empty = list_head_empty(&q->list);
         spin_unlock(&q->lock, irql);
 
         if (!empty)
@@ -352,7 +347,7 @@ static bool rcu_work_pending(void) {
 static void rcu_run_batch(struct list_head *batch, uint64_t seq) {
     struct rcu_cb *cb, *tmp;
     list_for_each_entry_safe(cb, tmp, batch, list) {
-        list_del_init(&cb->list);
+        list_node_delete_init(&cb->list);
 
 #ifdef TEST_ENABLED
         cb->gen_when_called = (size_t) seq;
@@ -567,7 +562,7 @@ static void rcu_gp_worker(void *unused_arg) {
             continue;
 
         struct list_head batch;
-        INIT_LIST_HEAD(&batch);
+        list_head_init(&batch);
 
         uint64_t seq = rcu_gp_start(&batch);
         rcu_gp_wait(seq);
@@ -647,7 +642,7 @@ static void rcu_build_tree(void) {
             if (level == 0) {
                 node->is_leaf = true;
                 node->cpu_base = j * RCU_FANOUT;
-                INIT_LIST_HEAD(&node->blocked);
+                list_head_init(&node->blocked);
                 owned = global.core_count - node->cpu_base;
             } else {
                 node->is_leaf = false;
@@ -681,7 +676,7 @@ void rcu_init(void) {
     rcu.cpus = nofail_vnews(rcu.cpus, global.core_count, ALLOC_ZERO);
     for (cpu_id_t cpu = 0; cpu < global.core_count; cpu++) {
         spinlock_init(&rcu.cpus[cpu].lock);
-        INIT_LIST_HEAD(&rcu.cpus[cpu].list);
+        list_head_init(&rcu.cpus[cpu].list);
         atomic_store_rlx(&rcu.cpus[cpu].reported_seq, 0);
     }
 

@@ -932,17 +932,17 @@ void crash_facilities_init(void) {
 
 void crash_perthread_init(struct thread *t) {
     struct crash_perthread *pt = &t->crash_data;
-    INIT_LIST_HEAD(&pt->crash_hooks);
+    list_head_init(&pt->crash_hooks);
     pt->in_hook = false;
-    INIT_LIST_HEAD(&pt->unwind.free_list);
-    INIT_LIST_HEAD(&pt->unwind.in_use);
+    list_head_init(&pt->unwind.free_list);
+    list_head_init(&pt->unwind.in_use);
     for (int i = 0; i < CRASH_UNWIND_NODES; i++)
-        list_add_tail(&pt->unwind.nodes[i].list, &pt->unwind.free_list);
+        list_head_push_back(&pt->unwind.free_list, &pt->unwind.nodes[i].list);
 }
 
 static struct crash_unwind_node *
 unwind_node_alloc(struct thread *t, enum crash_unwind_type type) {
-    struct list_head *n = list_pop_tail(&t->crash_data.unwind.free_list);
+    struct list_node *n = list_head_pop_back(&t->crash_data.unwind.free_list);
     if (!n)
         panic("ran out of nodes");
 
@@ -956,7 +956,7 @@ unwind_node_alloc(struct thread *t, enum crash_unwind_type type) {
 static void unwind_node_free(struct thread *t, struct crash_unwind_node *n) {
     n->type = CRASH_UNWIND_NONE;
     n->data.raw = 0;
-    list_add_tail(&n->list, &t->crash_data.unwind.free_list);
+    list_head_push_back(&t->crash_data.unwind.free_list, &n->list);
 }
 
 /* Small optimization here: it doesn't matter if we go backwards or
@@ -977,13 +977,13 @@ static void crash_unwind_node_add(struct crash_unwind_node_data *data,
 
         n = unwind_node_alloc(t, type);
         n->data.rcu_lock_times = 1;
-        list_add_tail(&n->list, &t->crash_data.unwind.in_use);
+        list_head_push_back(&t->crash_data.unwind.in_use, &n->list);
         return;
     }
 
     struct crash_unwind_node *node = unwind_node_alloc(t, type);
     node->data = *data;
-    list_add_tail(&node->list, &t->crash_data.unwind.in_use);
+    list_head_push_back(&t->crash_data.unwind.in_use, &node->list);
 }
 
 static void crash_unwind_node_remove(struct crash_unwind_node_data *data,
@@ -997,7 +997,7 @@ static void crash_unwind_node_remove(struct crash_unwind_node_data *data,
         list_for_each_entry_rev(n, &t->crash_data.unwind.in_use, list) {
             if (n->type == type) {
                 if (n->data.rcu_lock_times == 1) {
-                    list_del(&n->list);
+                    list_node_delete(&n->list);
                     unwind_node_free(t, n);
                 } else {
                     n->data.rcu_lock_times--;
@@ -1013,7 +1013,7 @@ static void crash_unwind_node_remove(struct crash_unwind_node_data *data,
 
     list_for_each_entry_rev(iter, &t->crash_data.unwind.in_use, list) {
         if (iter->data.raw == data->raw && iter->type == type) {
-            list_del(&iter->list);
+            list_node_delete(&iter->list);
             unwind_node_free(t, iter);
             found = true;
             break;
@@ -1078,7 +1078,7 @@ void crash_unwind(void) TSA_NO_ANALYSIS {
         thread_warn("unwinding %s (%p)", crash_unwind_type_to_str(cun->type),
                     cun->data.ptr);
         unwind_cbs[cun->type](&cun->data);
-        list_del(&cun->list);
+        list_node_delete(&cun->list);
         unwind_node_free(t, cun);
     }
 

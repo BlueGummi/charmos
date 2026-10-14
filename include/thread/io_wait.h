@@ -4,7 +4,7 @@
 
 struct io_wait_token {
     struct thread_wait_block block;
-    struct list_head list;
+    struct list_node list;
     bool active;
 };
 

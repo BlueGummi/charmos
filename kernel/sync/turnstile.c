@@ -53,7 +53,7 @@ void turnstiles_init(void) {
     for (size_t i = 0; i < TURNSTILE_HASH_SIZE; i++) {
         spinlock_init_chk(&global.turnstiles->heads[i].lock,
                           LOCK_CHK_CLASS(turnstile_chain), LOCK_CHKD_FULL);
-        INIT_LIST_HEAD(&global.turnstiles->heads[i].list);
+        list_head_init(&global.turnstiles->heads[i].list);
     }
 }
 
@@ -116,8 +116,8 @@ struct turnstile *turnstile_init(struct turnstile *ts) {
              turnstile_thread_cmp);
     rbt_init(&ts->queues[TURNSTILE_WRITER_QUEUE], turnstile_thread_get_data,
              turnstile_thread_cmp);
-    INIT_LIST_HEAD(&ts->freelist);
-    INIT_LIST_HEAD(&ts->hash_list);
+    list_head_init(&ts->freelist);
+    list_node_init(&ts->hash_list);
 
     return ts;
 }
@@ -142,12 +142,12 @@ static inline struct turnstile_hash_chain *turnstile_chain_for(void *obj) {
 static void turnstile_insert_to_freelist(struct turnstile *parent,
                                          struct turnstile *child) {
     SPINLOCK_ASSERT_HELD(&turnstile_chain_for(parent->lock_obj)->lock);
-    list_add_tail(&child->freelist, &parent->freelist);
+    list_head_push_back(&parent->freelist, &child->freelist_node);
     child->state = TURNSTILE_STATE_IN_FREE_LIST;
 }
 
 static struct turnstile *turnstile_freelist_pop(struct turnstile *ts) {
-    struct list_head *lh = list_pop_front_init(&ts->freelist);
+    struct list_node *lh = list_head_pop_front_init(&ts->freelist);
     enforce(lh); /* we are not to call this if the freelist is empty */
     struct turnstile *ret = turnstile_from_freelist(lh);
     ret->state = TURNSTILE_STATE_UNUSED;
@@ -157,7 +157,7 @@ static struct turnstile *turnstile_freelist_pop(struct turnstile *ts) {
 static void turnstile_insert(struct turnstile_hash_chain *chain,
                              struct turnstile *ts, void *lock_obj) {
     SPINLOCK_ASSERT_HELD(&chain->lock);
-    list_add_tail(&ts->hash_list, &chain->list);
+    list_head_push_back(&chain->list, &ts->hash_list);
     ts->state = TURNSTILE_STATE_IN_HASH_TABLE;
     ts->lock_obj = lock_obj;
 }
@@ -165,7 +165,7 @@ static void turnstile_insert(struct turnstile_hash_chain *chain,
 static void turnstile_remove(struct turnstile_hash_chain *chain,
                              struct turnstile *ts) {
     SPINLOCK_ASSERT_HELD(&chain->lock);
-    list_del_init(&ts->hash_list);
+    list_node_delete_init(&ts->hash_list);
     ts->state = TURNSTILE_STATE_UNUSED;
     ts->lock_obj = NULL;
 }
@@ -217,7 +217,7 @@ static void turnstile_requeue_waiter(struct turnstile *ts,
 
 static struct turnstile *turnstile_lookup_internal(void *obj) {
     struct turnstile_hash_chain *chain = turnstile_chain_for(obj);
-    struct list_head *pos;
+    struct list_node *pos;
 
     list_for_each(pos, &chain->list) {
         struct turnstile *ts = turnstile_from_hash_list_node(pos);
@@ -258,11 +258,11 @@ struct thread *turnstile_dequeue_first(struct turnstile *ts, size_t queue) {
     struct turnstile *got = ts;
     if (ts->waiters == 1) { /* last waiter, take the turnstile with you! */
         /* you're taking the turnstile */
-        enforce(list_empty(&ts->freelist));
+        enforce(list_head_empty(&ts->freelist));
         turnstile_remove(chain, ts);
     } else {
         /* not the last waiter, take one from the freelist */
-        enforce(!list_empty(&ts->freelist));
+        enforce(!list_head_empty(&ts->freelist));
         got = enforce(turnstile_freelist_pop(ts));
     }
 

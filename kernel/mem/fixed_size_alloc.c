@@ -44,10 +44,10 @@ static void fixed_size_drop_page(struct fixed_size_range *fsr,
         if (fsr->attrs.deinit_obj)
             fsr->attrs.deinit_obj(obj);
 
-        list_del_init(&fsn->list_node);
+        list_node_delete_init(&fsn->list_node);
     }
 
-    list_del(&hdr->page_list);
+    list_node_delete(&hdr->page_list);
     fsr->empty_pages--;
     pmm_free_page(hhdm_vaddr_to_paddr((uintptr_t) hdr));
 }
@@ -63,16 +63,16 @@ static bool fixed_size_refill(struct fixed_size_range *fsr) {
     struct fixed_size_page_hdr *hdr = (struct fixed_size_page_hdr *) virt;
     hdr->total = fixed_size_per_page(fsr);
     hdr->free_count = fixed_size_per_page(fsr);
-    INIT_LIST_HEAD(&hdr->page_list);
-    list_add_tail(&hdr->page_list, &fsr->fl_pages);
+    list_node_init(&hdr->page_list);
+    list_head_push_back(&fsr->fl_pages, &hdr->page_list);
     hdr->domain = fsr->domain;
     fsr->empty_pages++;
 
     for (uint32_t i = 0; i < hdr->total; i++) {
         void *obj = fixed_size_obj_n(fsr, hdr, i);
         struct fixed_size_node *fsn = fsn_for_obj(fsr, obj);
-        INIT_LIST_HEAD(&fsn->list_node);
-        list_add_tail(&fsn->list_node, &fsr->freelist);
+        list_node_init(&fsn->list_node);
+        list_head_push_back(&fsr->freelist, &fsn->list_node);
 
         if (fsr->attrs.init_obj) {
             memset(obj, 0, fsr->attrs.obj_size);
@@ -85,14 +85,14 @@ static bool fixed_size_refill(struct fixed_size_range *fsr) {
 
 void *fixed_size_alloc(struct fixed_size_range *fsr) {
     enum irql irql = spin_lock(&fsr->lock);
-    if (list_empty(&fsr->freelist)) {
+    if (list_head_empty(&fsr->freelist)) {
         if (!fixed_size_refill(fsr)) {
             spin_unlock(&fsr->lock, irql);
             return NULL;
         }
     }
 
-    struct list_head *pop = list_pop_front_init(&fsr->freelist);
+    struct list_node *pop = list_head_pop_front_init(&fsr->freelist);
     struct fixed_size_node *fsn = (struct fixed_size_node *) pop;
     void *obj = obj_for_fsn(fsr, fsn);
 
@@ -113,7 +113,7 @@ static void fixed_size_free_internal(struct fixed_size_range *fsr, void *obj) {
     struct fixed_size_node *fsn = fsn_for_obj(fsr, obj);
 
     hdr->free_count++;
-    list_add_tail(&fsn->list_node, &fsr->freelist);
+    list_head_push_back(&fsr->freelist, &fsn->list_node);
 
     if (hdr->free_count != hdr->total) {
         spin_unlock(&fsr->lock, irql);
@@ -143,7 +143,7 @@ void fixed_size_free(struct fixed_size_range *fsr, void *obj) {
 }
 
 void fixed_size_reclaim_freelist_pages(struct fixed_size_range *fsr) {
-    struct list_head *pos, *tmp;
+    struct list_node *pos, *tmp;
 
     enum irql irql = spin_lock(&fsr->lock);
     list_for_each_safe(pos, tmp, &fsr->fl_pages) {
@@ -164,8 +164,8 @@ void fixed_size_range_init(struct fixed_size_range *fsr,
     enforce(attrs->obj_size && attrs->obj_align, "Fill the fields out");
     spinlock_init(&fsr->lock);
     fsr->attrs = *attrs;
-    INIT_LIST_HEAD(&fsr->freelist);
-    INIT_LIST_HEAD(&fsr->fl_pages);
+    list_head_init(&fsr->freelist);
+    list_head_init(&fsr->fl_pages);
     fsr->empty_pages = 0;
     fsr->full_node_size = ALIGN_UP(
         sizeof(struct fixed_size_node) + attrs->obj_size, attrs->obj_align);

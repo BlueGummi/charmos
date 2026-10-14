@@ -172,7 +172,7 @@ static inline bool migrate_to_destination(struct thread *t, time_ms_t time) {
 static struct thread *pick_from_special_queues(struct scheduler *sched,
                                                enum thread_prio_class prio) {
     struct list_head *q = scheduler_get_this_thread_queue(sched, prio);
-    struct list_head *node = list_pop_front_init(q);
+    struct list_node *node = list_head_pop_front_init(q);
     enforce(node);
 
     return thread_from_rq_list_node(node);

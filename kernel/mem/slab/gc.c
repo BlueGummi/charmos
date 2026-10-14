@@ -207,9 +207,9 @@ static bool slab_do_gc(struct slab_gc *gc, struct slab *slab,
     bool recycle = slab_gc_should_recycle(slab, bias);
 
     if (recycle) {
-        list_del_init(&slab->list);
+        list_node_delete_init(&slab->list);
         slab_gc_dequeue(gc, slab);
-        list_add_tail(&slab->list, pending);
+        list_head_push_back(pending, &slab->list);
     } else if (flags & SLAB_GC_FLAG_SKIP_DESTROY) {
         return false;
     } else {
@@ -271,7 +271,7 @@ size_t slab_gc_run(struct slab_gc *gc, enum slab_gc_flags flags) {
     size_t destroyed = 0;
 
     struct list_head pending;
-    INIT_LIST_HEAD(&pending);
+    list_head_init(&pending);
 
     struct rbt_node *node = rbt_min(&gc->rbt);
     while (node && reclaimed < target) {
@@ -296,10 +296,10 @@ size_t slab_gc_run(struct slab_gc *gc, enum slab_gc_flags flags) {
     spin_unlock(&gc->lock, irql);
 
     uint32_t order_bias_bitmap = slab_flags_get_order_bias_bitmap(flags);
-    struct list_head *pnode, *ptemp;
+    struct list_node *pnode, *ptemp;
     list_for_each_safe(pnode, ptemp, &pending) {
         struct slab *s = slab_from_list_node(pnode);
-        list_del_init(pnode);
+        list_node_delete_init(pnode);
         slab_gc_recycle(s->parent_cache->parent_domain, s, slabs_recycled,
                         order_bias_bitmap);
     }
@@ -319,7 +319,7 @@ void slab_gc_enqueue(struct slab_domain *domain, struct slab *slab) {
     /* Put it in the right order */
     size_t order = slab_pow2_order(slab);
 
-    list_add_tail(&slab->list, &domain->slab_gc.lists[slab->type][order]);
+    list_head_push_back(&domain->slab_gc.lists[slab->type][order], &slab->list);
 
     rbt_insert(&domain->slab_gc.rbt, &slab->rb);
     atomic_inc(&gc->num_elements);
@@ -358,7 +358,7 @@ struct slab *slab_gc_get_for_cache(struct slab_cache *sc) {
 
     enum irql irql = spin_lock(&sgc->lock);
 
-    struct list_head *got = list_pop_tail_init(lh);
+    struct list_node *got = list_head_pop_back_init(lh);
     if (!got)
         goto out;
 
@@ -429,7 +429,7 @@ void slab_gc_init(struct slab_domain *dom) {
     gc->parent = dom;
     for (size_t i = 0; i < SLAB_POW2_ORDER_COUNT; i++) {
         for (int j = 0; j < SLAB_TYPE_COUNT; j++) {
-            INIT_LIST_HEAD(&gc->lists[j][i]);
+            list_head_init(&gc->lists[j][i]);
         }
     }
 }

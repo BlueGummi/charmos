@@ -30,6 +30,6 @@ TEST_DEFINE_UNIT(mutex_simple, object_wait_handoff) {
     thread_join(a);
     thread_join(b);
     TEST_ASSERT_EQ(c.count, 64);
-    TEST_ASSERT(list_empty(&c.mutex.waiters.waiters));
+    TEST_ASSERT(list_head_empty(&c.mutex.waiters.waiters));
     return TEST_SUCCESS;
 }

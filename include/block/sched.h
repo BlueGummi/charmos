@@ -226,7 +226,7 @@ static inline bool submit_if_urgent(struct bio_scheduler *sched,
 
 static inline bool sched_is_empty(struct bio_scheduler *sched) {
     for (uint32_t i = 0; i < BIO_SCHED_LEVELS; i++)
-        if (!list_empty(&sched->queues[i].list))
+        if (!list_head_empty(&sched->queues[i].list))
             return false;
 
     return true;

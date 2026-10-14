@@ -127,8 +127,8 @@ static void reset_summary(struct rt_thread_summary *sum) {
 static void reset_shed_request(struct rt_thread_shed_request *rtsr) {
     rtsr->urgency = FX(0.0);
     rtsr->threads_available = 0;
-    enforce(list_empty(&rtsr->threads));
-    INIT_LIST_HEAD(&rtsr->threads);
+    enforce(list_head_empty(&rtsr->threads));
+    list_head_init(&rtsr->threads);
     rtsr->on = false;
 }
 
@@ -150,8 +150,8 @@ rt_load_scheduler_static(struct rt_scheduler_static *rts) {
 
     rbt_init(&rts->mappings_internal, rt_mapping_get_data, rt_mapping_cmp);
     refcount_init(&rts->refcount, 1);
-    INIT_LIST_HEAD(&rts->list_internal);
-    list_add_tail(&rts->list_internal, &rt_global.static_list.list);
+    list_node_init(&rts->list_internal);
+    list_head_push_back(&rt_global.static_list.list, &rts->list_internal);
     rt_global.static_list.num_elems++;
 
     if (!(rts->active_mask_internal = cpu_mask_create())) {
@@ -209,7 +209,7 @@ static void rt_scheduler_destroy_internal(struct rt_scheduler_static *rts) {
 
     rts->ops.on_unload(rts);
 
-    list_del_init(&rts->list_internal);
+    list_node_delete_init(&rts->list_internal);
     rt_global.static_list.num_elems--;
     rt_slots_dealloc_for_scheduler(rts);
     cpu_mask_free(rts->active_mask_internal);
@@ -293,7 +293,7 @@ static bool try_migrate_all_before_switch(struct rt_scheduler *rts,
     /* Drop the lock now, we have ownership of all threads (hopefully!!!) */
     spin_unlock(&rts->lock, irql);
 
-    if (list_empty(thread_list)) {
+    if (list_head_empty(thread_list)) {
         /* TODO: Find a better way to wrap around assertions made
          * after a RT scheduler op so we don't crash the kernel */
         enforce(old == 0);
@@ -326,7 +326,7 @@ static bool try_migrate_all_before_switch(struct rt_scheduler *rts,
             continue;
 
         /* Bye bye */
-        list_del_init(&iter->rt_list_node);
+        list_node_delete_init(&iter->rt_list_node);
         send_to_compatible_cpu(iter);
     }
 
@@ -338,7 +338,7 @@ static void re_enqueue_threads(struct rt_scheduler *rts,
     struct thread *iter, *tmp;
 
     list_for_each_entry_safe(iter, tmp, threads, rt_list_node) {
-        list_del_init(&iter->rt_list_node);
+        list_node_delete_init(&iter->rt_list_node);
         enum irql irql = spin_lock_high(&rts->lock);
 
         /* TODO: remember to wrap these! */
@@ -365,7 +365,7 @@ static void setup_new_rt_scheduler(struct rt_scheduler *rts,
  * If we fail to find a struct rt_scheduler, something
  * has gone very very very wrong... */
 static struct rt_scheduler *get_new_rt_scheduler(domain_id_t domain) {
-    struct list_head *got = NULL;
+    struct list_node *got = NULL;
     if ((got = locked_list_pop_front(&rt_global.sch_pool[domain])))
         goto out;
 
@@ -465,7 +465,7 @@ void rt_scheduler_switch() {
     bool can_switch = true;
 
     struct list_head thread_list;
-    INIT_LIST_HEAD(&thread_list);
+    list_head_init(&thread_list);
     if (only_cpu)
         can_switch =
             try_migrate_all_before_switch(curr->rts, into, &thread_list);
@@ -525,7 +525,7 @@ void rt_scheduler_switch() {
          * not have taken anything from our rt_scheduler. need_new
          * requires us to NOT be the only CPU, so we do not drain
          * the runqueue of our mapping here */
-        enforce(list_empty(&thread_list));
+        enforce(list_head_empty(&thread_list));
         setup_new_rt_scheduler(next_rts, next);
     } else {
         re_enqueue_threads(next_rts, &thread_list);

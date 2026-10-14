@@ -10,7 +10,7 @@
 /* This is a single item in the hash table, and the idea here is that
  * when the current stack matches one of these, we return the existing one */
 struct stack_depot_record {
-    struct list_head hash_list;
+    struct list_node hash_list;
     refcount_t refcount;
     size_t num_entries;
     uint32_t hash;

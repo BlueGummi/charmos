@@ -185,7 +185,7 @@ struct crash_unwind_node_data {
 
 struct crash_unwind_node {
     enum crash_unwind_type type;
-    struct list_head list;
+    struct list_node list;
     struct crash_unwind_node_data data;
 };
 
@@ -219,7 +219,7 @@ struct crash_perthread {
  */
 struct crash_hook {
     char *name;
-    struct list_head list;
+    struct list_node list;
     enum crash_code code;
     enum crash_source source_mask;
 };

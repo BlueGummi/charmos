@@ -244,7 +244,7 @@ struct arena_bin {
         uintptr_t not_head_magic;
     };
 
-    struct list_head bin_list;
+    struct list_node bin_list;
 
     atomic_bool dying;
 
@@ -372,7 +372,7 @@ ct_assert_struct_size_eq(arena_seg_inmem_desc, 2);
 /* This is the parent structure of the operations and other
  * per-arena implementation data */
 struct arena_desc {
-    struct list_head list_node;
+    struct list_node list_node;
     const char *name;
     const char *description;
 

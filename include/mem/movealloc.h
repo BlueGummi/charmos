@@ -24,7 +24,7 @@ typedef void (*movealloc_callback)(void *a, void *b);
 struct movealloc_callback_node {
     movealloc_callback callback;
     void *a, *b;
-    struct list_head list;
+    struct list_node list;
 };
 
 struct movealloc_callback_chain {

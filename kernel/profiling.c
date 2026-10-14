@@ -5,12 +5,12 @@ extern struct profiling_entry __ekernel_profiling_data[];
 
 #ifdef PROFILING_ENABLED
 void profiling_init(void) {
-    INIT_LIST_HEAD(&global.profiling_list_head);
+    list_head_init(&global.profiling_list_head);
     struct profiling_entry *start = __skernel_profiling_data;
     struct profiling_entry *end = __ekernel_profiling_data;
 
     for (struct profiling_entry *pe = start; pe < end; pe++)
-        list_add(&pe->list_node, &global.profiling_list_head);
+        list_head_push_front(&global.profiling_list_head, &pe->list_node);
 }
 
 void profiling_log_all(void) {

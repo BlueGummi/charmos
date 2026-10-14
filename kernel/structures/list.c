@@ -5,13 +5,13 @@
 
 #ifdef DEBUG_LIST
 
-static bool list_link_is_plausible(const struct list_head *n) {
+static bool list_link_is_plausible(const struct list_node *n) {
     uintptr_t v = (uintptr_t) n;
 
     return v >= ADDRESS_RANGE_KERNEL_START && IS_ALIGNED(v, sizeof(void *));
 }
 
-static bool list_node_looks_linked(const struct list_head *n) {
+static bool list_node_looks_linked(const struct list_node *n) {
     if (n->next == NULL || n->prev == NULL)
         return false;
 
@@ -24,8 +24,8 @@ static bool list_node_looks_linked(const struct list_head *n) {
     return n->next->prev == n && n->prev->next == n;
 }
 
-void list_add_check(const struct list_head *new, const struct list_head *prev,
-                    const struct list_head *next) {
+void list_add_check(const struct list_node *new, const struct list_node *prev,
+                    const struct list_node *next) {
     if (cc_unlikely(new == NULL || prev == NULL || next == NULL))
         panic("list_add: NULL operand (new %p, prev %p, next %p)", new, prev,
               next);
@@ -47,7 +47,7 @@ void list_add_check(const struct list_head *new, const struct list_head *prev,
               new, new->next, new->prev, next);
 }
 
-void list_del_check(const struct list_head *entry) {
+void list_del_check(const struct list_node *entry) {
     if (cc_unlikely(entry == NULL))
         panic("list_del: NULL entry");
 
@@ -64,9 +64,9 @@ void list_del_check(const struct list_head *entry) {
               entry, entry->next, entry, entry->next->prev);
 }
 
-void list_splice_check(const struct list_head *list,
-                       const struct list_head *prev,
-                       const struct list_head *next) {
+void list_splice_check(const struct list_node *list,
+                       const struct list_node *prev,
+                       const struct list_node *next) {
     if (cc_unlikely(list == NULL || prev == NULL || next == NULL))
         panic("list_splice: NULL operand (list %p, prev %p, next %p)", list,
               prev, next);
@@ -76,8 +76,8 @@ void list_splice_check(const struct list_head *list,
               "next %p ->prev %p",
               prev, prev->next, next, next->prev);
 
-    const struct list_head *first = list->next;
-    const struct list_head *last = list->prev;
+    const struct list_node *first = list->next;
+    const struct list_node *last = list->prev;
 
     if (cc_unlikely(first == NULL || last == NULL))
         panic("list_splice: source %p is not initialised (next %p, prev %p)",
@@ -90,26 +90,25 @@ void list_splice_check(const struct list_head *list,
 }
 #endif /* DEBUG_LIST */
 
-void list_sort(struct list_head *head,
-               int (*cmp)(struct list_head *, struct list_head *)) {
-    if (list_empty(head) || head->next->next == head)
+void list_root_sort(struct list_node *head, list_cmp_fn cmp) {
+    if (head->next == head || head->next->next == head)
         return;
 
-    struct list_head *list = head->next;
+    struct list_node *list = head->next;
     head->prev->next = NULL;
     list->prev = NULL;
 
     int insize = 1;
 
     while (true) {
-        struct list_head *p = list;
+        struct list_node *p = list;
         list = NULL;
-        struct list_head *tail = NULL;
+        struct list_node *tail = NULL;
         int nmerges = 0;
 
         while (p) {
             nmerges++;
-            struct list_head *q = p;
+            struct list_node *q = p;
             int psize = 0;
             for (int i = 0; i < insize; i++) {
                 psize++;
@@ -122,7 +121,7 @@ void list_sort(struct list_head *head,
 
             /* Merge the two lists */
             while (psize > 0 || (qsize > 0 && q)) {
-                struct list_head *e;
+                struct list_node *e;
 
                 if (psize == 0) {
                     e = q;
@@ -162,8 +161,8 @@ void list_sort(struct list_head *head,
         insize *= 2;
     }
 
-    struct list_head *prev = head;
-    struct list_head *curr = list;
+    struct list_node *prev = head;
+    struct list_node *curr = list;
     while (curr) {
         curr->prev = prev;
         prev->next = curr;
@@ -177,7 +176,7 @@ void list_sort(struct list_head *head,
 
 /* Example:
  *
- * int node_cmp(struct list_head *a, struct list_head *b) {
+ * int node_cmp(struct list_node *a, struct list_node *b) {
  *     struct node *na = list_entry(a, struct node, list);
  *     struct node *nb = list_entry(b, struct node, list);
  *     return (na->value > nb->value) - (na->value < nb->value);

@@ -99,7 +99,7 @@ struct nvme_request {
 
     void *user_data;
 
-    struct list_head list_node;
+    struct list_node list_node;
 };
 
 struct nvme_waiting_requests {

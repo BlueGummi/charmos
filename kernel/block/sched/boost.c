@@ -95,7 +95,7 @@ bool bio_sched_boost_starved(struct bio_scheduler *sched) {
         if (checks_left > BIO_SCHED_MAX_BOOST_SCAN)
             checks_left = BIO_SCHED_MAX_BOOST_SCAN;
 
-        struct list_head *iter, *temp;
+        struct list_node *iter, *temp;
 
         list_for_each_safe(iter, temp, &queue->list) {
             struct bio_request *rq = bio_request_from_list_node(iter);

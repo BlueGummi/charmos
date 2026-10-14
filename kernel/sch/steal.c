@@ -105,12 +105,12 @@ static struct thread *steal_from_ts_threads(struct scheduler *victim) {
 
 static struct thread *steal_from_special_threads(struct scheduler *victim,
                                                  struct list_head *q) {
-    if (list_empty(q))
+    if (list_head_empty(q))
         return NULL;
 
     size_t core = smp_id(TOPC_IRQL);
 
-    struct list_head *pos, *n;
+    struct list_node *pos, *n;
     list_for_each_safe(pos, n, q) {
         struct thread *t = thread_from_rq_list_node(pos);
 
@@ -120,7 +120,7 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
 
         enforce(thread_get_state(t) == THREAD_STATE_READY);
 
-        list_del_init(&t->rq_list_node);
+        list_node_delete_init(&t->rq_list_node);
 
         scheduler_decrement_thread_count(victim, t);
         return t;

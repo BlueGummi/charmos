@@ -30,7 +30,7 @@ static void init_scheduler_boot(struct scheduler *sched) {
     pcpu->log_handle = LOG_HANDLE_DEFAULT;
     pcpu->perms.allowed_capabilities = UINT16_MAX;
     spinlock_init(&pcpu->perms.lock);
-    INIT_LIST_HEAD(&pcpu->perms.blocklist);
+    list_head_init(&pcpu->perms.blocklist);
     pcpu->scheduler = sched;
     pcpu->active_mapping = NULL;
     semaphore_init(&pcpu->switch_semaphore, 1, SEMAPHORE_INIT_IRQ_DISABLE);

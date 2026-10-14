@@ -14,18 +14,18 @@ extern struct movealloc_callback_node __skernel_movealloc_callbacks[];
 extern struct movealloc_callback_node __ekernel_movealloc_callbacks[];
 
 void movealloc_init_chain(void) {
-    INIT_LIST_HEAD(&global.movealloc_chain.list);
+    list_head_init(&global.movealloc_chain.list);
     struct movealloc_callback_node *start = __skernel_movealloc_callbacks;
     struct movealloc_callback_node *end = __ekernel_movealloc_callbacks;
     for (struct movealloc_callback_node *n = start; n < end; n++) {
-        INIT_LIST_HEAD(&n->list);
-        list_add_tail(&n->list, &global.movealloc_chain.list);
+        list_node_init(&n->list);
+        list_head_push_back(&global.movealloc_chain.list, &n->list);
     }
 }
 
 void movealloc_exec_all(void) {
     movealloc_init_chain();
-    struct list_head *iter;
+    struct list_node *iter;
     list_for_each(iter, &global.movealloc_chain.list) {
         struct movealloc_callback_node *node =
             movealloc_callback_node_from_list_node(iter);

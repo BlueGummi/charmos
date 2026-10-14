@@ -39,7 +39,7 @@ bool nvme_submit_bio_request(struct block_device *disk,
     req->size = bio->size;
     req->write = bio->write;
     req->user_data = bio;
-    INIT_LIST_HEAD(&req->list_node);
+    list_node_init(&req->list_node);
 
     req->on_complete = nvme_on_bio_complete;
 

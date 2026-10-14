@@ -256,7 +256,7 @@ struct rt_slot_request {
 };
 
 struct rt_scheduler_blocklist_node {
-    struct list_head list;
+    struct list_node list;
     char *blocked_scheduler_name;
 };
 
@@ -427,7 +427,7 @@ struct rt_scheduler_mapping {
 struct rt_scheduler_static {
 
     /* ---------- INTERNAL ---------- */
-    struct list_head list_internal;
+    struct list_node list_internal;
     struct rbt mappings_internal;          /* "dynamic" object.
                                             * nodes are dynamic, this is static */
     struct cpu_mask *active_mask_internal; /* Who is using us? */
@@ -455,7 +455,7 @@ struct rt_scheduler_static {
  * allowed to perform allocations and such, so it must take place inside of a
  * DPC. Similarly, destruction happens in a DPC */
 struct rt_scheduler {
-    struct list_head list; /* This is used to keep a global pool of
+    struct list_node list; /* This is used to keep a global pool of
                             * rt_schedulers. We split this per-domain,
                             * and whenever a CPU switches into an
                             * rt_scheduler, it takes one out of

@@ -346,9 +346,9 @@ void slab_cache_init(size_t order, struct slab_cache *cache,
      * leave that as an optional TODO: */
     enforce(cache->slab_metadata_size <= PAGE_SIZE);
 
-    INIT_LIST_HEAD(&cache->slabs[SLAB_FREE]);
-    INIT_LIST_HEAD(&cache->slabs[SLAB_PARTIAL]);
-    INIT_LIST_HEAD(&cache->slabs[SLAB_FULL]);
+    list_head_init(&cache->slabs[SLAB_FREE]);
+    list_head_init(&cache->slabs[SLAB_PARTIAL]);
+    list_head_init(&cache->slabs[SLAB_FULL]);
     slab_chunks_init(&cache->chunks, cache);
 }
 
@@ -387,7 +387,7 @@ struct slab *slab_init(struct slab *slab, struct slab_cache *parent) {
     slab->gc_enqueue_time_ms = 0;
     slab->type = parent->type;
     rbt_init_node(&slab->rb);
-    INIT_LIST_HEAD(&slab->list);
+    list_node_init(&slab->list);
     memset(slab->bitmap, 0, parent->bitmap_bytes);
 
     /* Pre-set unused trailing bits */
@@ -577,7 +577,7 @@ static void *slab_try_alloc_from_slab_list(struct slab_cache *cache,
                                            stack_handle_t handle,
                                            struct list_head *list) {
     SPINLOCK_ASSERT_HELD(&cache->lock);
-    struct list_head *node, *temp;
+    struct list_node *node, *temp;
     struct slab *slab;
     void *ret = NULL;
 

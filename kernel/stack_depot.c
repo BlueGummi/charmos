@@ -14,7 +14,7 @@ static struct fixed_size_range boot_fsr;
 void stack_depot_init() {
     stack_depot_global.starting_seed = 1234;
     for (int i = 0; i < STACK_DEPOT_HASH_SIZE; i++) {
-        INIT_LIST_HEAD(&stack_depot_global.chains[i].list);
+        list_head_init(&stack_depot_global.chains[i].list);
         spinlock_init(&stack_depot_global.chains[i].lock);
     }
 
@@ -114,11 +114,11 @@ stack_handle_t stack_depot_save(uintptr_t *entries, size_t num_entries,
     }
 
     refcount_init(&rec->refcount, 1);
-    INIT_LIST_HEAD(&rec->hash_list);
+    list_node_init(&rec->hash_list);
     rec->hash = hash;
     rec->num_entries = num_entries;
     memcpy(rec->entries, entries, num_entries * sizeof(uintptr_t));
-    list_add_tail(&rec->hash_list, &this_chain->list);
+    list_head_push_back(&this_chain->list, &rec->hash_list);
     spin_unlock(&this_chain->lock, irql);
 
     atomic_inc(&stack_depot_global.num_records);
@@ -157,7 +157,7 @@ void stack_depot_put(stack_handle_t key) {
     enum irql irql = spin_lock(&chain->lock);
 
     if (refcount_dec_and_test(&rec->refcount)) {
-        list_del(&rec->hash_list);
+        list_node_delete(&rec->hash_list);
         free_it = true;
     }
 

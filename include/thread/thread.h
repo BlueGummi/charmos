@@ -203,8 +203,8 @@ struct thread {
      * reset if unions are to be used */
 
     struct crash_perthread crash_data;
-    struct list_head reaper_list; /* reaper list */
-    struct list_head thread_list; /* global list of threads */
+    struct list_node reaper_list; /* reaper list */
+    struct list_node thread_list; /* global list of threads */
 
     /* Runqueue nodes */
 
@@ -214,8 +214,8 @@ struct thread {
     };
 
     union {
-        struct list_head rq_list_node; /* runqueue list node */
-        struct list_head rt_list_node; /* alias for rt scheduling */
+        struct list_node rq_list_node; /* runqueue list node */
+        struct list_node rt_list_node; /* alias for rt scheduling */
     };
 
     /* Waitqueue nodes */
@@ -223,10 +223,10 @@ struct thread {
     int32_t wq_prio;                     /* turnstile sort key
                                           * TODO: there is probably a smarter way
                                           */
-    struct list_head wq_list_node;       /* waitqueue list node */
+    struct list_node wq_list_node;       /* waitqueue list node */
     struct pairing_node wq_pairing_node; /* waitqueue pairing node */
 
-    struct list_head rcu_list_node; /* blocked reader node on RCU leaf */
+    struct list_node rcu_list_node; /* blocked reader node on RCU leaf */
 
     /* ========== State ========== */
 

@@ -54,13 +54,13 @@ static void destroy_chunk(struct slab_chunks *sc, struct slab_chunk *c) {
 static bool move_to(struct slab_chunks *sc, struct slab_chunk *c,
                     enum slab_chunk_state s) {
     enforce(c->state != s);
-    list_del_init(&c->list);
+    list_node_delete_init(&c->list);
     if (s == SLAB_CHUNK_FREE) {
         destroy_chunk(sc, c);
         return true;
     }
     c->state = s;
-    list_add_tail(&c->list, chunk_list_for(sc, s));
+    list_head_push_back(chunk_list_for(sc, s), &c->list);
     return false;
 }
 
@@ -94,13 +94,13 @@ static struct slab_chunk *alloc_chunk(struct slab_chunks *sc,
         return NULL;
     }
 
-    INIT_LIST_HEAD(&ret->list);
+    list_node_init(&ret->list);
     ret->owner = sc;
     ret->state = SLAB_CHUNK_PARTIAL;
     ret->base_addr = vaddr_to_base_addr(base);
     ret->used = 0;
     memset(ret->bitmap, 0, sc->bitmap_bytes);
-    list_add_tail(&ret->list, &sc->partial_list);
+    list_head_push_back(&sc->partial_list, &ret->list);
     return ret;
 }
 
@@ -173,7 +173,7 @@ static bool chunk_free(struct slab_chunks *chunks, struct slab_chunk *chunk,
 
 /* Peek but do not pop, since chunk_alloc will re-link a chunk when it fills */
 static struct slab_chunk *try_peek(struct list_head *lh) {
-    struct list_head *peek = list_peek_front(lh);
+    struct list_node *peek = list_head_peek_front(lh);
     if (!peek)
         return NULL;
 
@@ -215,8 +215,8 @@ void slab_chunks_init(struct slab_chunks *sc, struct slab_cache *parent) {
      * bits stay the real slot count, because that is different */
     sc->bitmap_bits = DIV_ROUND_UP(page_count, sc->page_stride);
     sc->bitmap_bytes = SLAB_BITMAP_BYTES_FOR(sc->bitmap_bits);
-    INIT_LIST_HEAD(&sc->partial_list);
-    INIT_LIST_HEAD(&sc->used_list);
+    list_head_init(&sc->partial_list);
+    list_head_init(&sc->used_list);
 
     spinlock_init(&sc->lock);
     sc->pow2_order = ilog2(sc->page_stride);

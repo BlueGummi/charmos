@@ -89,8 +89,8 @@ static enum lock_chk_result resolve_node(struct lock_chk_graph *graph,
         base_node->subclass = 0;
         base_node->context_bits = 0;
         INIT_HLIST_NODE(&base_node->hash_entry);
-        INIT_LIST_HEAD(&base_node->out_edges);
-        INIT_LIST_HEAD(&base_node->in_edges);
+        list_head_init(&base_node->out_edges);
+        list_head_init(&base_node->in_edges);
         hlist_add_head(&base_node->hash_entry,
                        &graph->class_hash[lock_chk_class_hash(class, 0)]);
     }
@@ -119,8 +119,8 @@ static enum lock_chk_result resolve_node(struct lock_chk_graph *graph,
         node->subclass = subclass;
         node->context_bits = 0;
         INIT_HLIST_NODE(&node->hash_entry);
-        INIT_LIST_HEAD(&node->out_edges);
-        INIT_LIST_HEAD(&node->in_edges);
+        list_head_init(&node->out_edges);
+        list_head_init(&node->in_edges);
         hlist_add_head(
             &node->hash_entry,
             &graph->class_hash[lock_chk_class_hash(class, subclass)]);
@@ -132,7 +132,7 @@ static enum lock_chk_result resolve_node(struct lock_chk_graph *graph,
 
 static struct lock_chk_edge *find_edge(struct lock_chk_dep from,
                                        struct lock_chk_dep to) {
-    struct list_head *entry;
+    struct list_node *entry;
     list_for_each(entry, &from.node->out_edges) {
         struct lock_chk_edge *edge =
             list_entry(entry, struct lock_chk_edge, from_entry);
@@ -169,7 +169,7 @@ static bool graph_path(struct lock_chk_graph *graph, struct lock_chk_dep start,
             return true;
         }
 
-        struct list_head *entry;
+        struct list_node *entry;
         list_for_each(entry, &node->out_edges) {
             struct lock_chk_edge *edge =
                 list_entry(entry, struct lock_chk_edge, from_entry);
@@ -199,10 +199,10 @@ static void publish_edge(struct lock_chk_graph *graph, struct lock_chk_dep from,
     edge->from_mode = from.mode;
     edge->to_mode = to.mode;
     edge->first_site = site;
-    INIT_LIST_HEAD(&edge->from_entry);
-    INIT_LIST_HEAD(&edge->to_entry);
-    list_add_tail(&edge->from_entry, &from.node->out_edges);
-    list_add_tail(&edge->to_entry, &to.node->in_edges);
+    list_node_init(&edge->from_entry);
+    list_node_init(&edge->to_entry);
+    list_head_push_back(&from.node->out_edges, &edge->from_entry);
+    list_head_push_back(&to.node->in_edges, &edge->to_entry);
 }
 
 static uint16_t extract_cycle(struct lock_chk_graph *graph,

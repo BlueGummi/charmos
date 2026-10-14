@@ -28,8 +28,12 @@ struct turnstile {
     /* If a boost occurs, what did we give it? */
     bool applied_pi_boost;
     enum thread_prio_class prio_class;
-    struct list_head hash_list;
-    struct list_head freelist;
+    struct list_node hash_list;
+
+    union {
+        struct list_head freelist;
+        struct list_node freelist_node;
+    };
     size_t waiters; /* how many goobers are blocking on me? */
     void *lock_obj; /* lock we are for */
     struct rbt queues[TURNSTILE_NUM_QUEUES];
@@ -37,7 +41,7 @@ struct turnstile {
 };
 
 #define turnstile_from_freelist(fl)                                            \
-    (container_of(fl, struct turnstile, freelist))
+    (container_of(fl, struct turnstile, freelist_node))
 #define turnstile_from_hash_list_node(hln)                                     \
     (container_of(hln, struct turnstile, hash_list))
 

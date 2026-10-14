@@ -135,14 +135,14 @@ static uint32_t size_to_bin(size_t size) {
 
 static void bin_insert(struct vas_arena *arena, struct vas_segment *seg) {
     uint32_t bin = size_to_bin(seg->length);
-    list_add(&seg->bin_node, &arena->free_bins[bin]);
+    list_head_push_front(&arena->free_bins[bin], &seg->bin_node);
     arena->bin_mask = BIT_SET(arena->bin_mask, bin);
 }
 
 static void bin_remove(struct vas_arena *arena, struct vas_segment *seg) {
     uint32_t bin = size_to_bin(seg->length);
-    list_del_init(&seg->bin_node);
-    if (list_empty(&arena->free_bins[bin]))
+    list_node_delete_init(&seg->bin_node);
+    if (list_head_empty(&arena->free_bins[bin]))
         arena->bin_mask = BIT_CLEAR(arena->bin_mask, bin);
 }
 
@@ -158,23 +158,23 @@ static struct vas_segment *segment_alloc(struct vas_arena *arena) {
         memset(seg, 0, sizeof(*seg));
         atomic_init(&seg->type, VAS_SEG_FREE);
         rbt_init_node(&seg->node);
-        INIT_LIST_HEAD(&seg->seg_node);
-        INIT_LIST_HEAD(&seg->bin_node);
+        list_node_init(&seg->seg_node);
+        list_node_init(&seg->bin_node);
     }
     return seg;
 }
 
 static void segment_insert_after(struct vas_arena *arena,
                                  struct vas_segment *seg,
-                                 struct list_head *prev) {
+                                 struct list_node *prev) {
     rbt_init_node(&seg->node);
     rbt_insert(&arena->tree, &seg->node);
-    list_add(&seg->seg_node, prev);
+    list_node_insert_after(prev, &seg->seg_node);
 }
 
 static void segment_delete(struct vas_arena *arena, struct vas_segment *seg) {
     rbt_delete(&arena->tree, &seg->node);
-    list_del(&seg->seg_node);
+    list_node_delete(&seg->seg_node);
     fixed_size_free(&arena->fsr, seg);
 }
 
@@ -200,9 +200,9 @@ static void arena_init(struct vas_arena *arena, bool is_global) {
         spinlock_init(&arena->lock);
     }
     rbt_init(&arena->tree, segment_key, segment_cmp);
-    INIT_LIST_HEAD(&arena->all_segs);
+    list_head_init(&arena->all_segs);
     for (uint32_t i = 0; i < VAS_BIN_COUNT; i++)
-        INIT_LIST_HEAD(&arena->free_bins[i]);
+        list_head_init(&arena->free_bins[i]);
     arena->bin_mask = 0;
     arena->total_free = 0;
     for (uint32_t cls = 0; cls < VAS_MAG_CLASSES; cls++) {
@@ -226,7 +226,7 @@ static struct vas_segment *arena_alloc(struct vas_arena *arena, size_t size,
     uint64_t mask = arena->bin_mask & (UINT64_MAX << size_to_bin(size));
     while (mask) {
         uint32_t bin = ci_ctzll(mask);
-        struct list_head *pos;
+        struct list_node *pos;
         list_for_each(pos, &arena->free_bins[bin]) {
             struct vas_segment *seg =
                 list_entry(pos, struct vas_segment, bin_node);
@@ -292,7 +292,7 @@ static bool segments_mergeable(struct vas_segment *left,
 static void arena_release(struct vas_arena *arena, struct vas_segment *seg) {
     arena->total_free += seg->length;
     atomic_store_rlx(&seg->type, VAS_SEG_FREE);
-    if (seg->seg_node.prev != &arena->all_segs) {
+    if (seg->seg_node.prev != list_head_sentinel(&arena->all_segs)) {
         struct vas_segment *prev =
             list_entry(seg->seg_node.prev, struct vas_segment, seg_node);
         if (segments_mergeable(prev, seg)) {
@@ -302,7 +302,7 @@ static void arena_release(struct vas_arena *arena, struct vas_segment *seg) {
             seg = prev;
         }
     }
-    if (seg->seg_node.next != &arena->all_segs) {
+    if (seg->seg_node.next != list_head_sentinel(&arena->all_segs)) {
         struct vas_segment *next =
             list_entry(seg->seg_node.next, struct vas_segment, seg_node);
         if (segments_mergeable(seg, next)) {
@@ -397,7 +397,7 @@ static void reclaim_locked(struct vas *vas) {
 
         enum irql irql = spin_lock(&local->lock);
         magazine_drain(vas, local);
-        struct list_head *pos, *next;
+        struct list_node *pos, *next;
 
         list_for_each_safe(pos, next, &local->all_segs) {
             struct vas_segment *seg =
@@ -448,9 +448,9 @@ static vaddr_t import_alloc(struct vas *vas, uint32_t cpu, size_t size,
     seg->length = VAS_CHUNK_SIZE;
 
     struct rbt_node *prev = rbt_find_predecessor(&local->tree, seg->start);
-    struct list_head *before =
+    struct list_node *before =
         prev ? &rbt_entry(prev, struct vas_segment, node)->seg_node
-             : &local->all_segs;
+             : list_head_sentinel(&local->all_segs);
 
     segment_insert_after(local, seg, before);
     bin_insert(local, seg);
@@ -631,7 +631,7 @@ void vas_reclaim_freelist_pages(struct vas_arena *arena) {
 }
 
 static void arena_destroy(struct vas_arena *arena) {
-    struct list_head *pos, *next;
+    struct list_node *pos, *next;
 
     list_for_each_safe(pos, next, &arena->all_segs) {
         struct vas_segment *seg = list_entry(pos, struct vas_segment, seg_node);
@@ -725,7 +725,8 @@ static struct vas *space_create(vaddr_t base, vaddr_t limit, bool bootstrap) {
     }
     seg->start = base;
     seg->length = limit - base;
-    segment_insert_after(&vas->global, seg, &vas->global.all_segs);
+    segment_insert_after(&vas->global, seg,
+                         list_head_sentinel(&vas->global.all_segs));
     bin_insert(&vas->global, seg);
     vas->global.total_free = seg->length;
     return vas;
@@ -790,7 +791,7 @@ void vas_unmap(struct vas *vas, void *vaddr, size_t len) {
 
 static void arena_dump(struct vas_arena *arena) {
     enum irql irql = spin_lock(&arena->lock);
-    struct list_head *pos;
+    struct list_node *pos;
     list_for_each(pos, &arena->all_segs) {
         struct vas_segment *seg = list_entry(pos, struct vas_segment, seg_node);
         enum vas_segment_type type = atomic_load_rlx(&seg->type);

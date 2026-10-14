@@ -70,9 +70,9 @@ void scheduler_init(void) {
         atomic_store_rlx(&idle_thread->state, THREAD_STATE_IDLE_THREAD);
         s->idle_thread = idle_thread;
 
-        INIT_LIST_HEAD(&s->rt_threads);
-        INIT_LIST_HEAD(&s->urgent_threads);
-        INIT_LIST_HEAD(&s->bg_threads);
+        list_head_init(&s->rt_threads);
+        list_head_init(&s->urgent_threads);
+        list_head_init(&s->bg_threads);
 
         if (!i) {
             struct thread *t = thread_create("main_thread", k_sch_main,

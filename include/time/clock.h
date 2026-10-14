@@ -44,7 +44,7 @@ struct clock {
     uint64_t mult;                /* cycle to ns */
     fx32_32_t uncertainty_margin; /* ns per s */
     freq_khz_t frequency_khz;
-    struct list_head list_internal;
+    struct list_node list_internal;
 
     enum clock_state state;
     enum clock_flags flags;

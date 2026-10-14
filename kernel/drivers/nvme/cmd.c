@@ -41,7 +41,7 @@ void nvme_send_waiters(struct nvme_device *dev) {
 
     enum irql irql = spin_lock_high(&waiters->lock);
 
-    struct list_head *pop = list_pop_front_init(&waiters->list);
+    struct list_node *pop = list_head_pop_front_init(&waiters->list);
     if (!pop)
         goto done;
 
@@ -77,7 +77,8 @@ static void nvme_process_one(struct nvme_device  *dev,
 static struct nvme_request *nvme_finished_pop_front(struct nvme_device *dev) {
     enum irql irql = spin_lock_high(&dev->finished_requests.lock);
 
-    struct list_head *lh = list_pop_front_init(&dev->finished_requests.list);
+    struct list_node *lh =
+        list_head_pop_front_init(&dev->finished_requests.list);
 
     spin_unlock(&dev->finished_requests.lock, irql);
 
@@ -139,7 +140,7 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
 
             enum irql irql2 = spin_lock_high(&dev->finished_requests.lock);
 
-            list_add_tail(&req->list_node, &dev->finished_requests.list);
+            list_head_push_back(&dev->finished_requests.list, &req->list_node);
 
             spin_unlock(&dev->finished_requests.lock, irql2);
 

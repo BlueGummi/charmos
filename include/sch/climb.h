@@ -48,7 +48,7 @@ enum climb_pressure_kind {
 
 struct climb_handle {
     char *name;
-    struct list_head list;
+    struct list_node list;
     climb_pressure_t pressure;
     climb_pressure_t applied_pressure_internal; /* If 0, this has not
                                                  * applied presssure */
@@ -124,7 +124,7 @@ int32_t climb_cmp_threads(const struct rbt_node *a, const struct rbt_node *b);
 static inline struct climb_handle *
 climb_handle_init(struct climb_handle *ch, struct climb_source *cs,
                   enum climb_pressure_kind k) {
-    INIT_LIST_HEAD(&ch->list);
+    list_node_init(&ch->list);
     if (cs) {
         ch->pressure = cs->base;
         ch->name = cs->name;

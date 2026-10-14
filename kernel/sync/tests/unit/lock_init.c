@@ -76,7 +76,7 @@ TEST_DEFINE_UNIT(lock_chk, initializers_install_policy) {
     rwlock_init(&rw, THREAD_PRIO_CLASS_TIMESHARE);
     seqlock_init(&seq);
 
-    TEST_ASSERT(list_empty(&static_simple_mutex.waiters.waiters));
+    TEST_ASSERT(list_head_empty(&static_simple_mutex.waiters.waiters));
     TEST_ASSERT(
         lock_init_state_valid(&spin, &qspin, &mutex, &simple, &rw, &seq));
     return TEST_SUCCESS;

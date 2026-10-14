@@ -31,7 +31,7 @@ static enum workqueue_error signal_worker(struct workqueue *queue) {
 
 bool workqueue_dequeue_task(struct workqueue *queue, struct work **out) {
     enum irql irql = spin_lock_high(&queue->work_lock);
-    struct list_head *lh = list_pop_front(&queue->works);
+    struct list_node *lh = list_head_pop_front(&queue->works);
     spin_unlock(&queue->work_lock, irql);
 
     if (lh) {
@@ -53,7 +53,7 @@ enum workqueue_error workqueue_enqueue(struct workqueue *queue,
         return WORKQUEUE_ERROR_WORK_EXECUTING;
     }
 
-    list_add_tail(&work->list_node, &queue->works);
+    list_head_push_back(&queue->works, &work->list_node);
 
     atomic_store(&work->enqueued, true);
 

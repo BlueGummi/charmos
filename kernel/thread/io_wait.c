@@ -7,7 +7,7 @@ void io_wait_begin(struct io_wait_token *out,
     struct thread *t = thread_get_current();
     enforce(!out->active);
     out->active = true;
-    list_add_tail(&out->list, &t->io_wait_tokens);
+    list_head_push_back(&t->io_wait_tokens, &out->list);
 
     thread_wait_header_init(request);
     const struct thread_wait_object object = {request, request};
@@ -33,10 +33,10 @@ void io_wait_end(struct io_wait_token *t, enum io_wait_end_action act) {
     if (c->active_wait_blocks == &t->block)
         thread_wait_cancel();
 
-    list_del_init(&t->list);
+    list_node_delete_init(&t->list);
     t->active = false;
 
-    if (list_empty(&c->io_wait_tokens)) {
+    if (list_head_empty(&c->io_wait_tokens)) {
         thread_unboost_self();
         if (act == IO_WAIT_END_YIELD)
             scheduler_yield();

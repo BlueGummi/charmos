@@ -164,7 +164,7 @@ xhci_request_init_blocking(struct xhci_request *req, struct xhci_command *cmd,
     req->callback        = xhci_wake_waiter;
     req->list_owner      = XHCI_REQ_LIST_NONE;
     req->port            = port;
-    INIT_LIST_HEAD(&req->list);
+    list_node_init(&req->list);
 }
 
 static inline void xhci_request_init(struct xhci_request           *req,
@@ -176,7 +176,7 @@ static inline void xhci_request_init(struct xhci_request           *req,
     req->completion_code = 0;
     req->type            = t;
     req->command         = cmd;
-    INIT_LIST_HEAD(&req->list);
+    list_node_init(&req->list);
     req->urb      = rq;
     req->private  = NULL;
     req->callback = xhci_cleanup;

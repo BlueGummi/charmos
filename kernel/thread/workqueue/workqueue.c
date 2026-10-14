@@ -121,8 +121,8 @@ struct workqueue *workqueue_create_full(struct workqueue_attributes *attrs,
         va_end(args_copy);
     }
 
-    INIT_LIST_HEAD(&wq->workers);
-    INIT_LIST_HEAD(&wq->works);
+    list_head_init(&wq->workers);
+    list_head_init(&wq->works);
 
     refcount_init(&wq->refcount, 1);
     atomic_store_rlx(&wq->state, WORKQUEUE_STATE_ACTIVE);
@@ -240,7 +240,7 @@ struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue) {
     if (!worker)
         return NULL;
 
-    INIT_LIST_HEAD(&worker->list_node);
+    list_node_init(&worker->list_node);
 
     worker->is_permanent = true;
     worker->inactivity_check_period = queue->attrs.idle_check.max;
@@ -295,7 +295,7 @@ struct work *work_init(struct work *work, work_function fn,
     atomic_init(&work->active, false);
     atomic_init(&work->enqueued, false);
     work->func = fn;
-    INIT_LIST_HEAD(&work->list_node);
+    list_node_init(&work->list_node);
     return work;
 }
 
