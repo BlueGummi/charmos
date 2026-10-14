@@ -43,9 +43,9 @@ bool thread_inherit_priority(struct thread *boosted, struct thread *from,
     enum irql irql, irql2;
     enum irql birql, firql;
 
-    thread_lock_two_pi_locks(boosted, from, &birql, &firql);
-
     thread_lock_two_runqueues(boosted, from, &sched, &sched2, &irql, &irql2);
+
+    thread_lock_two_pi_locks(boosted, from, &birql, &firql);
 
     bool did_boost = false;
     if (thread_get_state(boosted) == THREAD_STATE_READY) {
