@@ -41,10 +41,10 @@ TEST_DEFINE_INTEGRATION(apc, kernel_apc_runs_then_destroys) {
 
     apc_init(a, the_apc, NULL, the_apc_destroy);
 
-    TEST_ASSERT(thread_get(ted));
+    TEST_ASSERT(thread_getref(ted));
     TEST_ASSERT(apc_enqueue(ted, a, APC_TYPE_KERNEL));
-    thread_put(ted);
-    apc_put(a);
+    thread_putref(ted);
+    apc_putref(a);
 
     /* the thread only returns once it has seen the APC run */
     thread_join(ted);
@@ -66,10 +66,10 @@ TEST_DEFINE_INTEGRATION(apc, refcount_finalizes_at_zero) {
     atomic_store(&apc_ref_destroyed, 0);
     apc_init(&apc, the_apc, NULL, apc_ref_destroy);
 
-    TEST_ASSERT(apc_get(&apc));
-    apc_put(&apc);
+    TEST_ASSERT(apc_getref(&apc));
+    apc_putref(&apc);
     TEST_ASSERT_EQ(atomic_load(&apc_ref_destroyed), 0);
-    apc_put(&apc);
+    apc_putref(&apc);
     TEST_ASSERT_EQ(atomic_load(&apc_ref_destroyed), 1);
     return TEST_SUCCESS;
 }
@@ -77,7 +77,7 @@ TEST_DEFINE_INTEGRATION(apc, refcount_finalizes_at_zero) {
 TEST_DEFINE_INTEGRATION(apc, null_destroy_valid) {
     struct apc apc;
     apc_init(&apc, the_apc, NULL, NULL);
-    apc_put(&apc);
+    apc_putref(&apc);
     return TEST_SUCCESS;
 }
 
@@ -120,13 +120,13 @@ TEST_DEFINE_INTEGRATION(apc, cancel_releases_queue_ref) {
     TEST_ASSERT_NONNULL(apc);
     apc_init(apc, cancelled_apc, NULL, cancelled_apc_destroy);
 
-    TEST_ASSERT(thread_get(target));
+    TEST_ASSERT(thread_getref(target));
     TEST_ASSERT(apc_enqueue(target, apc, APC_TYPE_KERNEL));
     TEST_ASSERT(!apc_enqueue(target, apc, APC_TYPE_KERNEL));
     TEST_ASSERT(apc_cancel(target, apc));
-    thread_put(target);
+    thread_putref(target);
 
-    apc_put(apc);
+    apc_putref(apc);
     TEST_ASSERT_EQ(atomic_load(&apc_cancel_destroyed), 1);
     TEST_ASSERT(!atomic_load(&apc_cancel_ran));
 
@@ -174,10 +174,10 @@ TEST_DEFINE_INTEGRATION(apc, thread_rundown_releases_queue_ref) {
     TEST_ASSERT_NONNULL(apc);
     apc_init(apc, rundown_apc, NULL, rundown_apc_destroy);
 
-    TEST_ASSERT(thread_get(target));
+    TEST_ASSERT(thread_getref(target));
     TEST_ASSERT(apc_enqueue(target, apc, APC_TYPE_KERNEL));
-    thread_put(target);
-    apc_put(apc);
+    thread_putref(target);
+    apc_putref(apc);
 
     atomic_store(&apc_rundown_release, true);
     thread_join(target);
@@ -217,9 +217,9 @@ TEST_DEFINE_INTEGRATION(apc, caller_ref_allows_reuse) {
     struct apc apc;
     apc_init(&apc, reused_apc, NULL, reused_apc_destroy);
     for (size_t expected = 1; expected <= 2; expected++) {
-        TEST_ASSERT(thread_get(target));
+        TEST_ASSERT(thread_getref(target));
         TEST_ASSERT(apc_enqueue(target, &apc, APC_TYPE_KERNEL));
-        thread_put(target);
+        thread_putref(target);
         while (atomic_load(&apc_reuse_ran) < expected)
             scheduler_yield();
         while (atomic_load_acq(&apc.state) != APC_STATE_IDLE)
@@ -229,7 +229,7 @@ TEST_DEFINE_INTEGRATION(apc, caller_ref_allows_reuse) {
     thread_join(target);
     TEST_ASSERT_EQ(atomic_load(&apc_reuse_ran), 2);
     TEST_ASSERT_EQ(atomic_load(&apc_reuse_destroyed), 0);
-    apc_put(&apc);
+    apc_putref(&apc);
     TEST_ASSERT_EQ(atomic_load(&apc_reuse_destroyed), 1);
     return TEST_SUCCESS;
 }
@@ -277,14 +277,14 @@ TEST_DEFINE_INTEGRATION(apc, cancel_races_delivery) {
     struct apc *apc = apc_create();
     TEST_ASSERT_NONNULL(apc);
     apc_init(apc, raced_apc, NULL, raced_apc_destroy);
-    TEST_ASSERT(thread_get(target));
+    TEST_ASSERT(thread_getref(target));
     TEST_ASSERT(apc_enqueue(target, apc, APC_TYPE_KERNEL));
 
     atomic_store(&apc_race_release, true);
     bool cancelled = apc_cancel(target, apc);
-    thread_put(target);
+    thread_putref(target);
     atomic_store(&apc_race_settled, true);
-    apc_put(apc);
+    apc_putref(apc);
     thread_join(target);
 
     TEST_ASSERT_EQ(atomic_load(&apc_race_ran), (cancelled ? 0 : 1));
@@ -309,7 +309,7 @@ static void apc_event_test_thread(void *arg) TSA_NO_ANALYSIS {
     struct event_apc *evtapc = apc_event_apc_create();
     apc_event_apc_init(evtapc, the_event_apc, NULL, apc_destroy_free);
     TEST_ASSERT_VOID(apc_enqueue_event_apc(evtapc, APC_EVENT(apc_event_test)));
-    apc_put(&evtapc->apc);
+    apc_putref(&evtapc->apc);
 
     enum irql old = irql_raise(IRQL_DISPATCH_LEVEL);
     apc_event_signal(APC_EVENT(apc_event_test));

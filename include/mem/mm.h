@@ -97,24 +97,24 @@ enum mm_fault_result mm_do_anon_fault(struct vma_range *vma_range, vaddr_t addr,
 enum mm_fault_result mm_do_cow_fault(struct vma_range *vma_range, vaddr_t addr,
                                      enum mm_fault_flags);
 
-static inline bool mm_get(struct mm *mm) {
+static inline bool mm_getref(struct mm *mm) {
     return refcount_inc_not_zero(&mm->refcount);
 }
 
-static inline void mm_put(struct mm *mm) {
+static inline void mm_putref(struct mm *mm) {
     if (refcount_dec_and_test(&mm->refcount))
         mm_free(mm);
 }
 
 /* a new thread joins the address space */
-static inline bool mm_users_inc(struct mm *mm) {
+static inline bool mm_users_getref(struct mm *mm) {
     return refcount_inc_not_zero(&mm->users);
 }
 
-/* last user -> mm_exit(mm); then mm_put() */
-static inline void mm_users_put(struct mm *mm) {
+/* last user -> mm_exit(mm); then mm_putref() */
+static inline void mm_users_putref(struct mm *mm) {
     if (refcount_dec_and_test(&mm->users)) {
         mm_exit(mm);
-        mm_put(mm); /* release the mm_refcount that mm_users held */
+        mm_putref(mm); /* release the mm_refcount that mm_users held */
     }
 }

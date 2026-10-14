@@ -194,7 +194,7 @@ void vma_range_unlink_anon_vmas(struct vma_range *vma_range) {
         struct anon_vma *av = avc->anon_vma;
         avc_unlink(avc);
         avc_free(avc);
-        anon_vma_put(av);
+        anon_vma_putref(av);
     }
 
     vma_range->anon_vma = NULL;

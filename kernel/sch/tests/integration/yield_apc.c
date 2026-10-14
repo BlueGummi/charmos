@@ -32,14 +32,14 @@ static void yd_enqueue_main(void *arg) {
 
     apc_init(apc, yd_apc, NULL, apc_destroy_free);
     rcu_read_lock();
-    bool got = thread_get_rcu(target);
+    bool got = thread_getref_rcu(target);
     rcu_read_unlock();
 
     if (got) {
         apc_enqueue(target, apc, APC_TYPE_KERNEL);
-        thread_put(target);
+        thread_putref(target);
     }
-    apc_put(apc);
+    apc_putref(apc);
 }
 
 TEST_DEFINE_INTEGRATION(sched, yield_defers_kernel_apcs, .min_cores = 3) {

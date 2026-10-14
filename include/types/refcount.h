@@ -63,14 +63,14 @@ static inline void refcount_put_not_last(refcount_t *rc) {
     enforce(!refcount_dec_and_test(rc));
 }
 
-/* generate a _get function for a structure type, given a refcount
+/* generate a _getref function for a structure type, given a refcount
  * member name and a failure condition. if the failure condition (e.g. object
- * being cleaned up) is met, then the _get will return false. will panic if
+ * being cleaned up) is met, then the _getref will return false. will panic if
  * refcount drops to zero before we get a chance to decrement it.
  */
-#define REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(                    \
+#define REFCOUNT_GENERATE_GETREF_FOR_STRUCT_WITH_FAILURE_COND(                 \
     __struct, __refcount_member, __failure_member, __failure_state)            \
-    static inline bool __struct##_get(struct __struct *obj) {                  \
+    static inline bool __struct##_getref(struct __struct *obj) {               \
         uint32_t old;                                                          \
         while (true) {                                                         \
             old = atomic_load_acq(&obj->__refcount_member);                    \

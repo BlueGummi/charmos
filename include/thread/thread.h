@@ -506,10 +506,10 @@ void thread_unlock_two_pi_locks(struct thread *a, struct thread *b,
                                 enum irql *irq_b) TSA_NO_ANALYSIS;
 
 bool thread_in_context(void);
-REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(thread, refcount, flags,
-                                                   &THREAD_FLAG_DYING);
+REFCOUNT_GENERATE_GETREF_FOR_STRUCT_WITH_FAILURE_COND(thread, refcount, flags,
+                                                      &THREAD_FLAG_DYING);
 void reaper_enqueue(struct thread *t);
-void thread_put(struct thread *t);
+void thread_putref(struct thread *t);
 
 /* Yield nesting work:
  *
@@ -639,12 +639,12 @@ static inline void thread_set_runqueue(struct thread *t, struct scheduler *s) {
 /* RCU keeps the thread memory allocated so we inc_not_zero here
  * and everything is fine and dandy, everything must be in a
  * read side critical section, though */
-static inline bool thread_get_rcu(struct thread *t) {
+static inline bool thread_getref_rcu(struct thread *t) {
     if (!refcount_inc_not_zero(&t->refcount))
         return false;
 
     if (thread_get_flags(t) & THREAD_FLAG_DYING) {
-        thread_put(t);
+        thread_putref(t);
         return false;
     }
 
@@ -667,18 +667,18 @@ static inline enum irql thread_acquire_internal(struct thread *t,
 
 static inline enum irql thread_acquire(struct thread *t,
                                        bool *success) TSA_NO_ANALYSIS {
-    return thread_acquire_internal(t, thread_get, success);
+    return thread_acquire_internal(t, thread_getref, success);
 }
 
 static inline enum irql thread_acquire_rcu(struct thread *t,
                                            bool *success) TSA_NO_ANALYSIS {
-    return thread_acquire_internal(t, thread_get_rcu, success);
+    return thread_acquire_internal(t, thread_getref_rcu, success);
 }
 
 static inline void thread_release(struct thread *t,
                                   enum irql irql) TSA_NO_ANALYSIS {
     spin_unlock(&t->lock, irql);
-    thread_put(t);
+    thread_putref(t);
 }
 
 static inline bool thread_is_rt(struct thread *t) {

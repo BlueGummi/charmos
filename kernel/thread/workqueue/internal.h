@@ -38,11 +38,11 @@ static inline bool workqueue_needs_spawn(struct workqueue *queue) {
     return atomic_load(&queue->spawn_pending);
 }
 
-static inline bool workqueue_get(struct workqueue *queue) {
+static inline bool workqueue_getref(struct workqueue *queue) {
     return refcount_inc(&queue->refcount);
 }
 
-static inline void workqueue_put(struct workqueue *queue) {
+static inline void workqueue_putref(struct workqueue *queue) {
     if (refcount_dec_and_test(&queue->refcount))
         return workqueue_free(queue);
 }

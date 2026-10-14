@@ -30,7 +30,7 @@ TEST_DEFINE_UNIT(stack_depot, save_current_roundtrip) {
     TEST_ASSERT_EQ(n, rec->num_entries);
     TEST_ASSERT_MEM_EQ(entries, rec->entries, n * sizeof(uintptr_t));
 
-    stack_depot_put(handle);
+    stack_depot_putref(handle);
     return TEST_SUCCESS;
 }
 
@@ -56,16 +56,16 @@ TEST_DEFINE_UNIT(stack_depot, identical_trace_dedups) {
     TEST_ASSERT_PTR_EQ(c, a);
     TEST_ASSERT_EQ(refcount_read(&stack_depot_get_record(a)->refcount), 3);
 
-    stack_depot_put(c);
-    stack_depot_put(b);
+    stack_depot_putref(c);
+    stack_depot_putref(b);
     TEST_ASSERT_EQ(refcount_read(&stack_depot_get_record(a)->refcount), 1);
-    stack_depot_put(a);
+    stack_depot_putref(a);
 
     stack_handle_t d =
         stack_depot_save(trace, SD_TRACE_LEN, ALLOC_FLAGS_DEFAULT);
     TEST_ASSERT_NONNULL(d);
     TEST_ASSERT_EQ(refcount_read(&stack_depot_get_record(d)->refcount), 1);
-    stack_depot_put(d);
+    stack_depot_putref(d);
 
     return TEST_SUCCESS;
 }
@@ -100,10 +100,10 @@ TEST_DEFINE_UNIT(stack_depot, distinct_traces_get_distinct_records) {
     TEST_ASSERT_EQ(stack_depot_read(ht, out), SD_TRACE_LEN);
     TEST_ASSERT_MEM_EQ(out, tail, sizeof(tail));
 
-    stack_depot_put(ht);
-    stack_depot_put(hp);
-    stack_depot_put(hb);
-    stack_depot_put(ha);
+    stack_depot_putref(ht);
+    stack_depot_putref(hp);
+    stack_depot_putref(hb);
+    stack_depot_putref(ha);
     return TEST_SUCCESS;
 }
 
@@ -134,7 +134,7 @@ TEST_DEFINE_UNIT(stack_depot, hash_bucket) {
     spin_unlock(&chain->lock, irql);
     TEST_ASSERT(found);
 
-    stack_depot_put(h);
+    stack_depot_putref(h);
     return TEST_SUCCESS;
 }
 
@@ -153,7 +153,7 @@ TEST_DEFINE_UNIT(stack_depot, bulk_save_roundtrip,
         if (!handles[i]) {
             /* OOM? Unwind + skip */
             for (size_t j = 0; j < i; j++)
-                stack_depot_put(handles[j]);
+                stack_depot_putref(handles[j]);
             vfree(handles);
             return TEST_SKIP(TEST_SKIP_RAM_LOW);
         }
@@ -172,7 +172,7 @@ TEST_DEFINE_UNIT(stack_depot, bulk_save_roundtrip,
         TEST_ASSERT_PTR_EQ(
             stack_depot_save(want, SD_TRACE_LEN, ALLOC_FLAGS_DEFAULT),
             handles[i]);
-        stack_depot_put(handles[i]);
+        stack_depot_putref(handles[i]);
     }
 
     for (size_t i = 0; i < count; i++)
@@ -180,7 +180,7 @@ TEST_DEFINE_UNIT(stack_depot, bulk_save_roundtrip,
             TEST_ASSERT_PTR_NE(handles[i], handles[j]);
 
     for (size_t i = 0; i < count; i++)
-        stack_depot_put(handles[i]);
+        stack_depot_putref(handles[i]);
 
     vfree(handles);
     return TEST_SUCCESS;
@@ -203,7 +203,7 @@ TEST_DEFINE_UNIT(stack_depot, random_save_put_churn,
             uintptr_t got[STACK_TRACE_MAX_DEPTH] = {0};
             TEST_ASSERT_EQ(stack_depot_read(live[i], got), SD_TRACE_LEN);
             TEST_ASSERT_MEM_EQ(got, trace, sizeof(trace));
-            stack_depot_put(live[i]);
+            stack_depot_putref(live[i]);
             live[i] = NULL;
         } else {
             live[i] =
@@ -216,7 +216,7 @@ TEST_DEFINE_UNIT(stack_depot, random_save_put_churn,
 
     for (size_t i = 0; i < SD_CHURN_SET; i++)
         if (live[i])
-            stack_depot_put(live[i]);
+            stack_depot_putref(live[i]);
 
     return TEST_SUCCESS;
 }
@@ -236,7 +236,7 @@ TEST_DEFINE_UNIT(stack_depot, save_current_dedup) {
     TEST_ASSERT_PTR_EQ(h[0], h[1]);
     TEST_ASSERT_EQ(refcount_read(&stack_depot_get_record(h[0])->refcount), 2);
 
-    stack_depot_put(h[1]);
-    stack_depot_put(h[0]);
+    stack_depot_putref(h[1]);
+    stack_depot_putref(h[0]);
     return TEST_SUCCESS;
 }

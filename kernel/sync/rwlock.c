@@ -52,7 +52,7 @@ static inline bool rwlock_locked_with_type(struct rwlock *lock,
     return false;
 }
 
-static struct thread *rwlock_get_owner_ref(struct rwlock *lock) {
+static struct thread *rwlock_getref_owner(struct rwlock *lock) {
     struct thread *owner;
 
     rcu_read_lock();
@@ -60,7 +60,7 @@ static struct thread *rwlock_get_owner_ref(struct rwlock *lock) {
     owner = RWLOCK_WRITER_HELD(word)
                 ? (struct thread *) RWLOCK_GET_OWNER_FROM_WORD(word)
                 : NULL;
-    if (owner && !thread_get_rcu(owner))
+    if (owner && !thread_getref_rcu(owner))
         owner = NULL;
     rcu_read_unlock();
 
@@ -281,10 +281,10 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
         enforce(RWLOCK_GET_PRIO_CEIL(lword) &&
                 "rwlock prio ceiling cannot be 0 (background)");
 
-        struct thread *owner = rwlock_get_owner_ref(lock);
+        struct thread *owner = rwlock_getref_owner(lock);
         if (owner) {
             /* Same idea as mutex.c */
-            thread_put(owner);
+            thread_putref(owner);
         }
         turnstile_block(ts, queue, lock, irql_out, owner);
 

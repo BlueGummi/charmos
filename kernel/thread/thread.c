@@ -383,7 +383,7 @@ void thread_free(struct thread *t) {
     vfree(t->turnstile);
     apc_rundown_thread(t);
     thread_free_stack(t);
-    log_site_put(t->log_site);
+    log_site_putref(t->log_site);
     vfree(t);
 }
 
@@ -391,7 +391,7 @@ static void thread_reap_rcu(struct rcu_cb *cb) {
     reaper_enqueue(container_of(cb, struct thread, free_rcu));
 }
 
-void thread_put(struct thread *t) {
+void thread_putref(struct thread *t) {
     if (!refcount_dec_and_test(&t->refcount))
         return;
 

@@ -53,8 +53,8 @@ struct event_apc *apc_event_apc_create(void);
 void apc_init(struct apc *a, apc_func_t fn, void *arg1, apc_destroy_t destroy);
 void apc_event_apc_init(struct event_apc *a, apc_func_t fn, void *arg1,
                         apc_destroy_t destroy);
-bool apc_get(struct apc *a);
-void apc_put(struct apc *a);
+bool apc_getref(struct apc *a);
+void apc_putref(struct apc *a);
 void apc_destroy_free(struct apc *a);
 void apc_event_signal(struct apc_event_desc *desc);
 

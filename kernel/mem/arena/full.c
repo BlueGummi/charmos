@@ -107,6 +107,6 @@ err_checked arena_on_hook_full(struct arena *a, enum arena_hook_type hook) {}
 
 bool arena_is_empty_full(struct arena *a) {}
 
-bool arena_get_full(struct arena *a) {}
+bool arena_getref_full(struct arena *a) {}
 
-void arena_put_full(struct arena *a) {}
+void arena_putref_full(struct arena *a) {}

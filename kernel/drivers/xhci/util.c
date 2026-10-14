@@ -84,7 +84,7 @@ void xhci_cleanup(struct xhci_device *dev, struct xhci_request *req) {
     vfree(req->command);
     vfree(req);
 
-    usb_device_put(udev);
+    usb_device_putref(udev);
 }
 
 struct xhci_ring *xhci_allocate_ring() {

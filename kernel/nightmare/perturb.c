@@ -160,14 +160,14 @@ void nightmare_perturb_apc_spammer(struct nightmare_ctx *ctx,
             struct test_conc_worker *target_worker =
                 &nightmare_runtime.conc.workers[idx];
             struct thread *target_th = atomic_load_acq(&target_worker->th);
-            if (target_th && thread_get(target_th)) {
+            if (target_th && thread_getref(target_th)) {
                 struct apc *apc = apc_create();
                 if (apc) {
                     apc_init(apc, nightmare_apc_probe, ctx, apc_destroy_free);
                     apc_enqueue(target_th, apc, APC_TYPE_KERNEL);
-                    apc_put(apc);
+                    apc_putref(apc);
                 }
-                thread_put(target_th);
+                thread_putref(target_th);
             }
         }
 

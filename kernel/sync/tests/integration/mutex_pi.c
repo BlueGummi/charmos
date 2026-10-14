@@ -284,7 +284,7 @@ TEST_DEFINE_INTEGRATION(mutex, pi_revert, .min_cores = 2) {
                                       .flags = THREAD_FLAG_PINNED);
 
     rt->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;
-    enforce(thread_get(ts));
+    enforce(thread_getref(ts));
 
     thread_enqueue_on_core(ts, cpu);
     while (!atomic_load(&pi_revert_got))
@@ -296,7 +296,7 @@ TEST_DEFINE_INTEGRATION(mutex, pi_revert, .min_cores = 2) {
     thread_join(rt);
 
     uint32_t boosts = ts->boost_count;
-    thread_put(ts);
+    thread_putref(ts);
     TEST_ASSERT_EQ(boosts, 1);
     TEST_ASSERT(atomic_load(&pi_reverted));
 

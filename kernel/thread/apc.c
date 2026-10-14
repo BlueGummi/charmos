@@ -151,7 +151,7 @@ static void deliver_apc_type(struct thread *t, enum apc_type type) {
 
         apc_execute(apc);
         atomic_store_release(&apc->state, APC_STATE_IDLE);
-        apc_put(apc);
+        apc_putref(apc);
         drained++;
     }
 }
@@ -182,7 +182,7 @@ bool apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
         return false;
     }
 
-    if (!apc_get(a)) {
+    if (!apc_getref(a)) {
         thread_release(t, irql);
         return false;
     }
@@ -191,7 +191,7 @@ bool apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
     if (!atomic_cas_strong(&a->state, &expected, APC_STATE_QUEUED, mo_acq_rel,
                            mo_acquire)) {
         thread_release(t, irql);
-        apc_put(a);
+        apc_putref(a);
         return false;
     }
 
@@ -212,13 +212,13 @@ bool apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
 /* We can only enqueue and run from ourselves, no sync needed */
 bool apc_enqueue_event_apc(struct event_apc *a, struct apc_event_desc *desc) {
     enforce(desc);
-    if (!a || !apc_get(&a->apc))
+    if (!a || !apc_getref(&a->apc))
         return false;
 
     enum apc_state expected = APC_STATE_IDLE;
     if (!atomic_cas_strong(&a->apc.state, &expected, APC_STATE_QUEUED,
                            mo_acq_rel, mo_acquire)) {
-        apc_put(&a->apc);
+        apc_putref(&a->apc);
         return false;
     }
 
@@ -229,7 +229,7 @@ bool apc_enqueue_event_apc(struct event_apc *a, struct apc_event_desc *desc) {
     struct thread *t = thread_get_current();
     if (!thread_apc_sanity_check(t)) {
         atomic_store_release(&a->apc.state, APC_STATE_IDLE);
-        apc_put(&a->apc);
+        apc_putref(&a->apc);
         return false;
     }
 
@@ -302,7 +302,7 @@ bool apc_cancel(struct thread *t, struct apc *a) {
     thread_release(t, irql);
     if (removed) {
         atomic_store_release(&a->state, APC_STATE_IDLE);
-        apc_put(a);
+        apc_putref(a);
     }
     return removed;
 }
@@ -335,11 +335,11 @@ void apc_event_apc_init(struct event_apc *a, apc_func_t fn, void *arg1,
     a->execute_times = 0;
 }
 
-bool apc_get(struct apc *a) {
+bool apc_getref(struct apc *a) {
     return a && refcount_inc_not_zero(&a->refcount);
 }
 
-void apc_put(struct apc *a) {
+void apc_putref(struct apc *a) {
     enforce(a);
     if (!refcount_dec_and_test(&a->refcount))
         return;
@@ -383,7 +383,7 @@ void apc_rundown_thread(struct thread *t) {
     while ((a = apc_dequeue_head(&drained))) {
         a->owner = NULL;
         atomic_store_release(&a->state, APC_STATE_IDLE);
-        apc_put(a);
+        apc_putref(a);
     }
 }
 

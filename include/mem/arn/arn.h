@@ -71,8 +71,8 @@
 #define ARN_SIG_on_hook                                                        \
     enum err, cc_warn_unused_result, return, (enum arena_hook_type hook), (hook)
 #define ARN_SIG_is_empty bool, , return, (), ()
-#define ARN_SIG_get bool, , return, (), ()
-#define ARN_SIG_put void, , , (), ()
+#define ARN_SIG_getref bool, , return, (), ()
+#define ARN_SIG_putref void, , , (), ()
 
 #define ARN_UNPAREN_(...) __VA_ARGS__
 #define ARN_APPLY_(m, ...) m(__VA_ARGS__)

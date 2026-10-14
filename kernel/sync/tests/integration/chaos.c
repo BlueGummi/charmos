@@ -116,7 +116,7 @@ static void chaos_apc_spammer(void *arg) {
         }
 
         rcu_read_lock();
-        bool got = thread_get_rcu(states[id].t);
+        bool got = thread_getref_rcu(states[id].t);
         rcu_read_unlock();
 
         if (!got) {
@@ -130,9 +130,9 @@ static void chaos_apc_spammer(void *arg) {
             apc_init(a, chaos_apc_fn, NULL, apc_destroy_free);
             CHAOS_LOG("queue apc to %p", states[id].t);
             apc_enqueue(states[id].t, a, APC_TYPE_KERNEL);
-            apc_put(a);
+            apc_putref(a);
         }
-        thread_put(states[id].t);
+        thread_putref(states[id].t);
 
         thread_sleep_for_ms(10);
         scheduler_yield();
@@ -209,7 +209,7 @@ static void chaos_waker(void *arg) {
         }
 
         rcu_read_lock();
-        bool got = thread_get_rcu(states[id].t);
+        bool got = thread_getref_rcu(states[id].t);
         rcu_read_unlock();
 
         if (!got) {
@@ -224,7 +224,7 @@ static void chaos_waker(void *arg) {
         thread_wait_header_satisfy(&state->wait,
                                    THREAD_WAKE_REASON_SLEEP_MANUAL, NULL);
         spin_unlock(&state->lock, irql);
-        thread_put(states[id].t);
+        thread_putref(states[id].t);
 
         scheduler_yield();
     }
@@ -379,7 +379,7 @@ TEST_DEFINE_INTEGRATION(mutex, interruptible_apc_fuzz,
         threads[i] = thread_create("cs", chaos_sleeper, .arg = (void *) i,
                                    .joinable = true);
         TEST_ASSERT_NONNULL(threads[i]);
-        enforce(thread_get(threads[i]));
+        enforce(thread_getref(threads[i]));
         chaos_diag_attach(threads[i], i);
         thread_enqueue(threads[i]);
     }
@@ -426,7 +426,7 @@ TEST_DEFINE_INTEGRATION(mutex, interruptible_apc_fuzz,
 
     for (size_t i = 0; i < chaos_threads; i++) {
         chaos_diag_release(threads[i], i);
-        thread_put(threads[i]);
+        thread_putref(threads[i]);
     }
 
     chaos_diag_release(spammer, CHAOS_DIAG_SPAMMER);

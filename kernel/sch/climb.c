@@ -227,7 +227,7 @@ static void apply_handle(struct thread *t, struct climb_handle *ch) {
         struct rbt *tree = &sched->climb_threads;
 
         /* Get a reference for the tree */
-        enforce(thread_get(t));
+        enforce(thread_getref(t));
         climb_info("Insert %p to tree", cts);
         rbt_insert(tree, &cts->climb_node);
         cts->on_climb_tree = true;
@@ -303,17 +303,17 @@ static void climb_handle_act_other(struct thread *t, struct climb_handle *ch,
     spin_unlock(&sch->lock, irql);
 }
 
-static bool climb_get_ref_not_curr(struct thread *t) {
+static bool climb_getref_not_curr(struct thread *t) {
     if (t != thread_get_current())
-        return thread_get(t);
+        return thread_getref(t);
 
     return true;
 }
 
-/* Fine to thread_put here since we don't hold the scheduler lock */
-static void climb_drop_ref_not_curr(struct thread *t) {
+/* Fine to thread_putref here since we don't hold the scheduler lock */
+static void climb_putref_not_curr(struct thread *t) {
     if (t != thread_get_current())
-        thread_put(t);
+        thread_putref(t);
 }
 
 static void climb_handle_act(struct thread *t, struct climb_handle *h,
@@ -337,7 +337,7 @@ static void climb_handle_act_locked(struct thread *t, struct climb_handle *h,
 }
 
 void climb_handle_apply(struct thread *t, struct climb_handle *h) {
-    if (!climb_get_ref_not_curr(t))
+    if (!climb_getref_not_curr(t))
         return;
 
     climb_handle_act(t, h, apply_handle);
@@ -345,7 +345,7 @@ void climb_handle_apply(struct thread *t, struct climb_handle *h) {
 }
 
 void climb_handle_apply_locked(struct thread *t, struct climb_handle *h) {
-    if (!climb_get_ref_not_curr(t))
+    if (!climb_getref_not_curr(t))
         return;
 
     climb_handle_act_locked(t, h, apply_handle);
@@ -361,7 +361,7 @@ void climb_handle_remove(struct climb_handle *h) {
     struct thread *t = h->given_to;
     climb_handle_act(t, h, remove_handle);
     h->given_to = NULL;
-    climb_drop_ref_not_curr(t);
+    climb_putref_not_curr(t);
 }
 
 void climb_handle_remove_locked(struct climb_handle *h) {
@@ -373,7 +373,7 @@ void climb_handle_remove_locked(struct climb_handle *h) {
     struct thread *t = h->given_to;
     climb_handle_act_locked(t, h, remove_handle);
     h->given_to = NULL;
-    climb_drop_ref_not_curr(t);
+    climb_putref_not_curr(t);
 }
 
 void climb_thread_remove(struct thread *t) {
@@ -384,20 +384,20 @@ void climb_thread_remove(struct thread *t) {
     struct rbt *tree = &sched->climb_threads;
     struct rbt_node *node = &cts->climb_node;
 
-    bool put = false;
+    bool need_putref = false;
     if (rbt_has_node(tree, node)) {
         climb_info("Removing from tree %p", cts);
         rbt_delete(tree, node);
         cts->pressure_periods = 0;
         cts->on_climb_tree = false;
-        put = true;
+        need_putref = true;
     }
 
     spin_unlock(&sched->lock, irql_out);
 
     /* OK outside of the scheduler lock */
-    if (put)
-        thread_put(t);
+    if (need_putref)
+        thread_putref(t);
 }
 
 static struct climb_budget climb_budget_from_summary(struct climb_summary *s) {
@@ -442,7 +442,7 @@ static void climb_apply_budget(struct scheduler *sched,
 
 /* Threads dropped from the tree per period. NOTE: that this can
  * only happen AFTER the scheduler lock is dropped,
- * since the last thread_put() can wake the reaper.
+ * since the last thread_putref() can wake the reaper.
  *
  * TODO: There's probably a better way */
 #define CLIMB_DROP_BATCH 64
@@ -548,7 +548,7 @@ void climb_per_period_hook() {
     spin_unlock(&sched->lock, irql);
 
     for (size_t i = 0; i < drop.count; i++)
-        thread_put(drop.threads[i]);
+        thread_putref(drop.threads[i]);
 }
 
 void climb_thread_init(struct thread *t) {

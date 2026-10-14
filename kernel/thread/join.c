@@ -21,7 +21,7 @@ int thread_join(struct thread *t) {
     int status = t->exit_status;
     spin_unlock(&t->join_lock, irql);
 
-    thread_put(t);
+    thread_putref(t);
     return status;
 }
 
@@ -48,7 +48,7 @@ bool thread_join_timeout(struct thread *t, time_ms_t timeout_ms,
 
     spin_unlock(&t->join_lock, irql);
 
-    thread_put(t);
+    thread_putref(t);
     return true;
 }
 
@@ -57,5 +57,5 @@ void thread_detach(struct thread *t) {
     enforce(f & THREAD_FLAG_JOINABLE);
     enforce(!(f & THREAD_FLAG_JOINED), "detach races an in-flight join");
 
-    thread_put(t);
+    thread_putref(t);
 }

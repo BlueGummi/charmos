@@ -94,10 +94,10 @@ rt_scheduler_static_set_state(struct rt_scheduler_static *rts,
     atomic_store_release(&rts->state, new);
 }
 
-REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(
+REFCOUNT_GENERATE_GETREF_FOR_STRUCT_WITH_FAILURE_COND(
     rt_scheduler_static, refcount, state, == RT_SCHEDULER_STATIC_DESTROYING);
 
-static inline void rt_scheduler_static_put(struct rt_scheduler_static *rts) {
+static inline void rt_scheduler_static_putref(struct rt_scheduler_static *rts) {
     if (refcount_dec_and_test(&rts->refcount)) {
         enforce(rt_scheduler_static_get_state(rts) ==
                 RT_SCHEDULER_STATIC_DESTROYING);

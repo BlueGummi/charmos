@@ -144,12 +144,12 @@ struct thread *mutex_read_owner(struct mutex *mtx) {
     return (struct thread *) (MUTEX_READ_LOCK_WORD(mtx) & (~MUTEX_META_BITS));
 }
 
-static struct thread *mutex_get_owner_ref(struct mutex *mutex) {
+static struct thread *mutex_getref_owner(struct mutex *mutex) {
     struct thread *owner;
 
     rcu_read_lock();
     owner = mutex_read_owner(mutex);
-    if (owner && !thread_get_rcu(owner))
+    if (owner && !thread_getref_rcu(owner))
         owner = NULL;
     rcu_read_unlock();
 
@@ -168,12 +168,12 @@ size_t mutex_lock_get_backoff(size_t current_backoff) {
 }
 
 static bool mutex_owner_running(struct mutex *mutex) {
-    struct thread *owner = mutex_get_owner_ref(mutex);
+    struct thread *owner = mutex_getref_owner(mutex);
     if (!owner) /* no owner, can't possibly be running */
         return false;
 
     bool ret = thread_get_state(owner) == THREAD_STATE_RUNNING;
-    thread_put(owner);
+    thread_putref(owner);
 
     return ret;
 }
@@ -260,13 +260,13 @@ void mutex_lock_subclass_full(struct mutex *mutex, enum lock_subclass subclass,
 
         /* owner unchanged, waiter bit still the same...
          * time to do the slow path */
-        struct thread *owner = mutex_get_owner_ref(mutex);
+        struct thread *owner = mutex_getref_owner(mutex);
         if (owner == current_owner) {
             /* Turnstile chain lock stabilizes the lock word until block()
              * publishes the waiter, so we do not pin for the entire
              * blocking period, since unlock clears ts->owner
              * under this same chain before owner exits */
-            thread_put(owner);
+            thread_putref(owner);
             turnstile_block(ts, TURNSTILE_WRITER_QUEUE, mutex, ts_lock_irql,
                             owner);
 
@@ -275,7 +275,7 @@ void mutex_lock_subclass_full(struct mutex *mutex, enum lock_subclass subclass,
             owner_change_count = 0;
         } else {
             if (owner)
-                thread_put(owner);
+                thread_putref(owner);
             /* nevermind, something changed again */
             turnstile_unlock(mutex, ts_lock_irql);
         }

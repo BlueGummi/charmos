@@ -4,7 +4,7 @@
 
 #include <string.h>
 
-static void daemon_put(struct daemon *d) {
+static void daemon_putref(struct daemon *d) {
     if (refcount_dec_and_test(&d->refcount)) {
         atomic_store(&d->state, DAEMON_STATE_DEAD);
 
@@ -20,7 +20,7 @@ static void daemon_put(struct daemon *d) {
     }
 }
 
-static void daemon_get(struct daemon *d) {
+static void daemon_getref(struct daemon *d) {
     enforce(refcount_inc_not_zero(&d->refcount));
 }
 
@@ -86,7 +86,7 @@ static void daemon_thread_exit(struct daemon *daemon,
 
     vfree(self);
 
-    daemon_put(daemon);
+    daemon_putref(daemon);
     thread_exit();
 }
 
@@ -191,7 +191,7 @@ static struct daemon_thread *daemon_thread_create_bg(struct daemon *daemon) {
 static struct daemon_thread *
 daemon_thread_spawn(struct daemon *daemon,
                     struct daemon_thread *(*create)(struct daemon *) ) {
-    daemon_get(daemon);
+    daemon_getref(daemon);
     struct daemon_thread *t = create(daemon);
     if (!t) {
         refcount_put_not_last(&daemon->refcount);
@@ -342,7 +342,7 @@ void daemon_destroy(struct daemon *daemon) {
         semaphore_post(&daemon->bg_sem);
 
     /* Initial reference gone */
-    daemon_put(daemon);
+    daemon_putref(daemon);
 }
 
 struct daemon_thread *daemon_spawn_worker(struct daemon *daemon) {

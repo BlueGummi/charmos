@@ -38,8 +38,8 @@ void rmap_walk_anon(struct folio *f, rmap_visit_fn visit, void *private) {
 }
 
 /*
- * TODO: folio teardown must anon_vm_area_put(folio_get_anon_vma(f)) to balance
- * this get once folio_free() handles anon folios */
+ * TODO: folio teardown must anon_vma_putref(folio_get_anon_vma(f)) to balance
+ * this getref once folio_free() handles anon folios */
 
 /* First PTE for a new anon folio, now becoming anonymous, owned by the faulting
  * range's anon_vma, gaining first mapper */
@@ -48,8 +48,8 @@ void folio_add_anon_rmap_new(struct folio *f, struct vma_range *vr,
     enforce(vr->anon_vma);
 
     /* TODO: we might consider returning errors for this because
-     * the refcount get might fail? */
-    enforce(anon_vma_get(vr->anon_vma));
+     * the refcount getref might fail? */
+    enforce(anon_vma_getref(vr->anon_vma));
     folio_set_anon(f, vr->anon_vma, va_to_index(vr, va));
     folio_set_flag(f, FOLIO_FLAG_MAPPED);
     folio_mapcount_inc(f);

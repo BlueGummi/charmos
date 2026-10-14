@@ -136,7 +136,7 @@ static void xhci_free_new_rings(struct xhci_slot *orig,
 
 enum usb_error xhci_configure_device_endpoints(struct usb_device *usb) {
     struct xhci_slot *xslot = usb->slot;
-    if (!xhci_slot_get(xslot))
+    if (!xhci_slot_getref(xslot))
         return USB_ERR_NO_DEVICE;
 
     enum usb_error         err  = USB_OK;
@@ -144,7 +144,7 @@ enum usb_error xhci_configure_device_endpoints(struct usb_device *usb) {
     struct xhci_input_ctx *input_ctx =
         valloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
     if (!input_ctx) {
-        xhci_slot_put(xslot);
+        xhci_slot_putref(xslot);
         return USB_ERR_OOM;
     }
 
@@ -231,7 +231,7 @@ enum usb_error xhci_configure_device_endpoints(struct usb_device *usb) {
     *xslot = local_copy;
 
     spin_unlock(&xhci->lock, irql);
-    xhci_slot_put(xslot);
+    xhci_slot_putref(xslot);
 
     if (!xhci_request_ok(&request)) {
         xhci_warn("Failed to configure endpoints for slot %u",
@@ -244,7 +244,7 @@ enum usb_error xhci_configure_device_endpoints(struct usb_device *usb) {
 err_free:
     xhci_free_new_rings(xslot, &local_copy);
     vfree_aligned(input_ctx);
-    xhci_slot_put(xslot);
+    xhci_slot_putref(xslot);
     return err;
 }
 
@@ -286,7 +286,7 @@ static void xhci_work_port_disconnect(void *arg1) {
                 spin_lock_raw(&port->update_lock);
 
                 usb_teardown_device(dev);
-                xhci_slot_put(slot);
+                xhci_slot_putref(slot);
                 spin_unlock_raw(&port->update_lock);
             } else {
                 spin_unlock(&d->lock, irql);
@@ -398,7 +398,7 @@ static void xhci_process_single(struct xhci_device  *dev,
     request->callback(dev, request);
 
     if (rslot)
-        xhci_slot_put(rslot);
+        xhci_slot_putref(rslot);
 }
 
 static void xhci_worker_submit_waiting(struct xhci_device *dev) {

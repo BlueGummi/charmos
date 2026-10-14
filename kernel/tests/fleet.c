@@ -125,7 +125,7 @@ static bool test_fleet_attach(struct test_fleet *f, struct test_conc_worker *w,
         return false;
     }
 
-    enforce(thread_get(t));
+    enforce(thread_getref(t));
     atomic_store_release(&w->th, t);
     return true;
 }
@@ -163,7 +163,7 @@ struct test_conc_worker *test_fleet_spawn_on_core(struct test_fleet *f,
         return NULL;
     }
 
-    enforce(thread_get(t));
+    enforce(thread_getref(t));
     atomic_store_release(&w->th, t);
     thread_enqueue_on_core(t, core_id);
     return w;
@@ -264,11 +264,11 @@ static void test_fleet_drain(struct test_fleet *f, enum test_stop reason) {
     test_fleet_disarm_hard_deadline(f);
 }
 
-static void test_fleet_put(struct test_fleet *f) {
+static void test_fleet_thread_putref(struct test_fleet *f) {
     for (size_t i = 0; i < f->count; i++) {
         struct thread *t = atomic_xchg_acq_rel(&f->workers[i].th, NULL);
         if (t)
-            thread_put(t);
+            thread_putref(t);
     }
 
     atomic_store_release(&f->conc.active, false);
@@ -313,7 +313,7 @@ struct test_verdict test_fleet_join(struct test_fleet *f) {
     if (stalled || failed || spawn_failed)
         test_fleet_dump(f, stalled ? &ev : NULL);
 
-    test_fleet_put(f);
+    test_fleet_thread_putref(f);
     f->joined = true;
 
     if (spawn_failed)
@@ -345,7 +345,7 @@ bool test_fleet_teardown(struct test_context *ctx) {
 
         test_fleet_drain(f, TEST_STOP_BUDGET);
         test_liveness_stop(&f->liveness);
-        test_fleet_put(f);
+        test_fleet_thread_putref(f);
     }
 
     test_fleet_free_allocs(f);

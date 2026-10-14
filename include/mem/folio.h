@@ -132,11 +132,11 @@ static inline bool folio_test_set_flag(struct folio *f, enum folio_flags m) {
     return atomic_fetch_or_acq_rel(&f->flags, m) & m;
 }
 
-static inline bool folio_get(struct folio *f) {
+static inline bool folio_getref(struct folio *f) {
     return refcount_inc_not_zero(&f->refcount);
 }
 
-static inline void folio_put(struct folio *f) {
+static inline void folio_putref(struct folio *f) {
     if (refcount_dec_and_test(&f->refcount))
         folio_free(f);
 }

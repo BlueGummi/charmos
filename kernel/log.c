@@ -424,11 +424,11 @@ static void log_dump_site_pinned(struct log_site *site,
 
 void log_dump_site_with_opts(struct log_site *site,
                              struct log_dump_options opts) {
-    if (!site || !log_site_get(site))
+    if (!site || !log_site_getref(site))
         return;
 
     log_dump_site_pinned(site, opts);
-    log_site_put(site);
+    log_site_putref(site);
 }
 
 void log_dump_site_default(struct log_site *site) {
@@ -442,7 +442,7 @@ void log_dump_site(struct log_site *site) {
 void log_emit_full(struct log_site *site, struct log_handle *handle,
                    enum log_level ll, const char *func, const char *file,
                    int32_t line, uintptr_t ip, uint8_t narg, char *fmt, ...) {
-    if (!site || !log_site_get(site))
+    if (!site || !log_site_getref(site))
         return;
 
     enum log_level level = ll;
@@ -541,7 +541,7 @@ void log_emit_full(struct log_site *site, struct log_handle *handle,
         panic("fatal log event");
     }
 
-    log_site_put(site);
+    log_site_putref(site);
 }
 
 void log_sites_init(void) {

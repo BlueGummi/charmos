@@ -65,7 +65,7 @@ static inline bool percpu_rc_is_percpu(uintptr_t pcpu) {
  * the eventual cleanup goes "9 - 9 = 0" and handles it perfectly ok
  *
  */
-static inline void percpu_rc_get(struct percpu_rc *ref) {
+static inline void percpu_rc_getref(struct percpu_rc *ref) {
     rcu_read_lock();
     uintptr_t pcpu = atomic_load_rlx(&ref->percpu_count_ptr);
 
@@ -78,7 +78,7 @@ static inline void percpu_rc_get(struct percpu_rc *ref) {
     rcu_read_unlock();
 }
 
-static inline void percpu_rc_put(struct percpu_rc *ref) {
+static inline void percpu_rc_putref(struct percpu_rc *ref) {
     rcu_read_lock();
     uintptr_t pcpu = atomic_load_rlx(&ref->percpu_count_ptr);
 
@@ -95,7 +95,7 @@ static inline void percpu_rc_put(struct percpu_rc *ref) {
     }
 }
 
-static inline bool percpu_rc_tryget(struct percpu_rc *ref) {
+static inline bool percpu_rc_try_getref(struct percpu_rc *ref) {
     rcu_read_lock();
     uintptr_t pcpu = atomic_load_rlx(&ref->percpu_count_ptr);
 
@@ -115,7 +115,7 @@ static inline bool percpu_rc_tryget(struct percpu_rc *ref) {
     return true;
 }
 
-static inline bool percpu_rc_tryget_live(struct percpu_rc *ref) {
+static inline bool percpu_rc_try_getref_live(struct percpu_rc *ref) {
     rcu_read_lock();
     uintptr_t pcpu = atomic_load_rlx(&ref->percpu_count_ptr);
 

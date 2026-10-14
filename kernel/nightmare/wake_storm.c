@@ -251,14 +251,14 @@ static void wake_storm_release_all(struct wake_storm_state *state,
                                    bool count_issued) {
     for (size_t i = 0; i < state->sleeper_count; i++) {
         struct thread *t = atomic_load_acq(&state->sleepers[i].th);
-        if (!t || !thread_get(t))
+        if (!t || !thread_getref(t))
             continue;
         if (count_issued)
             wake_storm_signal(&state->sleepers[i], true);
         else
             thread_alert(t);
 
-        thread_put(t);
+        thread_putref(t);
     }
 }
 
@@ -281,7 +281,7 @@ static void wake_storm_waker_main(struct nightmare_ctx *ctx,
         size_t slot = test_rng_next(&self->rng) % state->sleeper_count;
         struct wake_storm_sleeper *target = &state->sleepers[slot];
         struct thread *t = atomic_load_acq(&target->th);
-        if (!t || !thread_get(t)) {
+        if (!t || !thread_getref(t)) {
             scheduler_yield();
             continue;
         }
@@ -302,7 +302,7 @@ static void wake_storm_waker_main(struct nightmare_ctx *ctx,
             wake_storm_signal(target, !uncounted);
         }
 
-        thread_put(t);
+        thread_putref(t);
         scheduler_yield();
     }
 

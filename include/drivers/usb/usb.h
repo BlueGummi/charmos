@@ -391,11 +391,12 @@ struct usb_request {
         (_req)->dev = (_dev);                                                  \
     } while (0)
 
-REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(usb_device, refcount, status,
-                                                   == USB_DEV_DISCONNECTED);
+REFCOUNT_GENERATE_GETREF_FOR_STRUCT_WITH_FAILURE_COND(usb_device, refcount,
+                                                      status,
+                                                      == USB_DEV_DISCONNECTED);
 
 void usb_free_device(struct usb_device *dev);
-static inline void usb_device_put(struct usb_device *dev) {
+static inline void usb_device_putref(struct usb_device *dev) {
     if (refcount_dec_and_test(&dev->refcount))
         usb_free_device(dev);
 }

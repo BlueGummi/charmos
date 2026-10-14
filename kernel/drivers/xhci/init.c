@@ -114,7 +114,7 @@ static void xhci_disable_slot_done(struct xhci_device  *dev,
 }
 
 /* DISABLE SLOT is issued asynchronously: its completion result is never
- * consumed, and it can be triggered by xhci_slot_put() dropping
+ * consumed, and it can be triggered by xhci_slot_putref() dropping
  * the last slot reference from inside xhci_process_single(), which runs on the
  * single command-completion worker
  *

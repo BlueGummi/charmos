@@ -183,11 +183,11 @@ void log_site_free(struct log_site *site);
 struct log_site *log_site_create(struct log_site_options opts);
 void log_handle_init(struct log_handle *h, enum log_handle_flags f);
 
-static inline bool log_site_get(struct log_site *site) {
+static inline bool log_site_getref(struct log_site *site) {
     return refcount_inc_not_zero(&site->refcount);
 }
 
-static inline void log_site_put(struct log_site *site) {
+static inline void log_site_putref(struct log_site *site) {
     if (refcount_dec_and_test(&site->refcount))
         log_site_free(site);
 }

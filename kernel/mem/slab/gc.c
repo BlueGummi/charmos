@@ -337,7 +337,7 @@ static void slab_gc_dequeue(struct slab_gc *gc, struct slab *slab) {
 #ifdef DEBUG_SLAB_DEEP
     for (size_t i = 0; i < slab->parent_cache->objs_per_slab; i++) {
         if (slab->traces[i])
-            stack_depot_put(slab->traces[i]);
+            stack_depot_putref(slab->traces[i]);
 
         slab->traces[i] = NULL;
     }

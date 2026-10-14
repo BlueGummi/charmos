@@ -22,7 +22,7 @@ void folio_free_folio_struct(struct folio *f) {
 /* TODO: implement later
 void folio_free(struct folio *folio) {
     if (folio_is_anon(folio)) {
-        anon_vma_put(folio_get_anon_vma(folio));
+        anon_vma_putref(folio_get_anon_vma(folio));
     } else if (folio_is_file_vma_range(folio)) {
         // TODO: When we get file VMA
     }

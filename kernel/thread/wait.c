@@ -201,14 +201,14 @@ struct thread *thread_wait_header_satisfy(struct thread_wait_header *header,
         uint64_t epoch = b->epoch;
         uint16_t key = b->key;
 
-        enforce(thread_get(t));
+        enforce(thread_getref(t));
         spin_unlock(&header->lock, irql);
 
         irql = spin_lock_high(&t->wait_lock);
         bool won = satisfy(t, epoch, key, reason, callback);
         spin_unlock(&t->wait_lock, irql);
 
-        thread_put(t);
+        thread_putref(t);
         if (won)
             return t;
     }

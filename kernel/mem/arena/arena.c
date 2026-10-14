@@ -331,11 +331,11 @@ struct arena_bin *arena_dumpster_find_leader(struct arena_dumpster *ad,
     /* list_del_rcu prevents the middle links from getting
      * their own references wiped, so traversal under the
      * leader's list is fine */
-    if (!arena_bin_get_rcu(first_leader)) {
+    if (!arena_bin_getref_rcu(first_leader)) {
         found = NULL;
         list_for_each_entry_rcu(
             entry, list_node_as_head(&first_leader->bin_list), bin_list) {
-            if (arena_bin_get_rcu(entry)) {
+            if (arena_bin_getref_rcu(entry)) {
                 found = &entry;
                 goto out;
             }
@@ -369,7 +369,7 @@ void arena_dumpster_add_bin(struct arena_dumpster *ad, struct arena_bin *ab) {
     mutex_unlock(mtx);
 
     if (leader)
-        arena_bin_put(leader);
+        arena_bin_putref(leader);
 }
 
 void arena_dumpster_delete_bin(struct arena_dumpster *ad,
@@ -388,7 +388,7 @@ void arena_dumpster_delete_bin(struct arena_dumpster *ad,
         list_for_each_entry_rcu(iter, list_node_as_head(&leader->bin_list),
                                 bin_list) {
             /* This is the next physical leader */
-            if (arena_bin_get_rcu(iter)) {
+            if (arena_bin_getref_rcu(iter)) {
                 next = iter;
                 break;
             }

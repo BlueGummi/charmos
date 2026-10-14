@@ -219,7 +219,7 @@ static void sd_dedup_worker(void *arg) {
         scheduler_yield();
 
     for (size_t i = 0; i < held_n; i++)
-        stack_depot_put(held[i]);
+        stack_depot_putref(held[i]);
 
     atomic_dec(&sd_mt.left);
 }
@@ -270,7 +270,7 @@ TEST_DEFINE_INTEGRATION(stack_depot, mt_dedup, TEST_INTENSITY(16, 64, 256)) {
 
     SD_MT_JOIN();
 
-    /* Last put drops the record off the chain */
+    /* Last putref drops the record off the chain */
     TEST_ASSERT_EQ(sd_chain_count(trace, SD_TRACE_LEN), 0);
     return TEST_SUCCESS;
 }
@@ -312,12 +312,12 @@ static bool sd_shared_body(size_t tid) {
         if (sd_rng(&rng) & 1)
             scheduler_yield();
 
-        /* Re read after potential preemption, so racing put does not
+        /* Re read after potential preemption, so racing putref does not
          * recycle the record under our ref */
         SD_WORKER_CHECK(stack_depot_read(h, got) == SD_TRACE_LEN);
         SD_WORKER_CHECK(!memcmp(got, want, sizeof(want)));
 
-        stack_depot_put(h);
+        stack_depot_putref(h);
     }
 
     return true;
@@ -335,7 +335,7 @@ TEST_DEFINE_INTEGRATION(stack_depot, mt_shared_set,
     sd_mt_spawn("sd_shared", sd_shared_worker, SD_MT_THREADS);
     SD_MT_JOIN();
 
-    /* Everything was put back and nothing left behind */
+    /* Everything was putref-ed back and nothing left behind */
     for (size_t id = 0; id < SD_MT_SET; id++) {
         uintptr_t trace[SD_TRACE_LEN];
         sd_make_trace(trace, SD_TRACE_LEN, SD_MT_SET_ID + id);
@@ -375,7 +375,7 @@ static bool sd_disjoint_body(size_t tid) {
         SD_WORKER_CHECK(again == mine[i]);
         SD_WORKER_CHECK(
             refcount_read(&stack_depot_get_record(mine[i])->refcount) == 2);
-        stack_depot_put(again);
+        stack_depot_putref(again);
 
         if ((i & 3) == 0)
             scheduler_yield();
@@ -403,7 +403,7 @@ static void sd_disjoint_worker(void *arg) {
 
     for (size_t i = 0; i < sd_mt_disjoint_per_thread; i++) {
         if (sd_disjoint_handles[tid][i]) {
-            stack_depot_put(sd_disjoint_handles[tid][i]);
+            stack_depot_putref(sd_disjoint_handles[tid][i]);
             sd_disjoint_handles[tid][i] = NULL;
         }
     }
@@ -439,7 +439,7 @@ TEST_DEFINE_INTEGRATION(stack_depot, mt_disjoint, TEST_INTENSITY(8, 32, 128)) {
 #define SD_MT_CHURN_ID 0x6000
 static size_t sd_mt_churn_iters_count = 4000;
 
-/* Tiny id set and save/put pair keeps refcounts around zero,
+/* Tiny id set and save/putref pair keeps refcounts around zero,
  * so we use that to test for races and issues here */
 static bool sd_churn_body(size_t tid) {
     uint64_t rng = sd_rng_seed(tid + SD_MT_THREADS);
@@ -465,7 +465,7 @@ static bool sd_churn_body(size_t tid) {
         SD_WORKER_CHECK(refcount_read(&stack_depot_get_record(h)->refcount) >
                         0);
 
-        stack_depot_put(h);
+        stack_depot_putref(h);
     }
 
     return true;
@@ -507,9 +507,9 @@ static cc_noinline bool sd_cur_body(size_t tid) {
     stack_handle_t a = h[0], b = h[1];
     if (!a || !b) {
         if (a)
-            stack_depot_put(a);
+            stack_depot_putref(a);
         if (b)
-            stack_depot_put(b);
+            stack_depot_putref(b);
         sd_mt_report_oom();
         return false;
     }
@@ -523,7 +523,7 @@ static cc_noinline bool sd_cur_body(size_t tid) {
         ok = false;
     }
 
-    stack_depot_put(b);
+    stack_depot_putref(b);
 
     if (ok) {
         sd_cur_lens[tid] = stack_depot_read(a, sd_cur_traces[tid]);
@@ -531,7 +531,7 @@ static cc_noinline bool sd_cur_body(size_t tid) {
         return true;
     }
 
-    stack_depot_put(a);
+    stack_depot_putref(a);
     return false;
 }
 
@@ -563,7 +563,7 @@ TEST_DEFINE_INTEGRATION(stack_depot, mt_save_current) {
     }
 
     for (size_t i = 0; i < SD_MT_THREADS; i++)
-        stack_depot_put(sd_cur_handles[i]);
+        stack_depot_putref(sd_cur_handles[i]);
 
     return TEST_SUCCESS;
 }

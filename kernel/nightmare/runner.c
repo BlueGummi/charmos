@@ -288,7 +288,7 @@ static bool nightmare_spawn_threads(void) {
             .arg = worker, .joinable = true);
         if (!thread)
             goto fail;
-        enforce(thread_get(thread));
+        enforce(thread_getref(thread));
         atomic_store_release(&worker->th, thread);
         created++;
     }
@@ -298,7 +298,7 @@ static bool nightmare_spawn_threads(void) {
         "nightmare_heartbeat", nightmare_heartbeat_main, .joinable = true);
     if (!heartbeat)
         goto fail;
-    enforce(thread_get(heartbeat));
+    enforce(thread_getref(heartbeat));
     atomic_store_release(&nightmare_runtime.conc.aux, heartbeat);
     return true;
 
@@ -339,12 +339,12 @@ static void nightmare_release_threads(void) {
         struct thread *thread =
             atomic_xchg_acq_rel(&nightmare_runtime.conc.workers[i].th, NULL);
         if (thread)
-            thread_put(thread);
+            thread_putref(thread);
     }
     struct thread *heartbeat =
         atomic_xchg_acq_rel(&nightmare_runtime.conc.aux, NULL);
     if (heartbeat)
-        thread_put(heartbeat);
+        thread_putref(heartbeat);
 }
 
 void nightmare_publish_perturb_verdict(struct nightmare_verdict verdict) {

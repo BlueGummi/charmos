@@ -141,7 +141,7 @@ TEST_DEFINE_UNIT(wait_block, apc_preserves_registration) {
             scheduler_yield();
     }
     thread_join(t);
-    apc_put(&apc);
+    apc_putref(&apc);
     TEST_ASSERT(!atomic_load(&c.lost_registration));
     TEST_ASSERT_EQ(atomic_load(&c.delivered), 5);
     TEST_ASSERT(list_head_empty(&c.header.waiters));

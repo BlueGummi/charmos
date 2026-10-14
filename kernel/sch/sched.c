@@ -406,7 +406,7 @@ void scheduler_switch_in() TSA_NO_ANALYSIS {
     struct thread *drop = us->drop_last_ref;
     us->drop_last_ref = NULL;
     if (drop)
-        thread_put(drop);
+        thread_putref(drop);
 
     scheduler_periodic_work_execute(PERIODIC_WORK_PERIOD_BASED);
     vmm_reclaim_page_tables();

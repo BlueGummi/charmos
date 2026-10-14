@@ -86,7 +86,8 @@ enum arena_caps { ARENA_CAP };
 /* Notes on prefixes, since this op table gets busy
  *
  * qry_* is the per-object/ptr "getter", set_* for the "setters", and
- * get_* is more of an "extract this from the structure"
+ * get_* is more of an "extract this from the structure", and
+ * getref/putref are the reference counting ops
  *
  * As for arena_params, we only use this whenever no *p exists. In other cases,
  * *p is intended to be used as the arena allocator as an overloadable
@@ -171,9 +172,9 @@ struct arena_ops {
 
     /* These merely handle the internal reference counting, notably
      * NOT destroying or recycling arenas */
-    bool (*get)(struct arena *a);
+    bool (*getref)(struct arena *a);
 
-    void (*put)(struct arena *a);
+    void (*putref)(struct arena *a);
 
     arena_ext_fn_t ext_fns[ARENA_MAX_EXT_FN];
 };
@@ -555,17 +556,17 @@ err_checked arena_on_hook_full(struct arena *a, enum arena_hook_type hook);
 
 bool arena_is_empty_full(struct arena *a);
 
-bool arena_get_full(struct arena *a);
+bool arena_getref_full(struct arena *a);
 
-void arena_put_full(struct arena *a);
+void arena_putref_full(struct arena *a);
 
 struct arena *arena_create_via(struct arena_desc *desc, struct arena_params *p);
 
 /* TODO: Figure out dying semantics */
-static inline bool arena_bin_get_rcu(struct arena_bin *bin) {
+static inline bool arena_bin_getref_rcu(struct arena_bin *bin) {
     return refcount_inc_not_zero(&bin->refcount);
 }
 
-static inline void arena_bin_put(struct arena_bin *bin) {
+static inline void arena_bin_putref(struct arena_bin *bin) {
     cc_unused(bin);
 }

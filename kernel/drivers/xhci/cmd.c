@@ -38,7 +38,7 @@ bool xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
     }
 
     if (cmd->slot) {
-        if (!xhci_slot_get(cmd->slot)) {
+        if (!xhci_slot_getref(cmd->slot)) {
             spin_unlock(&dev->lock, irql);
             return false;
         }
@@ -67,12 +67,12 @@ enum usb_error xhci_submit_interrupt_transfer(struct usb_request *req) {
     enum usb_error      return_status = USB_OK;
 
     /* we drop this ref in the callback to the urb */
-    if (!usb_device_get(dev)) {
+    if (!usb_device_getref(dev)) {
         return USB_ERR_NO_DEVICE;
     }
 
-    if (!xhci_slot_get(slot)) {
-        usb_device_put(dev);
+    if (!xhci_slot_getref(slot)) {
+        usb_device_putref(dev);
         return USB_ERR_NO_DEVICE;
     }
 
@@ -130,7 +130,7 @@ enum usb_error xhci_submit_interrupt_transfer(struct usb_request *req) {
         return_status = USB_ERR_NO_DEVICE;
 
 out:
-    xhci_slot_put(slot);
+    xhci_slot_putref(slot);
     return return_status;
 }
 
@@ -186,11 +186,11 @@ enum usb_error xhci_send_control_transfer(struct xhci_device *dev,
         return fail_control_transfer(USB_ERR_INVALID_ARGUMENT);
 
     /* request is responsible for dropping this */
-    if (!usb_device_get(req->dev))
+    if (!usb_device_getref(req->dev))
         return fail_control_transfer(USB_ERR_NO_DEVICE);
 
-    if (!xhci_slot_get(slot)) {
-        usb_device_put(req->dev);
+    if (!xhci_slot_getref(slot)) {
+        usb_device_putref(req->dev);
         return fail_control_transfer(USB_ERR_NO_DEVICE);
     }
 
@@ -200,8 +200,8 @@ enum usb_error xhci_send_control_transfer(struct xhci_device *dev,
 
     if (!xreq || !cmd || !emit) {
         /* drop USB dev ref, drop slot ref, dealloc, bye bye */
-        usb_device_put(req->dev);
-        xhci_slot_put(slot);
+        usb_device_putref(req->dev);
+        xhci_slot_putref(slot);
         vfree(xreq);
         vfree(cmd);
         vfree(emit);
@@ -225,11 +225,11 @@ enum usb_error xhci_send_control_transfer(struct xhci_device *dev,
     };
 
     if (!xhci_send_command(dev, cmd)) {
-        xhci_slot_put(slot);
+        xhci_slot_putref(slot);
         return fail_control_transfer(USB_ERR_NO_DEVICE);
     }
 
-    xhci_slot_put(slot);
+    xhci_slot_putref(slot);
     return USB_OK;
 }
 

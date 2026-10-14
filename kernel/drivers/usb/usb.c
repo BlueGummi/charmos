@@ -385,7 +385,7 @@ void usb_print_device(struct usb_device *dev) {
 }
 
 enum usb_error usb_init_device(struct usb_device *dev) {
-    if (!usb_device_get(dev))
+    if (!usb_device_getref(dev))
         return USB_ERR_NO_DEVICE;
 
     enum usb_error err = USB_OK;
@@ -421,7 +421,7 @@ out:
         dev->host->ops->reset_slot(dev);
     }
 
-    usb_device_put(dev);
+    usb_device_putref(dev);
     usb_trace("ok");
     return err;
 }
@@ -438,7 +438,7 @@ void usb_teardown_device(struct usb_device *dev) {
     dev->free     = NULL;
     dev->teardown = NULL;
 
-    usb_device_put(dev);
+    usb_device_putref(dev);
 }
 
 void usb_free_device(struct usb_device *dev) {

@@ -91,14 +91,14 @@ static void apc_enqueue_thread(void *arg) {
         cpu_pause();
 
     rcu_read_lock();
-    bool got = thread_get_rcu(si_t);
+    bool got = thread_getref_rcu(si_t);
     rcu_read_unlock();
 
     if (got) {
         apc_enqueue(si_t, apc, APC_TYPE_KERNEL);
-        thread_put(si_t);
+        thread_putref(si_t);
     }
-    apc_put(apc);
+    apc_putref(apc);
 }
 
 static void sleeping_thread(void *arg) {
@@ -163,7 +163,7 @@ static void apc_sub_enq_thread(void *arg) {
         cpu_pause();
 
     rcu_read_lock();
-    bool got = thread_get_rcu(sub_t);
+    bool got = thread_getref_rcu(sub_t);
     rcu_read_unlock();
 
     if (got) {
@@ -171,9 +171,9 @@ static void apc_sub_enq_thread(void *arg) {
         while (!atomic_load(&sub_apc_ran))
             scheduler_yield();
         thread_alert(sub_t);
-        thread_put(sub_t);
+        thread_putref(sub_t);
     }
-    apc_put(apc);
+    apc_putref(apc);
 }
 
 static void sleeping_sub_thread(void *arg) {

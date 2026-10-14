@@ -264,7 +264,7 @@ static void slab_free_virt_and_phys(struct slab *slab) {
 
         /* Might not necessarily exist */
         if (slab->traces[i])
-            stack_depot_put(slab->traces[i]);
+            stack_depot_putref(slab->traces[i]);
     }
 #endif
 
@@ -504,7 +504,7 @@ static void *slab_alloc_from(struct slab_cache *cache, stack_handle_t handle,
 #ifdef DEBUG_SLAB_DEEP
             enforce(&slab->traces[i] < (stack_handle_t *) slab->mem);
             if (slab->traces[i])
-                stack_depot_put(slab->traces[i]);
+                stack_depot_putref(slab->traces[i]);
 
             slab->traces[i] = handle;
 #endif
@@ -868,7 +868,7 @@ void *valloc_pages(size_t page_count, enum alloc_flags flags) {
 void slab_free_page_hdr(struct slab_page_hdr *hdr, enum alloc_behavior bh) {
     uint32_t pages = hdr->pages;
     if (hdr->handle)
-        stack_depot_put(hdr->handle);
+        stack_depot_putref(hdr->handle);
 
     page_free(hdr, pages, bh);
 }
@@ -951,7 +951,7 @@ void *valloc_try_from_magazine(struct slab_domain *domain,
 #ifdef DEBUG_SLAB_DEEP
         size_t idx = slab_allocation_index(slab, ret);
         if (slab->traces[idx])
-            stack_depot_put(slab->traces[idx]);
+            stack_depot_putref(slab->traces[idx]);
 
         slab->traces[idx] = handle;
 #endif

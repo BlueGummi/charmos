@@ -191,7 +191,7 @@ rt_unload_scheduler_static(struct rt_scheduler_static *rts) {
         goto done;
 
     rt_scheduler_static_set_state(rts, RT_SCHEDULER_STATIC_DESTROYING);
-    rt_scheduler_static_put(rts);
+    rt_scheduler_static_putref(rts);
     err = RT_SCHEDULER_ERR_OK;
 
 done:
@@ -415,7 +415,7 @@ void rt_scheduler_switch() {
     if (!into)
         return;
 
-    if (!rt_scheduler_static_get(into))
+    if (!rt_scheduler_static_getref(into))
         return clear_switch_and_post(pcpu, RT_SCHEDULER_ERR_NOT_FOUND);
 
     struct rt_scheduler_static *from = pcpu->active_mapping->static_bptr;
@@ -439,7 +439,7 @@ void rt_scheduler_switch() {
 
         clear_switch_and_post(pcpu, err);
         spin_unlock(&rt_global.switch_lock, girql);
-        rt_scheduler_static_put(into);
+        rt_scheduler_static_putref(into);
         return;
     }
 
@@ -534,14 +534,14 @@ void rt_scheduler_switch() {
     mark_active(next);
 
     /* Drop the old ref, only reachable via success path */
-    rt_scheduler_static_put(from);
+    rt_scheduler_static_putref(from);
 out:
     /* Post to the thread that sent us this */
     clear_switch_and_post(pcpu, err);
     rt_scheduler_release_two_mappings(curr, next, irql_curr, irql_next);
     spin_unlock(&rt_global.switch_lock, girql);
     if (put_into)
-        rt_scheduler_static_put(into);
+        rt_scheduler_static_putref(into);
 }
 
 enum rt_scheduler_error

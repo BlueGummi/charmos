@@ -58,13 +58,14 @@ static inline bool anon_vma_is_root(const struct anon_vma *av) {
     return av->root == av;
 }
 
-static inline bool anon_vma_get(struct anon_vma *av) {
+static inline bool anon_vma_getref(struct anon_vma *av) {
     return refcount_inc_not_zero(&av->refcount);
 }
 
 /* Drop ref: When forked anon_vma dies it releases its root pin, allowing
- * the put to go up the hierarchy, but it's bounded, as root is its own root */
-static inline void anon_vma_put(struct anon_vma *av) {
+ * the putref to go up the hierarchy, but it's bounded, as root is its own
+ * root */
+static inline void anon_vma_putref(struct anon_vma *av) {
     while (av) {
         struct anon_vma *root = av->root;
         if (!refcount_dec_and_test(&av->refcount))

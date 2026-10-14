@@ -98,7 +98,7 @@ static void worker_exit(struct workqueue *queue, struct worker *worker,
 
     worker_destroy(queue, worker);
 
-    workqueue_put(queue);
+    workqueue_putref(queue);
 
     thread_exit();
 }
@@ -110,7 +110,7 @@ void worker_main(void *unused) TSA_NO_ANALYSIS {
     struct workqueue *queue = w->workqueue;
     enforce(w);
 
-    enforce(workqueue_get(queue));
+    enforce(workqueue_getref(queue));
 
     while (true) {
 

@@ -52,7 +52,7 @@ int percpu_rc_init(struct percpu_rc *rc, percpu_rc_release_fn release,
     if (!counters)
         return ERR_NO_MEM;
 
-    /* Init with PERCPU_COUNT_BIAS + 1 so early put()s during kill don't
+    /* Init with PERCPU_COUNT_BIAS + 1 so early putref()s during kill don't
      * prematurely trigger release */
     atomic_store_rlx(&rc->count, 1 + PERCPU_COUNT_BIAS);
     atomic_store_release(&rc->percpu_count_ptr, (uintptr_t) counters);

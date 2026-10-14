@@ -54,7 +54,7 @@ stack_handle_t stack_depot_save(uintptr_t *entries, size_t num_entries,
 struct stack_depot_record *stack_depot_get_record(stack_handle_t key);
 size_t stack_depot_read(stack_handle_t key, uintptr_t *entries);
 void stack_depot_print(stack_handle_t key);
-void stack_depot_put(stack_handle_t key);
+void stack_depot_putref(stack_handle_t key);
 stack_handle_t stack_depot_save_current();
 
 static inline size_t stack_depot_get_record_count() {

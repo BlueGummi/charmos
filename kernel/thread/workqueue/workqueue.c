@@ -222,7 +222,7 @@ void workqueue_destroy(struct workqueue *queue) {
         condvar_broadcast_callback(&queue->queue_cv, mark_worker_exit);
     }
 
-    workqueue_put(queue);
+    workqueue_putref(queue);
 }
 
 void workqueue_kick(struct workqueue *queue) {

@@ -258,10 +258,10 @@ static inline bool xhci_request_ok(struct xhci_request *rq) {
     return rq->completion_code == CC_SUCCESS && rq->status == XHCI_REQUEST_OK;
 }
 
-REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(
+REFCOUNT_GENERATE_GETREF_FOR_STRUCT_WITH_FAILURE_COND(
     xhci_slot, refcount, state, >= XHCI_SLOT_STATE_DISCONNECTING);
 
-static inline void xhci_slot_put(struct xhci_slot *slot) {
+static inline void xhci_slot_putref(struct xhci_slot *slot) {
     if (refcount_dec_and_test(&slot->refcount)) {
         xhci_teardown_slot(slot);
     }
