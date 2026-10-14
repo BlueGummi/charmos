@@ -10,13 +10,13 @@ static void percpu_rc_switch_to_atomic_rcu(struct rcu_cb *cb) {
     struct percpu_rc *rc = container_of(cb, struct percpu_rc, rcu);
     uintptr_t pcpu = atomic_load_rlx(&rc->percpu_count_ptr);
 
-    int64_t *counters = PERCPU_RC_PTR(pcpu);
+    atomic_int64_t *counters = PERCPU_RC_PTR(pcpu);
     int64_t sum = 0;
 
     if (counters) {
         for (size_t i = 0; i < global.core_count; i++) {
-            sum += counters[i];
-            counters[i] = 0;
+            sum += atomic_load_rlx(&counters[i]);
+            atomic_store_rlx(&counters[i], 0);
         }
 
         if (!rc->allow_reinit) {
@@ -62,7 +62,7 @@ int percpu_rc_init(struct percpu_rc *rc, percpu_rc_release_fn release,
 
 void percpu_rc_destroy(struct percpu_rc *ref) {
     uintptr_t pcpu = atomic_load_rlx(&ref->percpu_count_ptr);
-    int64_t *counters = PERCPU_RC_PTR(pcpu);
+    atomic_int64_t *counters = PERCPU_RC_PTR(pcpu);
 
     if (counters) {
         vfree(counters);
@@ -88,7 +88,7 @@ void percpu_rc_reinit(struct percpu_rc *rc) {
             "percpu_rc was not initialized with allow_reinit");
 
     uintptr_t pcpu = atomic_load_rlx(&rc->percpu_count_ptr);
-    int64_t *counters = PERCPU_RC_PTR(pcpu);
+    atomic_int64_t *counters = PERCPU_RC_PTR(pcpu);
     enforce(counters, "percpu_rc counters missing during reinit");
 
     atomic_store_rlx(&rc->count, 1 + PERCPU_COUNT_BIAS);
@@ -104,10 +104,10 @@ int64_t percpu_rc_read(struct percpu_rc *rc) {
 
     if (percpu_rc_is_percpu(pcpu)) {
         int64_t sum = 0;
-        int64_t *counters = PERCPU_RC_PTR(pcpu);
+        atomic_int64_t *counters = PERCPU_RC_PTR(pcpu);
         if (counters) {
             for (size_t i = 0; i < global.core_count; i++)
-                sum += counters[i];
+                sum += atomic_load_rlx(&counters[i]);
         }
         return (atomic_load_rlx(&rc->count) - PERCPU_COUNT_BIAS) + sum;
     }

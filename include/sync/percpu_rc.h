@@ -29,7 +29,7 @@ enum percpu_rc_flags {
 #define PERCPU_RC_DEAD BIT(0)
 #define PERCPU_RC_ATOMIC BIT(1)
 #define PERCPU_RC_PTR_MASK (~(PERCPU_RC_DEAD | PERCPU_RC_ATOMIC))
-#define PERCPU_RC_PTR(m) (int64_t *) (m & PERCPU_RC_PTR_MASK)
+#define PERCPU_RC_PTR(m) (atomic_int64_t *) (m & PERCPU_RC_PTR_MASK)
 
 struct percpu_rc {
     atomic_int64_t count;
@@ -70,8 +70,8 @@ static inline void percpu_rc_get(struct percpu_rc *ref) {
     uintptr_t pcpu = atomic_load_rlx(&ref->percpu_count_ptr);
 
     if (cc_likely(percpu_rc_is_percpu(pcpu))) {
-        int64_t *counters = PERCPU_RC_PTR(pcpu);
-        counters[smp_id(TOPC_NONE)]++;
+        atomic_int64_t *counters = PERCPU_RC_PTR(pcpu);
+        atomic_inc_rlx(&counters[smp_id(TOPC_NONE)]);
     } else {
         atomic_inc_rlx(&ref->count);
     }
@@ -83,8 +83,8 @@ static inline void percpu_rc_put(struct percpu_rc *ref) {
     uintptr_t pcpu = atomic_load_rlx(&ref->percpu_count_ptr);
 
     if (cc_likely(percpu_rc_is_percpu(pcpu))) {
-        int64_t *counters = PERCPU_RC_PTR(pcpu);
-        counters[smp_id(TOPC_NONE)]--;
+        atomic_int64_t *counters = PERCPU_RC_PTR(pcpu);
+        atomic_dec_rlx(&counters[smp_id(TOPC_NONE)]);
         rcu_read_unlock();
     } else {
         rcu_read_unlock();
@@ -100,8 +100,8 @@ static inline bool percpu_rc_tryget(struct percpu_rc *ref) {
     uintptr_t pcpu = atomic_load_rlx(&ref->percpu_count_ptr);
 
     if (cc_likely(percpu_rc_is_percpu(pcpu))) {
-        int64_t *counters = PERCPU_RC_PTR(pcpu);
-        counters[smp_id(TOPC_NONE)]++;
+        atomic_int64_t *counters = PERCPU_RC_PTR(pcpu);
+        atomic_inc_rlx(&counters[smp_id(TOPC_NONE)]);
         rcu_read_unlock();
         return true;
     }
@@ -120,8 +120,8 @@ static inline bool percpu_rc_tryget_live(struct percpu_rc *ref) {
     uintptr_t pcpu = atomic_load_rlx(&ref->percpu_count_ptr);
 
     if (cc_likely(percpu_rc_is_percpu(pcpu))) {
-        int64_t *counters = PERCPU_RC_PTR(pcpu);
-        counters[smp_id(TOPC_NONE)]++;
+        atomic_int64_t *counters = PERCPU_RC_PTR(pcpu);
+        atomic_inc_rlx(&counters[smp_id(TOPC_NONE)]);
         rcu_read_unlock();
         return true;
     }
