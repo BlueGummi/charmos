@@ -294,7 +294,9 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
 
     /* make sure nothing funny happened */
     enforce(rwlock_locked_with_type(lock, acq_type));
-    thread_boost_self(RWLOCK_GET_PRIO_CEIL(lword));
+
+    if (acq_type == RWLOCK_READ)
+        thread_boost_self(RWLOCK_GET_PRIO_CEIL(lword));
 
 #ifdef DEBUG_LOCK_CHK
     if (checked_deep)
@@ -368,9 +370,10 @@ void rw_unlock_full(struct rwlock *lock,
     enforce(irq_not_in_interrupt());
     enforce(irql_get() <= IRQL_APC_LEVEL);
 
-#ifdef DEBUG_LOCK_CHK
     uintptr_t lock_word = RWLOCK_READ_LOCK_WORD(lock);
     bool is_writer = (lock_word & RWLOCK_WRITER_HELD_BIT) != 0;
+
+#ifdef DEBUG_LOCK_CHK
     enum lock_chk_mode chk_mode =
         is_writer ? LOCK_CHK_MODE_EXCLUSIVE : LOCK_CHK_MODE_SHARED;
     struct lock_chk_rel_req req;
@@ -465,7 +468,8 @@ void rw_unlock_full(struct rwlock *lock,
 #endif /* DEBUG_LOCK_CHK */
     crash_unwind_exit_rwlock(lock);
 
-    thread_unboost_self();
+    if (!is_writer)
+        thread_unboost_self();
 }
 
 bool rwlock_locked(struct rwlock *lock, enum rwlock_acquire_type type) {

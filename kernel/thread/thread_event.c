@@ -19,7 +19,7 @@ static inline bool resume_is_from_sleep(uint8_t wake_reason) {
 static const char *thread_prio_class_str(enum thread_prio_class c) {
     switch (c) {
     case THREAD_PRIO_CLASS_URGENT: return "URGENT";
-    case THREAD_PRIO_CLASS_RT: return "RT";
+    case THREAD_PRIO_CLASS_REALTIME: return "RT";
     case THREAD_PRIO_CLASS_TIMESHARE: return "TS";
     case THREAD_PRIO_CLASS_BACKGROUND: return "BG";
     default: return "?";

@@ -25,9 +25,8 @@ struct turnstile {
     struct thread_wait_header wait;
     struct thread *owner;
 
-    /* If a boost occurs, what did we give it? */
     bool applied_pi_boost;
-    enum thread_prio_class prio_class;
+    enum thread_prio_class old_prio_class;
     struct list_node hash_list;
 
     union {

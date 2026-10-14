@@ -74,7 +74,7 @@ scheduler_get_this_thread_queue(struct scheduler *sched,
                                 enum thread_prio_class prio) {
     switch (prio) {
     case THREAD_PRIO_CLASS_URGENT: return &sched->urgent_threads;
-    case THREAD_PRIO_CLASS_RT: return &sched->rt_threads;
+    case THREAD_PRIO_CLASS_REALTIME: return &sched->rt_threads;
     case THREAD_PRIO_CLASS_TIMESHARE: return NULL; /* Use the tree */
     case THREAD_PRIO_CLASS_BACKGROUND: return &sched->bg_threads;
     }

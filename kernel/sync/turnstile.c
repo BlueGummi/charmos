@@ -81,7 +81,7 @@ int32_t turnstile_thread_priority(struct thread *t) {
         return (TURNSTILE_TS_PRIO_BASE + t->weight) > TURNSTILE_TS_PRIO_MAX
                    ? TURNSTILE_TS_PRIO_MAX
                    : TURNSTILE_TS_PRIO_BASE + t->weight;
-    case THREAD_PRIO_CLASS_RT: return TURNSTILE_RT_PRIO;
+    case THREAD_PRIO_CLASS_REALTIME: return TURNSTILE_RT_PRIO;
     case THREAD_PRIO_CLASS_URGENT: return TURNSTILE_URGENT_PRIO;
     }
     unreachable("thread prio class invalid");
@@ -239,9 +239,9 @@ enum irql turnstile_lookup(void *obj, struct turnstile **out_ts) {
 
 void turnstile_pi_remove(struct turnstile *ts) {
     if (ts->applied_pi_boost)
-        thread_uninherit_priority(ts->prio_class);
+        thread_uninherit_priority(ts->old_prio_class);
 
-    ts->prio_class = 0;
+    ts->old_prio_class = THREAD_PRIO_CLASS_BACKGROUND;
     ts->applied_pi_boost = false;
 }
 
@@ -327,7 +327,7 @@ turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
             break;
 
         if (!cur_ts->applied_pi_boost) {
-            cur_ts->prio_class = old_class;
+            cur_ts->old_prio_class = old_class;
             cur_ts->applied_pi_boost = true;
         }
 

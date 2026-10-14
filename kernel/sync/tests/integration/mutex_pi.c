@@ -36,7 +36,8 @@ static void pi_ts_thread(void *nothing) {
     test_info("lock");
     atomic_store(&pi_ts_got, true);
 
-    while (thread_get_current()->perceived_prio_class != THREAD_PRIO_CLASS_RT)
+    while (thread_get_current()->perceived_prio_class !=
+           THREAD_PRIO_CLASS_REALTIME)
         cpu_pause();
 
     enforce(mutex_read_owner(&pi_mutex) == thread_get_current());
@@ -64,8 +65,8 @@ TEST_DEFINE_INTEGRATION(mutex, pi_boost) {
                           .flags = THREAD_FLAG_PINNED);
     pi_dum = thread_create("pi_dum", pi_dummy, .joinable = true,
                            .flags = THREAD_FLAG_PINNED);
-    pi_rt->perceived_prio_class = THREAD_PRIO_CLASS_RT;
-    pi_dum->perceived_prio_class = THREAD_PRIO_CLASS_RT;
+    pi_rt->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;
+    pi_dum->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;
 
     thread_enqueue_on_core(pi_ts, cpu);
 
@@ -99,7 +100,8 @@ static void pi_chain_ts2(void *arg) {
     test_info("ts2 lock b");
     atomic_store(&ts2_grabbed_b, true);
 
-    while (thread_get_current()->perceived_prio_class != THREAD_PRIO_CLASS_RT)
+    while (thread_get_current()->perceived_prio_class !=
+           THREAD_PRIO_CLASS_REALTIME)
         cpu_pause();
 
     test_info("ts2 boosted");
@@ -113,7 +115,8 @@ static void pi_chain_ts1(void *arg) {
     test_info("ts1 lock a");
     atomic_store(&ts1_grabbed_a, true);
 
-    while (thread_get_current()->perceived_prio_class != THREAD_PRIO_CLASS_RT)
+    while (thread_get_current()->perceived_prio_class !=
+           THREAD_PRIO_CLASS_REALTIME)
         cpu_pause();
 
     mutex_lock(&pi_mtx_b);
@@ -148,7 +151,7 @@ TEST_DEFINE_INTEGRATION(mutex, pi_chain, .min_cores = 2) {
     pi_rt2 = thread_create("pi_rt2", pi_chain_rt, .joinable = true,
                            .flags = THREAD_FLAG_PINNED);
 
-    pi_rt2->perceived_prio_class = THREAD_PRIO_CLASS_RT;
+    pi_rt2->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;
 
     thread_enqueue_on_core(pi_ts2, cpu);
     while (!atomic_load(&ts2_grabbed_b))
@@ -180,7 +183,8 @@ static void pi_multi_ts(void *arg) {
     test_info("multi_ts running");
     atomic_store(&ts_got, true);
 
-    while (thread_get_current()->perceived_prio_class != THREAD_PRIO_CLASS_RT)
+    while (thread_get_current()->perceived_prio_class !=
+           THREAD_PRIO_CLASS_REALTIME)
         cpu_pause();
 
     test_info("ts boosted");
@@ -216,7 +220,7 @@ TEST_DEFINE_INTEGRATION(mutex, pi_multi_waiters,
     for (size_t i = 0; i < num_rt; i++) {
         rt[i] = thread_create("pi_rt", pi_multi_rt, .joinable = true,
                               .flags = THREAD_FLAG_PINNED);
-        rt[i]->perceived_prio_class = THREAD_PRIO_CLASS_RT;
+        rt[i]->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;
     }
 
     thread_enqueue_on_core(ts, cpu);
@@ -246,12 +250,14 @@ static void pi_revert_ts(void *arg) {
 
     atomic_store(&pi_revert_got, true);
 
-    while (thread_get_current()->perceived_prio_class != THREAD_PRIO_CLASS_RT)
+    while (thread_get_current()->perceived_prio_class !=
+           THREAD_PRIO_CLASS_REALTIME)
         cpu_pause();
 
     mutex_unlock(&pi_revert_mtx);
 
-    while (thread_get_current()->perceived_prio_class == THREAD_PRIO_CLASS_RT)
+    while (thread_get_current()->perceived_prio_class ==
+           THREAD_PRIO_CLASS_REALTIME)
         cpu_pause();
 
     atomic_store(&pi_reverted, true);
@@ -277,7 +283,7 @@ TEST_DEFINE_INTEGRATION(mutex, pi_revert, .min_cores = 2) {
     struct thread *rt = thread_create("pi_rt", pi_revert_rt, .joinable = true,
                                       .flags = THREAD_FLAG_PINNED);
 
-    rt->perceived_prio_class = THREAD_PRIO_CLASS_RT;
+    rt->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;
     enforce(thread_get(ts));
 
     thread_enqueue_on_core(ts, cpu);

@@ -51,7 +51,7 @@ void scheduler_count_migratable_threads(struct scheduler *caller,
     /* count urgent, count realtime, count timesharing, count background */
     size_t c = caller->core_id;
     agg[THREAD_PRIO_CLASS_URGENT] = migratable_in_list(c, &s->urgent_threads);
-    agg[THREAD_PRIO_CLASS_RT] = migratable_in_list(c, &s->rt_threads);
+    agg[THREAD_PRIO_CLASS_REALTIME] = migratable_in_list(c, &s->rt_threads);
     agg[THREAD_PRIO_CLASS_BACKGROUND] = migratable_in_list(c, &s->bg_threads);
     agg[THREAD_PRIO_CLASS_TIMESHARE] = migratable_in_tree(c, &s->completed_rbt);
     agg[THREAD_PRIO_CLASS_TIMESHARE] += migratable_in_tree(c, &s->thread_rbt);

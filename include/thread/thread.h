@@ -683,7 +683,7 @@ static inline void thread_release(struct thread *t,
 
 static inline bool thread_is_rt(struct thread *t) {
     return t->perceived_prio_class == THREAD_PRIO_CLASS_URGENT ||
-           t->perceived_prio_class == THREAD_PRIO_CLASS_RT;
+           t->perceived_prio_class == THREAD_PRIO_CLASS_REALTIME;
 }
 
 static inline enum thread_wait_type thread_get_wait_type(struct thread *t) {

@@ -17,7 +17,7 @@ static uint64_t           pci_device_count;
 LOG_HANDLE_DEFINE_PRINT(pci);
 LOG_SITE_DEFINE_PRINT(pci);
 
-const char *pci_class_name(uint8_t class_code, enum lock_subclass subclass) {
+const char *pci_class_name(uint8_t class_code, uint8_t subclass) {
     switch (class_code) {
     case 0x01:
         switch (subclass) {
