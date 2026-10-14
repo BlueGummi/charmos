@@ -141,7 +141,9 @@ static inline void cpu_mask_fill(struct cpu_mask *m) {
 }
 
 #define cpu_mask_active_bits()                                                 \
-    (global.core_count ? global.core_count : CPU_MASK_BITS)
+    (global.core_count && global.core_count <= CPU_MASK_BITS                   \
+         ? global.core_count                                                   \
+         : CPU_MASK_BITS)
 
 #define cpu_mask_set_all(m) bitmap_fill((m)->bits, cpu_mask_active_bits())
 

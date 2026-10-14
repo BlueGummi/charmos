@@ -77,6 +77,9 @@ cc_no_asan void k_main(void) TSA_ACQUIRES_IRQS {
     printf_init(framebuffer_request.response->framebuffers[0]);
     err_facilities_init();
     crash_facilities_init();
+    enforce(global.core_count <= CPU_MASK_BITS,
+            "%zu CPUs exceed CPU_MASK_BITS (%d)", global.core_count,
+            CPU_MASK_BITS);
     ndjson_early_init();
     bootstage_advance(BOOTSTAGE_EARLY_FB);
 

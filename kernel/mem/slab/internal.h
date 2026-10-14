@@ -715,6 +715,7 @@ static inline void slab_list_del(struct slab *slab) {
 
 static inline void slab_list_add(struct slab_cache *cache, struct slab *slab) {
     enum slab_state state = slab->state;
+    enforce(state < SLAB_STANDARD_STATE_COUNT);
     slab->parent_cache = cache;
     list_add_tail(&slab->list, &cache->slabs[state]);
 

@@ -10,8 +10,8 @@
 #include <smp/core.h>
 #include <stdbool.h>
 #include <sync/lock_chk_types.h>
-#include <sync/lock_general.h>
 #include <sync/raw_spinlock.h>
+#include <tsa.h>
 
 struct TSA_CAPABILITY("spinlock") spinlock {
     struct raw_spinlock raw;

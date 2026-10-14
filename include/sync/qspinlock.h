@@ -12,7 +12,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <sync/lock_chk_types.h>
-#include <sync/lock_general.h>
+#include <tsa.h>
 
 /* TODO: I would really like to use a CNA lock/cohorting as an extension to
  * qspinlock, possibly also with a boot-time flag to enable/disable it

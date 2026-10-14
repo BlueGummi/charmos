@@ -2,8 +2,8 @@
 #include <mem/alloc.h>
 #include <stat_series.h>
 #include <sync/lock_chk_assert.h>
-#include <sync/lock_general.h>
 #include <time/time.h>
+#include <tsa.h>
 
 void stat_series_init(struct stat_series *s, struct stat_bucket *buckets,
                       uint32_t nbuckets, time_us_t bucket_us,

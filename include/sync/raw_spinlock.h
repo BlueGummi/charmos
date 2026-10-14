@@ -5,7 +5,7 @@
 #include <compiler/core.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <sync/lock_general.h>
+#include <tsa.h>
 
 struct TSA_CAPABILITY("spinlock") raw_spinlock {
     atomic_uint8_t state;

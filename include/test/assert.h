@@ -16,13 +16,20 @@
  * from test.h
  */
 
+cc_analyzer_noreturn static inline struct test_verdict
+test_assert_failed(const char *msg) {
+    return TEST_FAIL(msg);
+}
+
+cc_analyzer_noreturn static inline void test_assert_void_failed(void) {}
+
 /* ==================== Boolean + Truthiness ==================== */
 
 #define TEST_ASSERT(cond)                                                      \
     do {                                                                       \
         if (!(cond)) {                                                         \
             test_err("assert \"%s\" failed", #cond);                           \
-            return TEST_FAIL(#cond);                                           \
+            return test_assert_failed(#cond);                                  \
         }                                                                      \
     } while (0)
 
@@ -32,7 +39,7 @@
     do {                                                                       \
         if (cond) {                                                            \
             test_err("assert false \"%s\" failed (was true)", #cond);          \
-            return TEST_FAIL("!" #cond);                                       \
+            return test_assert_failed("!" #cond);                              \
         }                                                                      \
     } while (0)
 
@@ -40,7 +47,7 @@
     do {                                                                       \
         if (!(cond)) {                                                         \
             test_err("assert \"%s\" failed: " fmt, #cond, ##__VA_ARGS__);      \
-            return TEST_FAIL(#cond);                                           \
+            return test_assert_failed(#cond);                                  \
         }                                                                      \
     } while (0)
 
@@ -50,7 +57,7 @@
         const void *_p = (const void *) (ptr);                                 \
         if (_p != NULL) {                                                      \
             test_err("assert \"%s == NULL\" failed (got %p)", #ptr, _p);       \
-            return TEST_FAIL(#ptr " == NULL");                                 \
+            return test_assert_failed(#ptr " == NULL");                        \
         }                                                                      \
     } while (0)
 
@@ -59,7 +66,7 @@
         const void *_p = (const void *) (ptr);                                 \
         if (_p == NULL) {                                                      \
             test_err("assert \"%s != NULL\" failed (got NULL)", #ptr);         \
-            return TEST_FAIL(#ptr " != NULL");                                 \
+            return test_assert_failed(#ptr " != NULL");                        \
         }                                                                      \
     } while (0)
 
@@ -70,7 +77,7 @@
         if (_pa != _pb) {                                                      \
             test_err("assert ptr \"%s == %s\" failed (%p != %p)", #a, #b, _pa, \
                      _pb);                                                     \
-            return TEST_FAIL(#a " == " #b);                                    \
+            return test_assert_failed(#a " == " #b);                           \
         }                                                                      \
     } while (0)
 
@@ -80,7 +87,7 @@
         const void *_pb = (const void *) (b);                                  \
         if (_pa == _pb) {                                                      \
             test_err("assert ptr \"%s != %s\" failed (both %p)", #a, #b, _pa); \
-            return TEST_FAIL(#a " != " #b);                                    \
+            return test_assert_failed(#a " != " #b);                           \
         }                                                                      \
     } while (0)
 
@@ -96,7 +103,7 @@
                      (unsigned long long) (uint64_t) (_b),                     \
                      (unsigned long long) (uint64_t) (_a),                     \
                      (unsigned long long) (uint64_t) (_b));                    \
-            return TEST_FAIL(#a " == " #b);                                    \
+            return test_assert_failed(#a " == " #b);                           \
         }                                                                      \
     } while (0)
 
@@ -108,7 +115,7 @@
             test_err("assert \"%s != %s\" failed (both equal %llu / 0x%llx)",  \
                      #a, #b, (unsigned long long) (uint64_t) (_a),             \
                      (unsigned long long) (uint64_t) (_a));                    \
-            return TEST_FAIL(#a " != " #b);                                    \
+            return test_assert_failed(#a " != " #b);                           \
         }                                                                      \
     } while (0)
 
@@ -120,7 +127,7 @@
             test_err("assert \"%s < %s\" failed (%llu >= %llu)", #a, #b,       \
                      (unsigned long long) (uint64_t) (_a),                     \
                      (unsigned long long) (uint64_t) (_b));                    \
-            return TEST_FAIL(#a " < " #b);                                     \
+            return test_assert_failed(#a " < " #b);                            \
         }                                                                      \
     } while (0)
 
@@ -132,7 +139,7 @@
             test_err("assert \"%s <= %s\" failed (%llu > %llu)", #a, #b,       \
                      (unsigned long long) (uint64_t) (_a),                     \
                      (unsigned long long) (uint64_t) (_b));                    \
-            return TEST_FAIL(#a " <= " #b);                                    \
+            return test_assert_failed(#a " <= " #b);                           \
         }                                                                      \
     } while (0)
 
@@ -144,7 +151,7 @@
             test_err("assert \"%s > %s\" failed (%llu <= %llu)", #a, #b,       \
                      (unsigned long long) (uint64_t) (_a),                     \
                      (unsigned long long) (uint64_t) (_b));                    \
-            return TEST_FAIL(#a " > " #b);                                     \
+            return test_assert_failed(#a " > " #b);                            \
         }                                                                      \
     } while (0)
 
@@ -156,7 +163,7 @@
             test_err("assert \"%s >= %s\" failed (%llu < %llu)", #a, #b,       \
                      (unsigned long long) (uint64_t) (_a),                     \
                      (unsigned long long) (uint64_t) (_b));                    \
-            return TEST_FAIL(#a " >= " #b);                                    \
+            return test_assert_failed(#a " >= " #b);                           \
         }                                                                      \
     } while (0)
 
@@ -168,7 +175,7 @@
         if ((int64_t) (_a) != (int64_t) (_b)) {                                \
             test_err("assert \"%s == %s\" failed (%lld != %lld)", #a, #b,      \
                      (long long) (int64_t) (_a), (long long) (int64_t) (_b));  \
-            return TEST_FAIL(#a " == " #b);                                    \
+            return test_assert_failed(#a " == " #b);                           \
         }                                                                      \
     } while (0)
 
@@ -179,7 +186,7 @@
         if (!((int64_t) (_a) < (int64_t) (_b))) {                              \
             test_err("assert \"%s < %s\" failed (%lld >= %lld)", #a, #b,       \
                      (long long) (int64_t) (_a), (long long) (int64_t) (_b));  \
-            return TEST_FAIL(#a " < " #b);                                     \
+            return test_assert_failed(#a " < " #b);                            \
         }                                                                      \
     } while (0)
 
@@ -190,7 +197,7 @@
         if (!((int64_t) (_a) <= (int64_t) (_b))) {                             \
             test_err("assert \"%s <= %s\" failed (%lld > %lld)", #a, #b,       \
                      (long long) (int64_t) (_a), (long long) (int64_t) (_b));  \
-            return TEST_FAIL(#a " <= " #b);                                    \
+            return test_assert_failed(#a " <= " #b);                           \
         }                                                                      \
     } while (0)
 
@@ -201,7 +208,7 @@
         if (!((int64_t) (_a) > (int64_t) (_b))) {                              \
             test_err("assert \"%s > %s\" failed (%lld <= %lld)", #a, #b,       \
                      (long long) (int64_t) (_a), (long long) (int64_t) (_b));  \
-            return TEST_FAIL(#a " > " #b);                                     \
+            return test_assert_failed(#a " > " #b);                            \
         }                                                                      \
     } while (0)
 
@@ -212,7 +219,7 @@
         if (!((int64_t) (_a) >= (int64_t) (_b))) {                             \
             test_err("assert \"%s >= %s\" failed (%lld < %lld)", #a, #b,       \
                      (long long) (int64_t) (_a), (long long) (int64_t) (_b));  \
-            return TEST_FAIL(#a " >= " #b);                                    \
+            return test_assert_failed(#a " >= " #b);                           \
         }                                                                      \
     } while (0)
 
@@ -224,7 +231,7 @@
         if (_sa == NULL || _sb == NULL || strcmp(_sa, _sb) != 0) {             \
             test_err("assert str \"%s == %s\" failed (\"%s\" != \"%s\")", #a,  \
                      #b, _sa ? _sa : "<NULL>", _sb ? _sb : "<NULL>");          \
-            return TEST_FAIL(#a " == " #b);                                    \
+            return test_assert_failed(#a " == " #b);                           \
         }                                                                      \
     } while (0)
 
@@ -236,7 +243,7 @@
             (_sa != NULL && _sb != NULL && strcmp(_sa, _sb) == 0)) {           \
             test_err("assert str \"%s != %s\" failed (both \"%s\")", #a, #b,   \
                      _sa ? _sa : "<NULL>");                                    \
-            return TEST_FAIL(#a " != " #b);                                    \
+            return test_assert_failed(#a " != " #b);                           \
         }                                                                      \
     } while (0)
 
@@ -248,7 +255,7 @@
         if (memcmp(_ma, _mb, _sz) != 0) {                                      \
             test_err("assert mem \"%s == %s\" failed (size %zu)", #a, #b,      \
                      _sz);                                                     \
-            return TEST_FAIL(#a " == " #b);                                    \
+            return test_assert_failed(#a " == " #b);                           \
         }                                                                      \
     } while (0)
 
@@ -269,7 +276,7 @@
             test_err("assert mem_zero \"%s\" failed (nonzero byte 0x%02x at "  \
                      "offset %zu of %zu)",                                     \
                      #ptr, _pz[_first_bad], _first_bad, _sz);                  \
-            return TEST_FAIL(#ptr " is zero");                                 \
+            return test_assert_failed(#ptr " is zero");                        \
         }                                                                      \
     } while (0)
 
@@ -282,7 +289,7 @@
                      "0x%llx)",                                                \
                      #err, (long long) (int64_t) (_err),                       \
                      (unsigned long long) (uint64_t) (_err));                  \
-            return TEST_FAIL(#err " == 0");                                    \
+            return test_assert_failed(#err " == 0");                           \
         }                                                                      \
     } while (0)
 
@@ -298,7 +305,7 @@
                      #min, #val, #max, (unsigned long long) (uint64_t) (_v),   \
                      (unsigned long long) (uint64_t) (_min),                   \
                      (unsigned long long) (uint64_t) (_max));                  \
-            return TEST_FAIL(#val " in range [" #min ", " #max "]");           \
+            return test_assert_failed(#val " in range [" #min ", " #max "]");  \
         }                                                                      \
     } while (0)
 
@@ -309,7 +316,7 @@
         if (!BIT_TEST(_v, _b)) {                                               \
             test_err("assert bit set \"%s bit %u\" failed (val=0x%llx)", #val, \
                      _b, (unsigned long long) _v);                             \
-            return TEST_FAIL(#val " bit " #bit " is set");                     \
+            return test_assert_failed(#val " bit " #bit " is set");            \
         }                                                                      \
     } while (0)
 
@@ -320,7 +327,7 @@
         if (BIT_TEST(_v, _b)) {                                                \
             test_err("assert bit clear \"%s bit %u\" failed (val=0x%llx)",     \
                      #val, _b, (unsigned long long) _v);                       \
-            return TEST_FAIL(#val " bit " #bit " is clear");                   \
+            return test_assert_failed(#val " bit " #bit " is clear");          \
         }                                                                      \
     } while (0)
 
@@ -333,7 +340,7 @@
                      "mask=0x%llx)",                                           \
                      #val, #mask, #mask, (unsigned long long) _v,              \
                      (unsigned long long) _m);                                 \
-            return TEST_FAIL(#val " has mask " #mask);                         \
+            return test_assert_failed(#val " has mask " #mask);                \
         }                                                                      \
     } while (0)
 
@@ -342,6 +349,7 @@
     do {                                                                       \
         if (!(cond)) {                                                         \
             test_err("assert void \"%s\" failed", #cond);                      \
+            test_assert_void_failed();                                         \
             return;                                                            \
         }                                                                      \
     } while (0)
@@ -350,6 +358,7 @@
     do {                                                                       \
         if (!(cond)) {                                                         \
             test_err("assert void \"%s\" failed: " fmt, #cond, ##__VA_ARGS__); \
+            test_assert_void_failed();                                         \
             return;                                                            \
         }                                                                      \
     } while (0)
@@ -365,6 +374,7 @@
                      (unsigned long long) (uint64_t) (_b),                     \
                      (unsigned long long) (uint64_t) (_a),                     \
                      (unsigned long long) (uint64_t) (_b));                    \
+            test_assert_void_failed();                                         \
             return;                                                            \
         }                                                                      \
     } while (0)
@@ -374,6 +384,7 @@
         const void *_p = (const void *) (ptr);                                 \
         if (_p == NULL) {                                                      \
             test_err("assert void \"%s != NULL\" failed", #ptr);               \
+            test_assert_void_failed();                                         \
             return;                                                            \
         }                                                                      \
     } while (0)

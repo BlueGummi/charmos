@@ -7,10 +7,10 @@
 #include <stdint.h>
 #include <structures/sll.h>
 #include <sync/lock_chk_assert.h>
-#include <sync/lock_general.h>
 #include <thread/io_wait.h>
 #include <thread/thread.h>
 #include <time/spin_sleep.h>
+#include <tsa.h>
 
 static void ide_start_next_locked(struct ide_channel *chan)
     TSA_MUST_HOLD(&chan->lock);

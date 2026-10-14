@@ -432,11 +432,7 @@ void log_dump_site_with_opts(struct log_site *site,
 }
 
 void log_dump_site_default(struct log_site *site) {
-    if (!site || !log_site_get(site))
-        return;
-
     log_dump_site_with_opts(site, LOG_DUMP_DEFAULT);
-    log_site_put(site);
 }
 
 void log_dump_site(struct log_site *site) {

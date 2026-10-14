@@ -109,6 +109,12 @@
 #define cc_owner_takes(tag, arg_idx)
 #endif
 
+#if defined(cn_id_clang)
+#define cc_analyzer_noreturn __attribute__((analyzer_noreturn))
+#else
+#define cc_analyzer_noreturn
+#endif
+
 #define cc_error(msg) __attribute__((error(msg)))
 #define cc_warning(msg) __attribute__((warning(msg)))
 #define cc_nonnull(...) __attribute__((nonnull(__VA_ARGS__)))
@@ -119,9 +125,6 @@
 #define cc_counted_by(member)
 #endif
 
-/* Compile-time constant argument diagnostics, non-constants do not get
- * diagnostics. cc_diagnose_if: severity is error/warning, cc_enable_if:
- * declaration only viable when cond is true */
 #if cn_has_attribute(diagnose_if)
 #define cc_diagnose_if(cond, msg, severity)                                    \
     __attribute__((diagnose_if(cond, msg, severity)))

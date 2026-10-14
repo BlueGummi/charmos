@@ -2,9 +2,9 @@
 #pragma once
 #include <stdbool.h>
 #include <sync/lock_chk_types.h>
-#include <sync/lock_general.h>
 #include <sync/spinlock.h>
 #include <thread/wait.h>
+#include <tsa.h>
 
 struct TSA_CAPABILITY("mutex") mutex_simple {
     struct thread *owner;

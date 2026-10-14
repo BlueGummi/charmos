@@ -9,8 +9,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sync/lock_chk_assert.h>
-#include <sync/lock_general.h>
 #include <thread/workqueue.h>
+#include <tsa.h>
 
 static bool remove(struct bcache *cache, uint64_t key, uint64_t spb);
 

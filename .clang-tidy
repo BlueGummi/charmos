@@ -1,13 +1,12 @@
-# false positive suppression: // NOLINTNEXTLINE(clang-analyzer-<check>): <reason>
+# false positive suppression: trailing // NOLINT(*<CheckName>), e.g. // NOLINT(*Malloc)
+# (// NOLINTNEXTLINE(*Malloc) above the line when clang-format would wrap it)
 Checks: >
   -*,
   clang-analyzer-core.*,
   clang-analyzer-nullability.*,
   clang-analyzer-unix.*,
   clang-analyzer-security.ArrayBound
-WarningsAsErrors: >
-  clang-analyzer-core.*,
-  clang-analyzer-nullability.*
+WarningsAsErrors: '*'
 HeaderFilterRegex: '.*/(include|kernel)/.*'
 ExcludeHeaderFilterRegex: '.*/kernel/(uACPI|flanterm)/.*'
 CheckOptions:

@@ -300,7 +300,7 @@ void nightmare_perturb_alloc_pressure(struct nightmare_ctx *ctx,
             }
             vfree(slots[slot]);
             slots[slot] = NULL;
-            slot_sizes[slot] = 0;
+            slot_sizes[slot] = 0; // NOLINT(*Malloc)
             slot_patterns[slot] = 0;
         } else {
             size_t size = 16 + (test_rng_next(&worker->rng) % 8176);

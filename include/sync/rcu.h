@@ -6,7 +6,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <structures/list.h>
-#include <sync/lock_general.h>
+#include <tsa.h>
 
 struct thread;
 

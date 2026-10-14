@@ -6,8 +6,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sync/lock_chk_types.h>
-#include <sync/lock_general.h>
 #include <thread/thread_types.h>
+#include <tsa.h>
 
 /* rwlock: pointer sized shared reader writer lock
  *

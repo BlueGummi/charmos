@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <sync/lock_chk_types.h>
-#include <sync/lock_general.h>
+#include <tsa.h>
 
 /* mutex: pointer sized mutex
  *

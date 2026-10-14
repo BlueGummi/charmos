@@ -114,18 +114,11 @@ static inline void bitmap_copy(bitmap_word_t *dst, const bitmap_word_t *src,
 }
 
 static inline void bitmap_fill(bitmap_word_t *map, size_t nbits) {
-    size_t words = BITMAP_WORDS(nbits);
-    if (words == 0) {
-        return;
+    for (size_t i = 0; i * BITMAP_BITS_PER_WORD < nbits; i++) {
+        size_t left = nbits - i * BITMAP_BITS_PER_WORD;
+        map[i] = left >= BITMAP_BITS_PER_WORD ? ~(bitmap_word_t) 0
+                                              : ((bitmap_word_t) 1 << left) - 1;
     }
-
-    for (size_t i = 0; i < words - 1; i++) {
-        map[i] = ~(bitmap_word_t) 0;
-    }
-
-    size_t rem = nbits % BITMAP_BITS_PER_WORD;
-    map[words - 1] =
-        rem ? (((bitmap_word_t) 1 << rem) - 1) : ~(bitmap_word_t) 0;
 }
 
 static inline void bitmap_set_range(bitmap_word_t *map, size_t start,

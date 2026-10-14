@@ -103,6 +103,7 @@ enum usb_error xhci_submit_interrupt_transfer(struct usb_request *req) {
     struct xhci_command *cmd = vnew(cmd, ALLOC_ZERO);
 
     if (!cmd) {
+        vfree(xreq);
         return_status = USB_ERR_OOM;
         goto out;
     }

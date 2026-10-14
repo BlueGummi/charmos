@@ -5,8 +5,8 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <sync/lock_general.h>
 #include <sync/spinlock.h>
+#include <tsa.h>
 
 struct printf_cursor;
 struct limine_framebuffer;

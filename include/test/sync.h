@@ -7,9 +7,9 @@
 #include <sync/completion.h>
 #include <sync/completion_latch.h>
 #include <sync/condvar.h>
-#include <sync/lock_general.h>
 #include <sync/spinlock.h>
 #include <time/time.h>
+#include <tsa.h>
 
 /* Just a wrapper around completion_latch. Someday we could
  *

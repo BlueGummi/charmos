@@ -137,7 +137,7 @@
 #include <asm.h>
 #include <compiler/core.h>
 #include <stringify.h>
-#include <sync/lock_general.h>
+#include <tsa.h>
 
 TSA_REENTRANT_CAPABILITY_DECLARE("irql", IRQL_RAISED);
 

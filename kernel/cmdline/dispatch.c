@@ -199,6 +199,28 @@ static void cmdline_extract_value_into(void *dst, enum type_enum c_type,
     }
 }
 
+static void cmdline_value_free(struct cmdline_value *v) {
+    if (!cmdline_type_is_heap_allocated(v->type) || !v->data)
+        return;
+
+    if (v->type == CMDLINE_TYPE_LIST) {
+        struct cmdline_list *list = v->data;
+        for (size_t i = 0; i < list->count; i++)
+            cmdline_value_free(&list->items[i]);
+        vfree(list->items);
+    }
+
+    vfree(v->data);
+    v->data = NULL;
+}
+
+static void cmdline_consume_value_into(void *dst, enum type_enum c_type,
+                                       struct cmdline_value *v) {
+    cmdline_extract_value_into(dst, c_type, v);
+    if (!dst || c_type != TYPE_POINTER)
+        cmdline_value_free(v);
+}
+
 void dispatch_parse_value(struct cmdline_entry *e, const char *name,
                           const char *var, const char *val) {
     if (e->mappings) {
@@ -248,9 +270,8 @@ void dispatch_parse_value(struct cmdline_entry *e, const char *name,
         if (vtmp.type == CMDLINE_TYPE_ERR)
             panic("cmdline variable %s received incompatible value '%s'", var,
                   val);
-        if (e->value.write_to)
-            cmdline_extract_value_into(e->value.write_to, e->value.c_type,
-                                       &vtmp);
+        // NOLINTNEXTLINE(*Malloc)
+        cmdline_consume_value_into(e->value.write_to, e->value.c_type, &vtmp);
         return;
     }
 
@@ -258,7 +279,7 @@ void dispatch_parse_value(struct cmdline_entry *e, const char *name,
         cmdline_parse_value_for(val, cmdline_entry_get_accepted_mask(e));
     if (vtmp.type == CMDLINE_TYPE_ERR)
         panic("cmdline variable %s received incompatible value '%s'", var, val);
-    e->value = vtmp;
+    e->value = vtmp; // NOLINT(*Malloc)
 }
 
 static void validate_scalar_range(enum type_enum c_type, const void *ptr,
@@ -491,7 +512,8 @@ static bool schema_dispatch(const char *var, const char *val,
             struct cmdline_value vtmp = cmdline_parse_value_for(val, mask);
             if (vtmp.type == CMDLINE_TYPE_ERR)
                 panic("cmdline '%s': parse failed for '%s'", var, val);
-            cmdline_extract_value_into(target_ptr, matched_prop->c_type, &vtmp);
+            // NOLINTNEXTLINE(*Malloc)
+            cmdline_consume_value_into(target_ptr, matched_prop->c_type, &vtmp);
         } else {
             panic("cmdline schema '%s': property '%s' has no parser configured",
                   s->prefix, prop_name);

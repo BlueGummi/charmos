@@ -3,7 +3,7 @@
 #include <stack_depot.h>
 #include <string.h>
 #include <sync/lock_chk_assert.h>
-#include <sync/lock_general.h>
+#include <tsa.h>
 
 struct stack_depot_globals stack_depot_global = {0};
 FIXED_SIZE_RANGE_PERDOMAIN_DEFINE(

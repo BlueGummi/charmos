@@ -8,9 +8,9 @@
 #include <sch/sched.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <sync/lock_general.h>
 #include <sync/mutex.h>
 #include <thread/workqueue.h>
+#include <tsa.h>
 
 /*
  * This is the asynchronous block device

@@ -172,7 +172,8 @@ enum usb_error xhci_configure_device_endpoints(struct usb_device *usb) {
         /* Add one, there is a slot that the add flags account for */
         input_ctx->ctrl_ctx.add_flags |= BIT(input_ctx_idx + 1);
 
-        struct xhci_ep_ctx *ep_ctx = &input_ctx->ep_ctx[input_ctx_idx];
+        struct xhci_ep_ctx *ep_ctx =
+            &input_ctx->ep_ctx[input_ctx_idx]; // NOLINT(*ArrayBound)
 
         ep_ctx->ep_type = usb_to_xhci_ep_type(ep->in, ep->type);
 
@@ -302,12 +303,6 @@ static void xhci_work_port_connect(void *arg1) {
         xhci_trace("port_connect work down");
         semaphore_wait(&d->port_connect);
         xhci_trace("port_connect work up");
-
-        /* Level triggered drain: handle each port the ISR marked CONNECTING...
-         *
-         * Cannot depend on future interrupt to rescue a port, device present
-         * now may not produce a change bit transition, so CONNECTING port
-         * always leaves CONNECTED or DISCONNECTED */
 
         bool keep_going = true;
         while (keep_going) {
@@ -622,10 +617,6 @@ static void xhci_process_request(struct xhci_device *dev,
                                  struct xhci_trb    *trb) {
     struct xhci_request *found = xhci_lookup_trb(dev, trb);
 
-    /* No owner left for the completion: hotplug can create this scenario:
-     * a transfer request force completed by disconnect may post stale
-     * completion for already queued TRB */
-
     if (!found) {
         xhci_warn("Completion TRB with no matching request, dropping");
         return;
@@ -639,8 +630,6 @@ static void xhci_process_request(struct xhci_device *dev,
     xhci_request_move(dev, found, XHCI_REQ_LIST_PROCESSED);
 }
 
-/* ack the change bits. multiple changes can coalesce into one event. only
- * write back a 1 for the bits we saw */
 static void xhci_ack_port_changes(uint32_t cc_mem_io *portsc_ptr,
                                   uint32_t            observed) {
     uint32_t change = observed & XHCI_PORTSC_CHANGE_MASK;
@@ -673,11 +662,8 @@ static void xhci_start_port_disconnect(struct xhci_device *dev,
     semaphore_post(&dev->port_disconnect);
 }
 
-/* xHC only raises PSC on 0->1 bit change, edges get coalesced. driving
- * from the CCS level makes missed edges fix themselves, as lost transitions
- * are fixed on the next reconcile which converges the port to match HW */
-static void xhci_reconcile_port_locked(struct xhci_device *dev,
-                                       struct xhci_port   *port) {
+static void xhci_reconcile_port(struct xhci_device *dev,
+                                struct xhci_port   *port) {
     bool present            = xhci_read_portsc(dev, port->port_id) & PORTSC_CCS;
     bool tracked            = port->slot != NULL;
     enum xhci_port_state st = port->state;
@@ -688,15 +674,12 @@ static void xhci_reconcile_port_locked(struct xhci_device *dev,
         xhci_start_port_disconnect(dev, port);
 }
 
-/* Sweep each port... ONE PSC is generated even when many ports change at once,
- * never re-posting for a set change bit. A bit slower, but the safe route */
-
 static void xhci_scan_ports_locked(struct xhci_device *dev) {
     for (size_t i = 0; i < dev->ports; i++) {
         struct xhci_port   *port       = &dev->port_info[i];
         uint32_t cc_mem_io *portsc_ptr = xhci_portsc_ptr(dev, port->port_id);
         xhci_ack_port_changes(portsc_ptr, mmio_read_32(portsc_ptr));
-        xhci_reconcile_port_locked(dev, port);
+        xhci_reconcile_port(dev, port);
     }
 }
 

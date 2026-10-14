@@ -47,8 +47,11 @@ static bool fat12_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
 
     uint8_t *buf1 = valloc(disk->sector_size);
     uint8_t *buf2 = valloc(disk->sector_size);
-    if (!buf1 || !buf2)
+    if (!buf1 || !buf2) {
+        vfree(buf1);
+        vfree(buf2);
         return false;
+    }
 
     for (uint32_t fat_index = 0; fat_index < fs->bpb->num_fats; fat_index++) {
         uint32_t base = fs->bpb->reserved_sector_count + fat_index * fat_size;

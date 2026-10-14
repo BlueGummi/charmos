@@ -14,24 +14,24 @@
 struct vfs_node *tmpfs_create_vfs_node(struct tmpfs_node *tnode);
 
 struct vfs_node *tmpfs_mkroot(const char *mount_point) {
-    struct tmpfs_fs *fs = vnew(fs, ALLOC_ZERO);
-
     struct tmpfs_node *root = vnew(root, ALLOC_ZERO);
-    if (!fs || !root)
+    if (!root)
         goto err;
 
     root->type = TMPFS_DIR;
     root->name = strdup(mount_point);
     root->mode = 0755;
 
-    fs->root = root;
-
     struct vfs_node *vnode = tmpfs_create_vfs_node(root);
+    if (!vnode)
+        goto err;
+
     return vnode;
 
 err:
+    if (root)
+        vfree(root->name);
     vfree(root);
-    vfree(fs);
     return NULL;
 }
 

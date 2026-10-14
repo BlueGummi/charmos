@@ -12,10 +12,14 @@ RUN apt update -y && apt upgrade -y && \
     apt update -y && \
     apt install -y xorriso nasm qemu-system gdb make gcc gcc-${GCC_VERSION} git cmake binutils \
                    python3 nodejs \
-                   clang-${LLVM_VERSION} lld-${LLVM_VERSION} llvm-${LLVM_VERSION} && \
+                   clang-${LLVM_VERSION} clang-tidy-${LLVM_VERSION} lld-${LLVM_VERSION} \
+                   llvm-${LLVM_VERSION} && \
     update-alternatives \
         --install /usr/bin/clang clang /usr/bin/clang-${LLVM_VERSION} 100 \
         --slave /usr/bin/clang++ clang++ /usr/bin/clang++-${LLVM_VERSION} \
+        --slave /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-${LLVM_VERSION} \
+        --slave /usr/bin/run-clang-tidy run-clang-tidy \
+                /usr/bin/run-clang-tidy-${LLVM_VERSION} \
         --slave /usr/bin/lld lld /usr/bin/lld-${LLVM_VERSION} \
         --slave /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-${LLVM_VERSION} \
         --slave /usr/bin/llvm-symbolizer llvm-symbolizer \

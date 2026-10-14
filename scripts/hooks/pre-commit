@@ -133,12 +133,15 @@ if [ -f "$REPO_ROOT/scripts/tagscan.py" ]; then
 fi
 
 # Build check
+BUILD_FLAGS=(-DDEBUG_ALL=ON -DTEST_ALL=ON -DPROFILING_ALL=ON -DTEST_NIGHTMARE_ALL=ON -DINJECT_ALL=ON)
+
 run_build() {
     local comp="$1"
     local dir="build-precommit-$comp"
+    local flags=("${BUILD_FLAGS[@]}")
+    [ "$comp" = clang ] && flags+=(-DCHARMOS_CLANG_TIDY=ON)
     echo -e "\033[34m[pre-commit] Checking $comp build (incremental: $dir)...\033[0m"
-    if ! "$REPO_ROOT/scripts/build.sh" -B "$dir" -k "$comp" -- \
-        -DDEBUG_ALL=ON -DTEST_ALL=ON -DPROFILING_ALL=ON -DTEST_NIGHTMARE_ALL=ON -DINJECT_ALL=ON; then
+    if ! "$REPO_ROOT/scripts/build.sh" -B "$dir" -k "$comp" -- "${flags[@]}"; then
         echo -e "\033[31m$comp build failed. Commit aborted\033[0m"
         return 1
     fi
@@ -152,7 +155,7 @@ if [ -n "$STAGED_FILES" ]; then
     "" | y | Y | yes | Yes | YES | b | B)
         run_build gcc || exit 1
         run_build clang || exit 1
-        echo -e "\033[32m[pre-commit] Both GCC and Clang builds passed\033[0m"
+        echo -e "\033[32m[pre-commit] GCC and Clang (+ clang-tidy) builds passed\033[0m"
         ;;
     g | G | gcc | GCC)
         run_build gcc || exit 1

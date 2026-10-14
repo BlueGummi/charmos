@@ -371,17 +371,16 @@ enum err ext2_mount(struct partition *p, struct ext2_fs *fs,
     fs->group_desc =
         (void *) ext2_block_read(fs, gdt_block, &fs->gdesc_cache_ent);
 
-    struct ext2_inode *inode = vnew(inode, ALLOC_ZERO);
     struct ext2_full_inode *f = vnew(f, ALLOC_ZERO);
-    if (!f || !inode)
+    if (!f)
         return ERR_NO_MEM;
 
     struct bcache_entry *root_ent = NULL;
-
-    ext2_inode_read(fs, EXT2_ROOT_INODE, &root_ent);
-
-    if (!root_ent)
+    struct ext2_inode *root = ext2_inode_read(fs, EXT2_ROOT_INODE, &root_ent);
+    if (!root) {
+        vfree(f);
         return ERR_IO;
+    }
 
     if (!out_node) {
         vfree(f);
@@ -389,10 +388,9 @@ enum err ext2_mount(struct partition *p, struct ext2_fs *fs,
         return ERR_OK;
     }
 
-    memcpy(&f->node, inode, sizeof(struct ext2_inode));
+    memcpy(&f->node, root, sizeof(struct ext2_inode));
 
     f->inode_num = EXT2_ROOT_INODE;
-    vfree(inode);
 
     out_node->open_handles += 1;
     out_node->flags = ext2_to_vfs_flags(f->node.flags);
