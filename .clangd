@@ -1,5 +1,10 @@
 CompileFlags:
-  Add: [-std=gnu11]
+  Add:
+    - -std=gnu11
+    - -Wthread-safety
+    - -Wthread-safety-beta
+    - -Wthread-safety-pointer
+    - -fexperimental-late-parse-attributes
   Remove:
     - -Wno-reloc-rel-dword
     - -malign-data*

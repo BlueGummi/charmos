@@ -47,10 +47,10 @@
 
 LOG_SITE_DEFINE_PRINT(rcu);
 LOG_HANDLE_DEFINE_PRINT(rcu);
-static struct rcu_state rcu;
+static struct rcu_globals rcu_global;
 
 static inline struct rcu_node *rcu_leaf_for_cpu(cpu_id_t cpu) {
-    return &rcu.leaves[cpu / RCU_FANOUT];
+    return &rcu_global.leaves[cpu / RCU_FANOUT];
 }
 
 static inline bool rcu_node_pending(const struct rcu_node *node) {
@@ -85,7 +85,7 @@ static void rcu_propagate_done(struct rcu_node *node, uint64_t seq,
 
         if (!parent) {
             /* Root is done, GP over */
-            atomic_store_release(&rcu.gp_completed, seq);
+            atomic_store_release(&rcu_global.gp_completed, seq);
             return;
         }
 
@@ -110,7 +110,7 @@ static void rcu_report_cpu_locked(struct rcu_node *leaf, cpu_id_t cpu,
         return;
     }
 
-    atomic_store_rlx(&rcu.cpus[cpu].reported_seq, gp_seq_seen);
+    atomic_store_rlx(&rcu_global.cpus[cpu].reported_seq, gp_seq_seen);
 
     cpu_mask_clear(&leaf->qs_cpus, cpu);
     rcu_propagate_done(leaf, gp_seq_seen, irql);
@@ -129,7 +129,7 @@ void rcu_read_lock(void) TSA_NO_ANALYSIS {
     if (cc_likely(nesting != 0)) {
         ca_write_once(t->rcu_nesting, nesting + 1);
     } else {
-        uint64_t seq = atomic_load_acq(&rcu.gp_seq);
+        uint64_t seq = atomic_load_acq(&rcu_global.gp_seq);
         t->rcu_read_seq = seq;
         ca_write_once(t->rcu_nesting, 1);
     }
@@ -187,15 +187,35 @@ void rcu_read_unlock(void) TSA_NO_ANALYSIS {
     crash_unwind_exit_rcu();
 }
 
+static inline bool rcu_cpu_needs_qs(cpu_id_t cpu, uint64_t *seen) {
+    uint64_t s = atomic_load_acq(&rcu_global.gp_seq);
+    if (s == atomic_load_acq(&rcu_global.gp_completed))
+        return false; /* no GP in flight */
+
+    if (atomic_load_rlx(&rcu_global.cpus[cpu].reported_seq) == s)
+        return false; /* already reported */
+
+    *seen = s;
+    return true;
+}
+
 void rcu_note_context_switch(struct thread *outgoing) TSA_NO_ANALYSIS {
-    if (!cc_unlikely(rcu.ready))
+    if (!cc_unlikely(rcu_global.ready))
+        return;
+
+    bool must_register =
+        outgoing && ca_read_once(outgoing->rcu_nesting) && !outgoing->rcu_leaf;
+
+    uint64_t seen;
+    if (cc_likely(!must_register) &&
+        !rcu_cpu_needs_qs(smp_id(TOPC_IRQL), &seen))
         return;
 
     enum irql outer = irql_raise(IRQL_HIGH_LEVEL);
 
     cpu_id_t cpu = smp_id(TOPC_IRQL);
     struct rcu_node *leaf = rcu_leaf_for_cpu(cpu);
-    uint64_t gp_seq_seen = atomic_load_acq(&rcu.gp_seq);
+    uint64_t gp_seq_seen = atomic_load_acq(&rcu_global.gp_seq);
 
     enum irql irql = spin_lock_high(&leaf->lock);
 
@@ -222,7 +242,7 @@ void rcu_note_context_switch(struct thread *outgoing) TSA_NO_ANALYSIS {
 
 /* This just lets the CPU answer IRQ_NOP */
 void rcu_note_irq_exit(void) TSA_NO_ANALYSIS {
-    if (!rcu.ready)
+    if (!rcu_global.ready)
         return;
 
     enforce(irq_in_interrupt());
@@ -234,12 +254,12 @@ void rcu_note_irq_exit(void) TSA_NO_ANALYSIS {
     if (t && ca_read_once(t->rcu_nesting) && !t->rcu_leaf)
         return;
 
-    uint64_t gp_seq_seen = atomic_load_acq(&rcu.gp_seq);
-    if (gp_seq_seen == atomic_load_acq(&rcu.gp_completed))
+    uint64_t gp_seq_seen = atomic_load_acq(&rcu_global.gp_seq);
+    if (gp_seq_seen == atomic_load_acq(&rcu_global.gp_completed))
         return;
 
     cpu_id_t cpu = smp_id(TOPC_IRQ);
-    if (atomic_load_rlx(&rcu.cpus[cpu].reported_seq) == gp_seq_seen)
+    if (atomic_load_rlx(&rcu_global.cpus[cpu].reported_seq) == gp_seq_seen)
         return;
 
     /* Technically the IRQL stuff here is a no-op, but we'll
@@ -256,19 +276,19 @@ void rcu_note_irq_exit(void) TSA_NO_ANALYSIS {
 }
 
 void rcu_idle_enter(void) {
-    if (!rcu.ready)
+    if (!rcu_global.ready)
         return;
 
     enforce(!irqs_enabled());
 
-    atomic_store_release(&rcu.cpus[smp_id(TOPC_IFLAG)].idle, true);
+    atomic_store_release(&rcu_global.cpus[smp_id(TOPC_IFLAG)].idle, true);
 }
 
 void rcu_idle_exit(void) {
-    if (!rcu.ready)
+    if (!rcu_global.ready)
         return;
 
-    struct rcu_cpu *me = &rcu.cpus[smp_id(TOPC_IFLAG)];
+    struct rcu_cpu *me = &rcu_global.cpus[smp_id(TOPC_IFLAG)];
     if (cc_likely(!atomic_load_rlx(&me->idle)))
         return;
 
@@ -291,10 +311,10 @@ void rcu_defer(struct rcu_cb *cb, rcu_fn func) {
     enum irql outer = irql_raise(IRQL_HIGH_LEVEL);
 
 #ifdef TEST_ENABLED
-    cb->enqueued_waiting_on_gen = atomic_load_rlx(&rcu.gp_seq);
+    cb->enqueued_waiting_on_gen = atomic_load_rlx(&rcu_global.gp_seq);
 #endif
 
-    if (cc_unlikely(!rcu.ready)) {
+    if (cc_unlikely(!rcu_global.ready)) {
         /* Before rcu_init(), we have nothing, and the boot CPU
          * is the only thing running RCU operations, so we can just do this */
         irql_lower(outer);
@@ -302,7 +322,7 @@ void rcu_defer(struct rcu_cb *cb, rcu_fn func) {
         return;
     }
 
-    struct rcu_cpu *q = &rcu.cpus[smp_id(TOPC_IRQL)];
+    struct rcu_cpu *q = &rcu_global.cpus[smp_id(TOPC_IRQL)];
 
     enum irql irql = spin_lock_high(&q->lock);
     list_head_push_back(&q->list, &cb->list);
@@ -310,12 +330,12 @@ void rcu_defer(struct rcu_cb *cb, rcu_fn func) {
 
     irql_lower(outer);
 
-    semaphore_post(&rcu.sem);
+    semaphore_post(&rcu_global.sem);
 }
 
 static void rcu_detach_callbacks(struct list_head *batch) {
     for (cpu_id_t cpu = 0; cpu < global.core_count; cpu++) {
-        struct rcu_cpu *q = &rcu.cpus[cpu];
+        struct rcu_cpu *q = &rcu_global.cpus[cpu];
 
         enum irql irql = spin_lock_high(&q->lock);
         list_head_splice_back_init(batch, &q->list);
@@ -325,7 +345,7 @@ static void rcu_detach_callbacks(struct list_head *batch) {
 
 static bool rcu_callbacks_pending(void) {
     for (cpu_id_t cpu = 0; cpu < global.core_count; cpu++) {
-        struct rcu_cpu *q = &rcu.cpus[cpu];
+        struct rcu_cpu *q = &rcu_global.cpus[cpu];
 
         enum irql irql = spin_lock_high(&q->lock);
         bool empty = list_head_empty(&q->list);
@@ -338,7 +358,7 @@ static bool rcu_callbacks_pending(void) {
 }
 
 static bool rcu_work_pending(void) {
-    if (atomic_load_acq(&rcu.gp_requests) != 0)
+    if (atomic_load_acq(&rcu_global.gp_requests) != 0)
         return true;
     return rcu_callbacks_pending();
 }
@@ -366,8 +386,8 @@ static void rcu_kick_pending(uint64_t seq) TSA_NO_ANALYSIS {
     /* Pairs with xchg in rcu_idle_exit */
     cpu_memory_barrier();
 
-    for (size_t l = 0; l < rcu.leaf_count; l++) {
-        struct rcu_node *leaf = &rcu.leaves[l];
+    for (size_t l = 0; l < rcu_global.leaf_count; l++) {
+        struct rcu_node *leaf = &rcu_global.leaves[l];
 
         enum irql irql = spin_lock_high(&leaf->lock);
 
@@ -381,11 +401,11 @@ static void rcu_kick_pending(uint64_t seq) TSA_NO_ANALYSIS {
 
         cpu_id_t cpu;
         for_each_cpu(cpu, &owing) {
-            if (!atomic_load_acq(&rcu.cpus[cpu].idle))
+            if (!atomic_load_acq(&rcu_global.cpus[cpu].idle))
                 continue;
 
             cpu_mask_clear(&leaf->qs_cpus, cpu);
-            atomic_store_rlx(&rcu.cpus[cpu].reported_seq, seq);
+            atomic_store_rlx(&rcu_global.cpus[cpu].reported_seq, seq);
         }
 
         struct cpu_mask pending;
@@ -406,8 +426,8 @@ static void rcu_report_stall(uint64_t seq, time_ms_t elapsed) {
 
     rcu_warn("grace period %lu stalled for %lu ms\n", seq, elapsed);
 
-    for (size_t l = 0; l < rcu.leaf_count; l++) {
-        struct rcu_node *leaf = &rcu.leaves[l];
+    for (size_t l = 0; l < rcu_global.leaf_count; l++) {
+        struct rcu_node *leaf = &rcu_global.leaves[l];
 
         struct cpu_mask pending = CPU_MASK_INIT;
 
@@ -451,9 +471,9 @@ static void rcu_report_stall(uint64_t seq, time_ms_t elapsed) {
 static uint64_t rcu_gp_start(struct list_head *batch) TSA_NO_ANALYSIS {
     enum irql outer = irql_raise(IRQL_DISPATCH_LEVEL);
     rcu_detach_callbacks(batch);
-    atomic_store_rlx(&rcu.gp_requests, 0);
+    atomic_store_rlx(&rcu_global.gp_requests, 0);
 
-    uint64_t prev = atomic_load_rlx(&rcu.gp_seq);
+    uint64_t prev = atomic_load_rlx(&rcu_global.gp_seq);
     enforce(prev != UINT64_MAX, "RCU GP seq wrap");
     uint64_t seq = prev + 1;
 
@@ -464,8 +484,8 @@ static uint64_t rcu_gp_start(struct list_head *batch) TSA_NO_ANALYSIS {
 #endif
 
     /* Root down, rcu.nodes is root then leaves */
-    for (size_t i = 0; i < rcu.node_count; i++) {
-        struct rcu_node *node = &rcu.nodes[i];
+    for (size_t i = 0; i < rcu_global.node_count; i++) {
+        struct rcu_node *node = &rcu_global.nodes[i];
 
         enum irql irql = spin_lock_high(&node->lock);
         node->gp_seq = seq;
@@ -490,7 +510,7 @@ static uint64_t rcu_gp_start(struct list_head *batch) TSA_NO_ANALYSIS {
         spin_unlock(&node->lock, irql);
     }
 
-    atomic_store_release(&rcu.gp_seq, seq);
+    atomic_store_release(&rcu_global.gp_seq, seq);
 
     /* Pairs with the xchg in rcu_idle_exit */
     cpu_memory_barrier();
@@ -498,8 +518,8 @@ static uint64_t rcu_gp_start(struct list_head *batch) TSA_NO_ANALYSIS {
     /* Retire quiescent and poke everyone else */
     cpu_id_t self = smp_id(TOPC_IRQL);
 
-    for (size_t l = 0; l < rcu.leaf_count; l++) {
-        struct rcu_node *leaf = &rcu.leaves[l];
+    for (size_t l = 0; l < rcu_global.leaf_count; l++) {
+        struct rcu_node *leaf = &rcu_global.leaves[l];
 
         enum irql irql = spin_lock_high(&leaf->lock);
         if (leaf->gp_seq != seq) {
@@ -511,7 +531,7 @@ static uint64_t rcu_gp_start(struct list_head *batch) TSA_NO_ANALYSIS {
          * and they'd clear the flag before they enter one */
         cpu_id_t cpu;
         for_each_cpu(cpu, &leaf->full_cpus) {
-            if (atomic_load_acq(&rcu.cpus[cpu].idle))
+            if (atomic_load_acq(&rcu_global.cpus[cpu].idle))
                 cpu_mask_clear(&leaf->qs_cpus, cpu);
         }
 
@@ -535,7 +555,7 @@ static void rcu_gp_wait(uint64_t seq) {
     time_ms_t last_kick = started;
     time_ms_t last_stall = started;
 
-    while (atomic_load_acq(&rcu.gp_completed) < seq) {
+    while (atomic_load_acq(&rcu_global.gp_completed) < seq) {
         scheduler_yield();
 
         time_ms_t now = time_get_ms();
@@ -556,7 +576,7 @@ static void rcu_gp_worker(void *unused_arg) {
     cc_unused(unused_arg);
 
     while (true) {
-        semaphore_wait(&rcu.sem);
+        semaphore_wait(&rcu_global.sem);
 
         if (!rcu_work_pending())
             continue;
@@ -576,20 +596,20 @@ void rcu_synchronize(void) {
     enforce(!irq_in_interrupt() && !irq_in_nmi());
     enforce(irql_get() <= IRQL_APC_LEVEL);
     enforce(!t || t->rcu_nesting == 0);
-    enforce(!rcu.ready || t != rcu.worker);
+    enforce(!rcu_global.ready || t != rcu_global.worker);
 
-    if (!rcu.ready)
+    if (!rcu_global.ready)
         return;
 
     /* Caller's unpublish happened before this load, meaning
      * grace periods that published a sequence greater than what's
      * here started after the unpublish */
-    uint64_t target = atomic_load_acq(&rcu.gp_seq) + 1;
+    uint64_t target = atomic_load_acq(&rcu_global.gp_seq) + 1;
 
-    atomic_inc_release(&rcu.gp_requests);
-    semaphore_post(&rcu.sem);
+    atomic_inc_release(&rcu_global.gp_requests);
+    semaphore_post(&rcu_global.sem);
 
-    while (atomic_load_acq(&rcu.gp_completed) < target)
+    while (atomic_load_acq(&rcu_global.gp_completed) < target)
         scheduler_yield();
 }
 
@@ -611,8 +631,8 @@ static void rcu_build_tree(void) {
     for (size_t i = 0; i < levels; i++)
         total += counts[i];
 
-    rcu.nodes = nofail_vnews(rcu.nodes, total, ALLOC_ZERO);
-    rcu.node_count = total;
+    rcu_global.nodes = nofail_vnews(rcu_global.nodes, total, ALLOC_ZERO);
+    rcu_global.node_count = total;
 
     /* Root first so forward pass initializes parents before children */
     size_t offsets[RCU_MAX_LEVELS];
@@ -622,7 +642,7 @@ static void rcu_build_tree(void) {
 
     for (size_t level = 0; level < levels; level++) {
         for (size_t j = 0; j < counts[level]; j++) {
-            struct rcu_node *node = &rcu.nodes[offsets[level] + j];
+            struct rcu_node *node = &rcu_global.nodes[offsets[level] + j];
 
             spinlock_init(&node->lock);
             node->gp_seq = 0;
@@ -634,7 +654,7 @@ static void rcu_build_tree(void) {
                 node->child_index = 0;
             } else {
                 node->parent =
-                    &rcu.nodes[offsets[level + 1] + (j / RCU_FANOUT)];
+                    &rcu_global.nodes[offsets[level + 1] + (j / RCU_FANOUT)];
                 node->child_index = j % RCU_FANOUT;
             }
 
@@ -659,27 +679,28 @@ static void rcu_build_tree(void) {
         }
     }
 
-    rcu.root = &rcu.nodes[0];
-    rcu.leaves = &rcu.nodes[offsets[0]];
-    rcu.leaf_count = counts[0];
+    rcu_global.root = &rcu_global.nodes[0];
+    rcu_global.leaves = &rcu_global.nodes[offsets[0]];
+    rcu_global.leaf_count = counts[0];
 }
 
 void rcu_init(void) {
-    atomic_store_rlx(&rcu.gp_seq, 1);
-    atomic_store_rlx(&rcu.gp_completed, 1);
-    atomic_store_rlx(&rcu.gp_requests, 0);
+    atomic_store_rlx(&rcu_global.gp_seq, 1);
+    atomic_store_rlx(&rcu_global.gp_completed, 1);
+    atomic_store_rlx(&rcu_global.gp_requests, 0);
 
-    semaphore_init(&rcu.sem, 0, SEMAPHORE_INIT_NORMAL);
+    semaphore_init(&rcu_global.sem, 0, SEMAPHORE_INIT_NORMAL);
 
     rcu_build_tree();
 
-    rcu.cpus = nofail_vnews(rcu.cpus, global.core_count, ALLOC_ZERO);
+    rcu_global.cpus =
+        nofail_vnews(rcu_global.cpus, global.core_count, ALLOC_ZERO);
     for (cpu_id_t cpu = 0; cpu < global.core_count; cpu++) {
-        spinlock_init(&rcu.cpus[cpu].lock);
-        list_head_init(&rcu.cpus[cpu].list);
-        atomic_store_rlx(&rcu.cpus[cpu].reported_seq, 0);
+        spinlock_init(&rcu_global.cpus[cpu].lock);
+        list_head_init(&rcu_global.cpus[cpu].list);
+        atomic_store_rlx(&rcu_global.cpus[cpu].reported_seq, 0);
     }
 
-    rcu.worker = thread_spawn("rcu_gp_worker", rcu_gp_worker);
-    rcu.ready = true;
+    rcu_global.worker = thread_spawn("rcu_gp_worker", rcu_gp_worker);
+    rcu_global.ready = true;
 }

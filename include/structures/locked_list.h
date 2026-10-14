@@ -8,7 +8,7 @@
 
 struct locked_list {
     struct spinlock lock;
-    struct list_head list TSA_GUARDED_BY(&lock);
+    struct list_head list TSA_GUARDED_BY(lock);
     size_t num_elems : 63;
     bool lock_high : 1;
 };
@@ -76,6 +76,7 @@ static inline size_t locked_list_num_elems(struct locked_list *ll) {
 }
 
 static inline void locked_list_init(struct locked_list *ll, bool irq_disable) {
+    tsa_unpublished(&ll->lock);
     list_head_init(&ll->list);
     spinlock_init(&ll->lock);
     ll->num_elems = 0;

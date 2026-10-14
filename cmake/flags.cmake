@@ -1,5 +1,5 @@
 set(_min_GNU 14)
-set(_min_Clang 22)
+set(_min_Clang 23)
 set(_min "${_min_${CMAKE_C_COMPILER_ID}}")
 if (_min AND CMAKE_C_COMPILER_VERSION VERSION_LESS _min)
     message(FATAL_ERROR "charmOS needs ${CMAKE_C_COMPILER_ID} >= ${_min}, found ${CMAKE_C_COMPILER_VERSION}")
@@ -31,6 +31,11 @@ set(KERNEL_WARNINGS
 
 if (CMAKE_C_COMPILER_ID STREQUAL "Clang")
     list(APPEND KERNEL_WARNINGS -Wthread-safety -Werror=thread-safety -Watomic-implicit-seq-cst)
+    # -beta gives us TSA_ACQUIRED_AFTER/BEFORE ordering. -pointer catches
+    # passing &guarded_member out of something unlocked. late-parse gives members' 
+    # TSA_GUARDED_BY reference a lock declared later in the struct
+    list(APPEND KERNEL_WARNINGS -Wthread-safety-beta -Wthread-safety-pointer -Werror=thread-safety-pointer)
+    list(APPEND KERNEL_WARNINGS -fexperimental-late-parse-attributes)
     list(APPEND KERNEL_WARNINGS -Werror=excess-initializers)
     list(APPEND KERNEL_WARNINGS -Wno-nullability-completeness)
 endif ()

@@ -56,8 +56,6 @@ struct rcu_node {
     struct list_head blocked;  /* threads preempted in a read section */
 };
 
-/* Per-CPU RCU data, so rcu_defer() doesn't have global contention
- * and reported_seq lets interrupt exit skip leaf lock */
 struct rcu_cpu {
     struct spinlock lock;
     struct list_head list;
@@ -65,7 +63,7 @@ struct rcu_cpu {
     atomic_bool idle;
 } cc_cache_aligned;
 
-struct rcu_state {
+struct rcu_globals {
     bool ready;
 
     atomic_uint64_t gp_seq;       /* last GP started */

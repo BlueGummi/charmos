@@ -24,6 +24,7 @@
 #define cc_section(x) __attribute__((section(x)))
 #define cc_hidden __attribute__((visibility("hidden")))
 #define cc_export __attribute__((visibility("default")))
+#define cc_overloadable __attribute__((overloadable))
 
 #define cc_likely(x) __builtin_expect(!!(x), 1)
 #define cc_unlikely(x) __builtin_expect(!!(x), 0)

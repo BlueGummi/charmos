@@ -22,6 +22,8 @@ struct TSA_CAPABILITY("spinlock") spinlock {
 #endif /* DEBUG_LOCK_CHK */
 };
 
+TSA_DEFINE_ASSUME(struct spinlock)
+
 #define SPINLOCK_INIT SPINLOCK_INIT_CHK(NULL, LOCK_CHKD_FULL)
 #define SPINLOCK_DEFINE(id) struct spinlock id = SPINLOCK_INIT
 #define SPINLOCK_DEFINE_CHK(id, class_, flags_)                                \
