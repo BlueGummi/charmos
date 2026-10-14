@@ -87,8 +87,15 @@ int32_t turnstile_thread_priority(struct thread *t) {
     unreachable("thread prio class invalid");
 }
 
+/* NOTE: we copy the computed turnstile wait queue key and then put it
+ * in wq_prio. This is because threads can change the actual priority (class,
+ * or the weights for timesharing threads) without holding the hash
+ * chain lock, which would lead to keys in the tree shifting about,
+ * and some bigger problems for other readers.
+ *
+ * We do eventually turnstile_requeue_waiter though. */
 static size_t turnstile_thread_get_data(struct rbt_node *n) {
-    return turnstile_thread_priority(thread_from_wq_rbt_node(n));
+    return thread_from_wq_rbt_node(n)->wq_prio;
 }
 
 static int32_t turnstile_thread_cmp(const struct rbt_node *a,
@@ -191,11 +198,18 @@ static bool turnstile_snapshot_wait(struct thread *thread,
 
 static void turnstile_requeue_waiter(struct turnstile *ts,
                                      struct thread *thread) {
+    SPINLOCK_ASSERT_HELD(&turnstile_chain_for(ts->lock_obj)->lock);
+
+    int32_t prio = turnstile_thread_priority(thread);
+    if (thread->wq_prio == prio)
+        return;
+
     for (size_t queue = 0; queue < TURNSTILE_NUM_QUEUES; queue++) {
         struct rbt *tree = &ts->queues[queue];
         if (!rbt_has_node(tree, &thread->wq_tree_node))
             continue;
 
+        thread->wq_prio = prio;
         rbt_reinsert(tree, &thread->wq_tree_node);
         return;
     }
@@ -341,8 +355,7 @@ turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
         if (!ts_valid || !curr_valid)
             break;
 
-        if (owner->perceived_prio_class != old_class)
-            turnstile_requeue_waiter(cur_ts, owner);
+        turnstile_requeue_waiter(cur_ts, owner);
 
         boosting_from = owner;
     }
@@ -365,6 +378,7 @@ static void turnstile_block_on(struct turnstile *ts, size_t queue_num) {
                             THREAD_WAIT_UNINTERRUPTIBLE,
                             THREAD_BLOCK_REASON_MANUAL);
 
+    curr->wq_prio = turnstile_thread_priority(curr);
     rbt_insert(&ts->queues[queue_num], &curr->wq_tree_node);
 }
 

@@ -220,6 +220,9 @@ struct thread {
 
     /* Waitqueue nodes */
     struct rbt_node wq_tree_node;        /* waitqueue tree node */
+    int32_t wq_prio;                     /* turnstile sort key
+                                          * TODO: there is probably a smarter way
+                                          */
     struct list_head wq_list_node;       /* waitqueue list node */
     struct pairing_node wq_pairing_node; /* waitqueue pairing node */
 

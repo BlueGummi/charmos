@@ -326,14 +326,14 @@ size_t rwlock_get_readers_to_wake(struct turnstile *ts) {
 
     /* for each reader that beats this priority,
      * increment the count of readers to wake */
-    int32_t prio_to_beat = writer ? turnstile_thread_priority(writer) : -1;
+    int32_t prio_to_beat = writer ? writer->wq_prio : -1;
     size_t to_wake = 0;
 
     rbt_for_each_reverse(iter, &ts->queues[TURNSTILE_READER_QUEUE]) {
         struct thread *check_reader = thread_from_wq_rbt_node(iter);
 
         /* can no longer beat the thread priority of the writer */
-        int32_t prio = turnstile_thread_priority(check_reader);
+        int32_t prio = check_reader->wq_prio;
 
         if (prio < prio_to_beat)
             break;
