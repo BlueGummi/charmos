@@ -1,5 +1,6 @@
 /* @title: Allocator Parameters */
 #pragma once
+#include <bitflag.h>
 #include <compiler/core.h>
 #include <compiler/wrapper.h>
 #include <console/printf.h>
@@ -42,13 +43,6 @@
 #define ALLOC_FLAG_TEST(flags, mask) (flags & mask)
 #define ALLOC_FLAG_CLASS(flags)                                                \
     ((flags >> ALLOC_CLASS_SHIFT) & ALLOC_CLASS_MASK)
-
-/* Bits 16..23 are available, this gives the 0-indexed Nth available bit.
- *
- * Do note that this is a compile-time constant, not an expression, because
- * it should be usable in enum definitions and other places, thus,
- * bounds safety is not enforceable (unfortunate) */
-#define ALLOC_FLAG_AVAIL_BIT(n) (1 << (ALLOC_CLASS_SHIFT - 4 + (n)))
 
 #define ALLOC_FLAG_EX_JOIN(subsys, flag) ALLOC_FLAG_EX_##subsys##_##flag
 #define ALLOC_FLAG_EX(subsys, flag) ALLOC_FLAG_EX_JOIN(subsys, flag)
@@ -108,6 +102,10 @@ enum alloc_flags : uint32_t {
     ALLOC_FLAG_CLASS_HIGH_BANDWIDTH = (3 << ALLOC_CLASS_SHIFT),
 };
 
+/* Bits 16..23 are available, this gives the 0-indexed Nth available bit */
+BITFLAG_AVAILABLE_DECLARE(enum alloc_flags, ALLOC_FLAG, BITFLAG_RANGE(16, 23));
+#define ALLOC_FLAG_AVAIL_BIT(n) BITFLAG_AVAIL_BIT(ALLOC_FLAG, n)
+
 struct alloc_flag_ex_desc {
     const char *subsystem;
     const char *flag_name;
@@ -131,7 +129,7 @@ struct alloc_flag_ex_desc {
 #define ALLOC_FLAGS_NONE 0
 
 /* Bits 6..15 and 24 */
-#define ALLOC_FLAGS_UNAVAILABLE_BITS ((1 << 24) | (0x3FF << 16))
+#define ALLOC_FLAGS_UNAVAILABLE_BITS ((1 << 24) | (0x3FFU << 6))
 
 #define ALLOC_FLAGS_DEFAULT                                                    \
     (ALLOC_FLAG_CLASS_DEFAULT | ALLOC_FLAG_FLEXIBLE_LOCALITY |                 \

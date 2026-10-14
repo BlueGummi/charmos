@@ -236,6 +236,22 @@
 
 #define PP_EXPAND(...) __VA_ARGS__
 
+#define PP_GET_1(a, ...) a
+#define PP_GET_2(a, b, ...) b
+#define PP_GET_3(a, b, c, ...) c
+#define PP_GET_4(a, b, c, d, ...) d
+#define PP_GET_5(a, b, c, d, e, ...) e
+
+#define PP_ARG(n, ...) PP_CONCAT(PP_GET_, n)(__VA_ARGS__)
+
+#define PP_DROP_1(a, ...) __VA_ARGS__
+#define PP_DROP_2(a, b, ...) __VA_ARGS__
+#define PP_DROP_3(a, b, c, ...) __VA_ARGS__
+#define PP_DROP_4(a, b, c, d, ...) __VA_ARGS__
+#define PP_DROP_5(a, b, c, d, e, ...) __VA_ARGS__
+
+#define PP_VA_ARGS_AFTER(n, ...) PP_CONCAT(PP_DROP_, n)(__VA_ARGS__)
+
 /* Unused argument discarders */
 #define PP_CC_VAR_UNUSED_1(a) ((void) (a))
 #define PP_CC_VAR_UNUSED_2(a, b) (PP_CC_VAR_UNUSED_1(a), (void) (b))

@@ -416,7 +416,7 @@ enum usb_error usb_transfer_sync(enum usb_error (*fn)(struct usb_request *),
 void usb_print_device(struct usb_device *dev);
 struct usb_interface_descriptor *usb_find_interface(struct usb_device *dev,
                                                     uint8_t class,
-                                                    enum lock_subclass subclass,
+                                                    uint8_t subclass,
                                                     uint8_t protocol);
 
 static inline uint8_t get_ep_index(struct usb_endpoint *ep) {

@@ -8,7 +8,8 @@
 #include <sync/turnstile.h>
 #include <thread/thread.h>
 
-/* LOCK ORDERING: chain -> thread.wait_lock -> header / runqueues -> thread */
+/* LOCK ORDERING: chain -> thread.wait_lock ->
+ * header / runqueues -> thread lock -> pi_lock */
 
 SLAB_SIZE_REGISTER_FOR_STRUCT(turnstile, SLAB_OBJ_ALIGN_DEFAULT);
 

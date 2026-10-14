@@ -1,5 +1,6 @@
 /* @title: Allocation Macros */
 #pragma once
+#include <compiler/core.h>
 #include <compiler/diagnostic.h>
 #include <compiler/intrinsic.h>
 
@@ -30,16 +31,16 @@
 /* struct foo *f = vnew(f, ALLOC_ZERO) */
 #define VNEW_PTR(p) typeof(&*(p))
 #define VNEW_CHECK(p)                                                          \
-    _Static_assert(                                                            \
+    static_assert(                                                             \
         __builtin_types_compatible_p(__typeof_unqual__(p), typeof(&*(p))),     \
         "vnew: target must be a pointer lvalue, not an array");                \
-    _Static_assert(!_Generic((p),                                              \
-                       void *: 1,                                              \
-                       const void *: 1,                                        \
-                       volatile void *: 1,                                     \
-                       const volatile void *: 1,                               \
-                       default: 0),                                            \
-                   "vnew: void pointer target, use valloc() with a size")
+    static_assert(!_Generic((p),                                               \
+                      void *: 1,                                               \
+                      const void *: 1,                                         \
+                      volatile void *: 1,                                      \
+                      const volatile void *: 1,                                \
+                      default: 0),                                             \
+                  "vnew: void pointer target, use valloc() with a size")
 
 #define vnew(p, ...)                                                           \
     ({                                                                         \
@@ -62,7 +63,7 @@
 #define vnew_flex(p, member, n, ...)                                           \
     ({                                                                         \
         VNEW_CHECK(p);                                                         \
-        _Static_assert(                                                        \
+        static_assert(                                                         \
             !__builtin_types_compatible_p(__typeof_unqual__((p)->member),      \
                                           typeof(&(p)->member[0])),            \
             "vnew_flex: member must be an array, not a pointer");              \

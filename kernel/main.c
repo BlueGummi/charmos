@@ -164,6 +164,10 @@ cc_no_asan void k_main(void) TSA_ACQUIRES_IRQS {
     movealloc_exec_all();
     bootstage_advance(BOOTSTAGE_MID_ALLOCATORS);
 
+    int *x = vnew(x);
+
+    vfree(x);
+
     scheduler_yield();
 }
 
