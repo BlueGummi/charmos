@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <sync/lock_chk.h>
+#include <sync/lock_general.h>
 #include <types/types.h>
 
 struct lock_chk_node;
@@ -70,7 +71,7 @@ struct lock_chk_held {
     uint16_t cpu; /* TODO: We use this to represent CPU due to size,
                    * cpu_id_t is a size_t */
     enum lock_chk_mode mode;
-    uint8_t subclass;
+    enum lock_subclass subclass;
     bool trylock;
     bool raw_operation;
 };
@@ -88,7 +89,7 @@ struct lock_chk_acq_req {
     const struct lock_chk_site *site;
     enum lock_chk_mode mode;
     enum irql prev_irql;
-    uint8_t subclass;
+    enum lock_subclass subclass;
     enum lock_op_flags op_flags;
     bool irqs_enabled : 1;
     bool in_irq : 1;
@@ -167,7 +168,7 @@ lock_chk_map_runtime_init(struct lock_chk_map *map,
 static inline struct lock_chk_acq_req
 lock_chk_acq_req_make(struct lock_chk_lock *lock,
                       const struct lock_chk_site *site, enum lock_chk_mode mode,
-                      uint8_t subclass, enum lock_op_flags flags) {
+                      enum lock_subclass subclass, enum lock_op_flags flags) {
     return (struct lock_chk_acq_req) {
         .map = &lock->map,
         .lock = lock_chk_id_of(lock),

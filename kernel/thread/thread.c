@@ -229,6 +229,7 @@ static struct thread *thread_init(struct thread *thread,
     spinlock_init(&thread->lock);
     thread_wait_init(thread);
     spinlock_init(&thread->join_lock);
+    spinlock_init(&thread->pi_lock);
 
     /* join_lock/join_cv are only ever touched from thread context, and
      * thread_join_timeout() has to allocate a timer while holding the
@@ -511,8 +512,7 @@ retry:
     if (gen_a1 != gen_a2 || gen_b1 != gen_b2)
         goto retry;
 
-    struct scheduler *first;
-    struct scheduler *second;
+    struct scheduler *first, *second;
 
     if (rq_a == rq_b) {
         first = rq_a;
@@ -569,8 +569,7 @@ retry:
     if (gen1 != gen2)
         goto retry;
 
-    struct scheduler *first;
-    struct scheduler *second;
+    struct scheduler *first, *second;
 
     if (thread_rq == other_rq) {
         first = thread_rq;
@@ -605,8 +604,7 @@ void thread_unlock_thread_and_rq(struct scheduler *thread_rq,
                                  struct scheduler *other_rq,
                                  enum irql irq_first,
                                  enum irql irq_second) TSA_NO_ANALYSIS {
-    struct scheduler *first;
-    struct scheduler *second;
+    struct scheduler *first, *second;
 
     if (thread_rq == other_rq) {
         first = thread_rq;
@@ -623,6 +621,32 @@ void thread_unlock_thread_and_rq(struct scheduler *thread_rq,
         spin_unlock(&second->lock, irq_second);
 
     spin_unlock(&first->lock, irq_first);
+}
+
+void thread_lock_two_pi_locks(struct thread *a, struct thread *b,
+                              enum irql *irq_a,
+                              enum irql *irq_b) TSA_NO_ANALYSIS {
+    enforce(a && b && a != b);
+    if (a < b) {
+        *irq_a = spin_lock_high_subclass(&a->pi_lock, LOCK_SUBCLASS_LOWER);
+        *irq_b = spin_lock_high_subclass(&b->pi_lock, LOCK_SUBCLASS_HIGHER);
+    } else {
+        *irq_b = spin_lock_high_subclass(&b->pi_lock, LOCK_SUBCLASS_LOWER);
+        *irq_a = spin_lock_high_subclass(&a->pi_lock, LOCK_SUBCLASS_HIGHER);
+    }
+}
+
+void thread_unlock_two_pi_locks(struct thread *a, struct thread *b,
+                                enum irql *irq_a,
+                                enum irql *irq_b) TSA_NO_ANALYSIS {
+    enforce(a && b && a != b);
+    if (a < b) {
+        spin_unlock(&b->pi_lock, *irq_b);
+        spin_unlock(&a->pi_lock, *irq_a);
+    } else {
+        spin_unlock(&a->pi_lock, *irq_a);
+        spin_unlock(&b->pi_lock, *irq_b);
+    }
 }
 
 /* TODO: This is surprisngly tricky to implement, and the primary reason why

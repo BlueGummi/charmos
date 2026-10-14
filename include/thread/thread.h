@@ -291,6 +291,9 @@ struct thread {
     enum thread_prio_class base_prio_class; /* for class boosts */
     enum thread_prio_class perceived_prio_class;
 
+    struct spinlock pi_lock; /* Synchronize accesses to priority changes
+                              * from other threads */
+
     /* We have this because perceived_prio_class can change arbitrarily,
      * which can corrupt state if it's in a different runqueue.
      *
@@ -493,6 +496,14 @@ void thread_lock_thread_and_rq(struct thread *t, struct scheduler *other_rq,
 void thread_unlock_thread_and_rq(struct scheduler *thread_rq,
                                  struct scheduler *other_rq,
                                  enum irql irq_first, enum irql irq_second);
+
+void thread_lock_two_pi_locks(struct thread *a, struct thread *b,
+                              enum irql *irq_a,
+                              enum irql *irq_b) TSA_NO_ANALYSIS;
+
+void thread_unlock_two_pi_locks(struct thread *a, struct thread *b,
+                                enum irql *irq_a,
+                                enum irql *irq_b) TSA_NO_ANALYSIS;
 
 bool thread_in_context(void);
 REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(thread, refcount, flags,

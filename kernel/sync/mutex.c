@@ -32,7 +32,8 @@ struct mutex_chk_rel_state {
 };
 
 static void mutex_chk_before_lock(struct mutex_chk_acq_state *state,
-                                  struct mutex *mutex, uint8_t subclass,
+                                  struct mutex *mutex,
+                                  enum lock_subclass subclass,
                                   const struct lock_chk_site *site) {
     enum lock_op_flags flags = LOCK_OP_IRQ_NONE | LOCK_OP_KIND_BLOCKING;
     lock_chk_note_use(&mutex->chk, flags);
@@ -96,7 +97,8 @@ struct mutex_chk_rel_state {
 };
 
 static void mutex_chk_before_lock(struct mutex_chk_acq_state *state,
-                                  struct mutex *mutex, uint8_t subclass,
+                                  struct mutex *mutex,
+                                  enum lock_subclass subclass,
                                   const struct lock_chk_site *site) {
     cc_unused(state, mutex, subclass, site);
 }
@@ -181,7 +183,7 @@ static void mutex_sanity_check(void) {
     enforce(irql_get() <= IRQL_APC_LEVEL);
 }
 
-void mutex_lock_subclass_full(struct mutex *mutex, uint8_t subclass,
+void mutex_lock_subclass_full(struct mutex *mutex, enum lock_subclass subclass,
                               const struct lock_chk_site *site)
     TSA_NO_ANALYSIS {
     enforce(subclass < LOCK_CHK_MAX_SUBCLASSES);

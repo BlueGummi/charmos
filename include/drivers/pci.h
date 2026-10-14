@@ -23,7 +23,7 @@ struct pci_device {
     uint16_t device_id;
 
     uint8_t class_code;
-    uint8_t subclass;
+    enum lock_subclass subclass;
     uint8_t prog_if;
     uint8_t revision;
 };
@@ -31,7 +31,7 @@ struct pci_device {
 struct pci_driver {
     struct device_driver driver;
     uint8_t class_code;
-    uint8_t subclass;
+    enum lock_subclass subclass;
     uint8_t prog_if;
     uint16_t vendor_id;
 };
@@ -189,7 +189,7 @@ LOG_SITE_EXTERN(pci);
 #define pci_log(log_level, fmt, ...)                                           \
     log(LOG_SITE(pci), LOG_HANDLE(pci), log_level, fmt, ##__VA_ARGS__)
 
-const char *pci_class_name(uint8_t class_code, uint8_t subclass);
+const char *pci_class_name(uint8_t class_code, enum lock_subclass subclass);
 
 void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out);
 uint32_t pci_read_bar(uint8_t bus, uint8_t device, uint8_t function,

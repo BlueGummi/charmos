@@ -41,6 +41,9 @@ bool thread_inherit_priority(struct thread *boosted, struct thread *from,
     TSA_NO_ANALYSIS {
     struct scheduler *sched, *sched2;
     enum irql irql, irql2;
+    enum irql birql, firql;
+
+    thread_lock_two_pi_locks(boosted, from, &birql, &firql);
 
     thread_lock_two_runqueues(boosted, from, &sched, &sched2, &irql, &irql2);
 
@@ -58,6 +61,8 @@ bool thread_inherit_priority(struct thread *boosted, struct thread *from,
         did_boost = scheduler_boost_thread_internal(boosted, from, old_class);
     }
 
+    thread_unlock_two_pi_locks(boosted, from, &birql, &firql);
+
     scheduler_release_two_locks(sched, sched2, irql, irql2);
 
     return did_boost;
@@ -66,28 +71,39 @@ bool thread_inherit_priority(struct thread *boosted, struct thread *from,
 void thread_uninherit_priority(enum thread_prio_class class) {
     struct thread *current = thread_get_current();
 
-    enum irql tirql = thread_acquire(current, NULL);
+    enum irql irql = spin_lock_high(&current->pi_lock);
 
+    enum thread_prio_class curr_prio = current->perceived_prio_class;
+
+    enforce(class <= curr_prio); /* We cannot "uninherit upwards" */
     current->perceived_prio_class = class;
 
-    thread_release(current, tirql);
+    spin_unlock(&current->pi_lock, irql);
 }
 
-enum thread_prio_class thread_unboost_self() {
+enum thread_prio_class thread_unboost_self(void) {
     struct thread *curr = thread_get_current();
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+    enum irql irql = spin_lock_high(&curr->pi_lock);
+
     enum thread_prio_class boosted = curr->perceived_prio_class;
     curr->perceived_prio_class = curr->base_prio_class;
-    irql_lower(irql);
+
+    spin_unlock(&curr->pi_lock, irql);
     return boosted;
 }
 
 enum thread_prio_class thread_boost_self(enum thread_prio_class new) {
     struct thread *curr = thread_get_current();
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+    enum irql irql = spin_lock_high(&curr->pi_lock);
+
     enum thread_prio_class old = curr->perceived_prio_class;
+
+    /* No boosting down */
+    enforce(new >= old);
+
     curr->perceived_prio_class = new;
-    irql_lower(irql);
+
+    spin_unlock(&curr->pi_lock, irql);
     return old;
 }
 

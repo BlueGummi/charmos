@@ -22,10 +22,9 @@ struct mutex_simple_chk_release_state {
     struct lock_chk_rel_token token;
 };
 
-static void
-mutex_simple_chk_before_lock(struct mutex_simple_chk_acquire_state *state,
-                             struct mutex_simple *m, uint8_t subclass,
-                             const struct lock_chk_site *site) {
+static void mutex_simple_chk_before_lock(
+    struct mutex_simple_chk_acquire_state *state, struct mutex_simple *m,
+    enum lock_subclass subclass, const struct lock_chk_site *site) {
     enum lock_op_flags flags = LOCK_OP_IRQ_NONE | LOCK_OP_KIND_BLOCKING;
     lock_chk_note_use(&m->chk, flags);
     mutex_simple_chk_stamp(m);
@@ -98,10 +97,9 @@ struct mutex_simple_chk_release_state {
     bool unused;
 };
 
-static inline void
-mutex_simple_chk_before_lock(struct mutex_simple_chk_acquire_state *state,
-                             struct mutex_simple *m, uint8_t subclass,
-                             const struct lock_chk_site *site) {
+static inline void mutex_simple_chk_before_lock(
+    struct mutex_simple_chk_acquire_state *state, struct mutex_simple *m,
+    enum lock_subclass subclass, const struct lock_chk_site *site) {
     cc_unused(state, m, subclass, site);
 }
 
@@ -199,9 +197,9 @@ void mutex_simple_init_chk_full(struct mutex_simple *m,
     mutex_simple_chk_state_init(m, class, flags);
 }
 
-void mutex_simple_lock_subclass_full(struct mutex_simple *m, uint8_t subclass,
-                                     const struct lock_chk_site *site)
-    TSA_NO_ANALYSIS {
+void mutex_simple_lock_subclass_full(
+    struct mutex_simple *m, enum lock_subclass subclass,
+    const struct lock_chk_site *site) TSA_NO_ANALYSIS {
     mutex_simple_sanity_check();
 
     struct mutex_simple_chk_acquire_state chk_state;

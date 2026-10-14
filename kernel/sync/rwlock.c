@@ -168,7 +168,7 @@ void rwlock_init_chk_full(struct rwlock *lock, enum thread_prio_class ceiling,
 }
 
 void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
-                  uint8_t subclass,
+                  enum lock_subclass subclass,
                   const struct lock_chk_site *site) TSA_NO_ANALYSIS {
     cc_unused(site);
     enforce(subclass < LOCK_CHK_MAX_SUBCLASSES);

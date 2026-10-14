@@ -30,6 +30,9 @@ enum lock_subclass : uint8_t {
 
     LOCK_SUBCLASS_SRC_CPU = 0,
     LOCK_SUBCLASS_DST_CPU = 1,
+
+    LOCK_SUBCLASS_LOWER = 0,
+    LOCK_SUBCLASS_HIGHER = 1,
 };
 
 enum lock_acquire_policy {

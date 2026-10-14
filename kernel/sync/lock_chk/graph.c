@@ -20,7 +20,7 @@ static struct lock_chk_node *node_hash_next(struct lock_chk_node *node) {
 
 static struct lock_chk_node *find_node(struct lock_chk_graph *graph,
                                        const struct lock_chk_class *class,
-                                       uint8_t subclass) {
+                                       enum lock_subclass subclass) {
     size_t bucket = lock_chk_class_hash(class, subclass);
     struct hlist_node *first = graph->class_hash[bucket].first;
     struct lock_chk_node *node =
@@ -70,7 +70,7 @@ static enum lock_chk_result record_ctx(struct lock_chk_node *base_node,
 
 static enum lock_chk_result resolve_node(struct lock_chk_graph *graph,
                                          struct lock_chk_map *map,
-                                         uint8_t subclass,
+                                         enum lock_subclass subclass,
                                          const struct lock_chk_acq_req *request,
                                          struct lock_chk_node **out) {
     if (subclass >= LOCK_CHK_MAX_SUBCLASSES)
@@ -373,7 +373,7 @@ void lock_chk_graph_init(struct lock_chk_graph *graph) {
 
 enum lock_chk_result lock_chk_graph_resolve_node(const struct lock_chk_ctx *ctx,
                                                  struct lock_chk_map *map,
-                                                 uint8_t subclass,
+                                                 enum lock_subclass subclass,
                                                  struct lock_chk_node **out) {
     bool irqs_enabled = raw_spin_lock_high(&ctx->graph->lock);
     enum lock_chk_result result =
@@ -532,7 +532,7 @@ static void rollback_nodes(struct lock_chk_graph *graph,
 
 enum lock_chk_result lock_chk_graph_prepare_acq(const struct lock_chk_ctx *ctx,
                                                 struct lock_chk_map *map,
-                                                uint8_t subclass,
+                                                enum lock_subclass subclass,
                                                 struct lock_chk_node **out) {
     struct lock_chk_graph *graph = ctx->graph;
     const struct lock_chk_acq_req *request = ctx->req;

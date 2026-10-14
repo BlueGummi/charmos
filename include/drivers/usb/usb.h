@@ -225,8 +225,8 @@ struct usb_device_descriptor { /* Refer to page 290 */
     uint16_t usb_num_bcd; /* USB number in binary coded
                            * decimal. 2.10 is 210H */
 
-    uint8_t class;    /* Class code */
-    uint8_t subclass; /* Subclass code */
+    uint8_t class;               /* Class code */
+    enum lock_subclass subclass; /* Subclass code */
     uint8_t protocol;
     uint8_t max_packet_size; /* Only 8, 16, 32, or 64 are valid */
 
@@ -251,9 +251,9 @@ struct usb_interface_descriptor { /* Page 296 */
     uint8_t alternate_setting; /* Select this alternate
                                 * setting for the interface */
 
-    uint8_t num_endpoints; /* Number of endpoings excluding EP0 */
-    uint8_t class;         /* Interface class code */
-    uint8_t subclass;      /* Interface subclass code */
+    uint8_t num_endpoints;       /* Number of endpoings excluding EP0 */
+    uint8_t class;               /* Interface class code */
+    enum lock_subclass subclass; /* Interface subclass code */
 
     uint8_t protocol; /* Interface protocol code qualified by `class` and
                          `subclass` */
@@ -320,7 +320,7 @@ struct usb_controller { /* Generic USB controller */
 struct usb_driver {
     const char *name;
     uint8_t class_code;
-    uint8_t subclass;
+    enum lock_subclass subclass;
     uint8_t protocol;
 
     enum usb_error (*bringup)(struct usb_device *dev); /* Called on connect */
@@ -416,7 +416,7 @@ enum usb_error usb_transfer_sync(enum usb_error (*fn)(struct usb_request *),
 void usb_print_device(struct usb_device *dev);
 struct usb_interface_descriptor *usb_find_interface(struct usb_device *dev,
                                                     uint8_t class,
-                                                    uint8_t subclass,
+                                                    enum lock_subclass subclass,
                                                     uint8_t protocol);
 
 static inline uint8_t get_ep_index(struct usb_endpoint *ep) {

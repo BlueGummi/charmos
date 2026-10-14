@@ -41,7 +41,7 @@ void mutex_unlock_full(struct mutex *mutex, const struct lock_chk_site *site)
 void mutex_lock_full(struct mutex *mutex, const struct lock_chk_site *site)
     TSA_ACQUIRES(mutex) TSA_MAY_SLEEP;
 
-void mutex_lock_subclass_full(struct mutex *mutex, uint8_t subclass,
+void mutex_lock_subclass_full(struct mutex *mutex, enum lock_subclass subclass,
                               const struct lock_chk_site *site)
     TSA_ACQUIRES(mutex) TSA_MAY_SLEEP;
 
@@ -121,8 +121,8 @@ mutex_guard_enter(struct mutex *m) TSA_MAY_SLEEP TSA_NO_ANALYSIS {
 }
 
 static inline cc_always_inline cc_maybe_unused struct mutex *
-mutex_guard_subclass_enter(struct mutex *m,
-                           uint8_t subclass) TSA_MAY_SLEEP TSA_NO_ANALYSIS {
+mutex_guard_subclass_enter(struct mutex *m, enum lock_subclass subclass)
+    TSA_MAY_SLEEP TSA_NO_ANALYSIS {
     mutex_lock_subclass(m, subclass);
     return m;
 }

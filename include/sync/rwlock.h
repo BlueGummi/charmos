@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sync/lock_chk_types.h>
+#include <sync/lock_general.h>
 #include <thread/thread_types.h>
 #include <tsa.h>
 
@@ -44,7 +45,7 @@ enum rwlock_acquire_type {
 };
 
 void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type type,
-                  uint8_t subclass, const struct lock_chk_site *site)
+                  enum lock_subclass subclass, const struct lock_chk_site *site)
     TSA_ACQUIRES(lock) TSA_MAY_SLEEP;
 void rw_unlock_full(struct rwlock *lock, const struct lock_chk_site *site)
     TSA_RELEASES(lock);
@@ -116,11 +117,13 @@ void rwlock_assert_not_held_full(struct rwlock *lock,
 #define rwlock_init(...) PP_CALL(rwlock_init, __VA_ARGS__)
 
 #define rw_lock(lock_, type_)                                                  \
-    rw_lock_full((lock_), (type_), 0, LOCK_CHK_SITE_HERE())
+    rw_lock_full((lock_), (type_), LOCK_SUBCLASS_PRIMARY, LOCK_CHK_SITE_HERE())
 #define rw_read_lock(lock_)                                                    \
-    rw_lock_full((lock_), RWLOCK_READ, 0, LOCK_CHK_SITE_HERE())
+    rw_lock_full((lock_), RWLOCK_READ, LOCK_SUBCLASS_PRIMARY,                  \
+                 LOCK_CHK_SITE_HERE())
 #define rw_write_lock(lock_)                                                   \
-    rw_lock_full((lock_), RWLOCK_WRITE, 0, LOCK_CHK_SITE_HERE())
+    rw_lock_full((lock_), RWLOCK_WRITE, LOCK_SUBCLASS_PRIMARY,                 \
+                 LOCK_CHK_SITE_HERE())
 #define rw_read_lock_subclass(lock_, subclass_)                                \
     rw_lock_full((lock_), RWLOCK_READ, (subclass_), LOCK_CHK_SITE_HERE())
 #define rw_write_lock_subclass(lock_, subclass_)                               \

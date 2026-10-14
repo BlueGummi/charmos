@@ -1,10 +1,10 @@
 /* @title: Queued Spinlock (MCS-based 4-byte qspinlock) */
 #pragma once
-#include "console/crash.h"
 #include <asm.h>
 #include <atomic.h>
 #include <bootstage.h>
 #include <compiler/core.h>
+#include <console/crash.h>
 #include <console/panic.h>
 #include <enforce.h>
 #include <irq/irq.h>
@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <sync/lock_chk_types.h>
+#include <sync/lock_general.h>
 #include <tsa.h>
 
 /* TODO: I would really like to use a CNA lock/cohorting as an extension to
@@ -165,7 +166,7 @@ static inline bool qspinlock_deep_checked(struct qspinlock *lock) {
 
 static inline struct lock_chk_acq_req
 qspinlock_chk_acq_req(struct qspinlock *lock, const struct lock_chk_site *site,
-                      uint8_t subclass, enum lock_op_flags flags) {
+                      enum lock_subclass subclass, enum lock_op_flags flags) {
     qspinlock_stamp(lock);
     return lock_chk_acq_req_make(&lock->chk, site, LOCK_CHK_MODE_EXCLUSIVE,
                                  subclass, flags);
@@ -193,7 +194,7 @@ struct qspinlock_rel_scope {
 static inline void qspinlock_acq_begin(struct qspinlock_acq_scope *scope,
                                        struct qspinlock *lock,
                                        const struct lock_chk_site *site,
-                                       uint8_t subclass,
+                                       enum lock_subclass subclass,
                                        enum lock_op_flags flags) {
     scope->checked = qspinlock_deep_checked(lock);
     if (!scope->checked)
@@ -327,7 +328,7 @@ struct qspinlock_rel_scope {
 static inline void qspinlock_acq_begin(struct qspinlock_acq_scope *scope,
                                        struct qspinlock *lock,
                                        const struct lock_chk_site *site,
-                                       uint8_t subclass,
+                                       enum lock_subclass subclass,
                                        enum lock_op_flags flags) {
     cc_unused(scope, lock, site, subclass, flags);
 }
@@ -425,14 +426,15 @@ static inline bool qspin_is_locked(const struct qspinlock *lock) {
     enforce(qspin_is_locked(l), "qspinlock not locked")
 
 static inline cc_warn_unused_result bool
-qspin_trylock_raw_full(struct qspinlock *lock, const struct lock_chk_site *site)
+qspin_trylock_raw_full(struct qspinlock *lock, enum lock_subclass sc,
+                       const struct lock_chk_site *site)
     TSA_TRY_ACQUIRES(true, lock) TSA_NO_ANALYSIS {
     enum lock_op_flags flags =
         LOCK_OP_RAW | LOCK_OP_IRQ_NONE | LOCK_OP_KIND_TRY;
     qspinlock_note_use(lock, flags);
 
     struct qspinlock_acq_scope chk;
-    qspinlock_acq_begin(&chk, lock, site, 0, flags);
+    qspinlock_acq_begin(&chk, lock, site, sc, flags);
 
     if (qspin_trylock_physical(lock)) {
 
@@ -447,6 +449,7 @@ qspin_trylock_raw_full(struct qspinlock *lock, const struct lock_chk_site *site)
 }
 
 static inline void qspin_lock_raw_full(struct qspinlock *lock,
+                                       enum lock_subclass sc,
                                        const struct lock_chk_site *site)
     TSA_ACQUIRES(lock) TSA_NO_ANALYSIS {
     enum lock_op_flags flags =
@@ -454,7 +457,7 @@ static inline void qspin_lock_raw_full(struct qspinlock *lock,
     qspinlock_note_use(lock, flags);
 
     struct qspinlock_acq_scope chk;
-    qspinlock_acq_begin(&chk, lock, site, 0, flags);
+    qspinlock_acq_begin(&chk, lock, site, sc, flags);
 
     qspin_lock_physical(lock);
 
@@ -499,10 +502,10 @@ static inline void qspin_unlock_full(struct qspinlock *lock, enum irql old_irql,
 }
 
 static inline cc_warn_unused_result enum irql
-qspin_lock_subclass_full(struct qspinlock *lock, uint8_t subclass,
-                         const struct lock_chk_site *site)
+qspin_lock_full(struct qspinlock *lock, enum lock_subclass sc,
+                const struct lock_chk_site *site)
     TSA_ACQUIRES_SPIN(lock) TSA_NO_ANALYSIS {
-    enforce(subclass < LOCK_CHK_MAX_SUBCLASSES);
+    enforce(sc < LOCK_CHK_MAX_SUBCLASSES);
     if (bootstage_get() >= BOOTSTAGE_MID_MP &&
         (irq_in_interrupt() || irq_in_nmi()))
         panic(
@@ -515,7 +518,7 @@ qspin_lock_subclass_full(struct qspinlock *lock, uint8_t subclass,
         qspinlock_classify(lock, flags, site);
 
     struct qspinlock_acq_scope chk;
-    qspinlock_acq_begin(&chk, lock, site, subclass, flags);
+    qspinlock_acq_begin(&chk, lock, site, sc, flags);
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     qspin_lock_physical(lock);
@@ -534,14 +537,10 @@ qspin_lock_subclass_full(struct qspinlock *lock, uint8_t subclass,
 }
 
 static inline cc_warn_unused_result enum irql
-qspin_lock_full(struct qspinlock *lock, const struct lock_chk_site *site)
+qspin_lock_high_full(struct qspinlock *lock, enum lock_subclass sc,
+                     const struct lock_chk_site *site)
     TSA_ACQUIRES_SPIN(lock) TSA_NO_ANALYSIS {
-    return qspin_lock_subclass_full(lock, 0, site);
-}
-
-static inline cc_warn_unused_result enum irql
-qspin_lock_high_full(struct qspinlock *lock, const struct lock_chk_site *site)
-    TSA_ACQUIRES_SPIN(lock) TSA_NO_ANALYSIS {
+    enforce(sc < LOCK_CHK_MAX_SUBCLASSES);
     if (bootstage_get() >= BOOTSTAGE_MID_MP && irq_in_nmi())
         panic("Attempted to take non-raw qspinlock from an NMI");
 
@@ -552,7 +551,7 @@ qspin_lock_high_full(struct qspinlock *lock, const struct lock_chk_site *site)
         qspinlock_classify(lock, flags, site);
 
     struct qspinlock_acq_scope chk;
-    qspinlock_acq_begin(&chk, lock, site, 0, flags);
+    qspinlock_acq_begin(&chk, lock, site, sc, flags);
 
     enum irql irql = irql_raise(IRQL_HIGH_LEVEL);
     qspin_lock_physical(lock);
@@ -568,7 +567,7 @@ qspin_lock_high_full(struct qspinlock *lock, const struct lock_chk_site *site)
 
 static inline cc_warn_unused_result bool
 qspin_trylock_full(struct qspinlock *lock, enum irql *out,
-                   const struct lock_chk_site *site)
+                   enum lock_subclass sc, const struct lock_chk_site *site)
     TSA_TRY_ACQUIRES_SPIN(true, lock) TSA_NO_ANALYSIS {
     if (bootstage_get() >= BOOTSTAGE_MID_MP &&
         (irq_in_interrupt() || irq_in_nmi()))
@@ -582,7 +581,7 @@ qspin_trylock_full(struct qspinlock *lock, enum irql *out,
         qspinlock_classify(lock, flags, site);
 
     struct qspinlock_acq_scope chk;
-    qspinlock_acq_begin(&chk, lock, site, 0, flags);
+    qspinlock_acq_begin(&chk, lock, site, sc, flags);
 
     *out = irql_raise(IRQL_DISPATCH_LEVEL);
     if (qspin_trylock_physical(lock)) {
@@ -604,7 +603,7 @@ qspin_trylock_full(struct qspinlock *lock, enum irql *out,
 
 static inline cc_warn_unused_result bool
 qspin_trylock_high_full(struct qspinlock *lock, enum irql *out,
-                        const struct lock_chk_site *site)
+                        enum lock_subclass sc, const struct lock_chk_site *site)
     TSA_TRY_ACQUIRES_SPIN(true, lock) TSA_NO_ANALYSIS {
     if (bootstage_get() >= BOOTSTAGE_MID_MP && irq_in_nmi())
         panic("Attempted to take non-raw qspinlock from an NMI");
@@ -616,7 +615,7 @@ qspin_trylock_high_full(struct qspinlock *lock, enum irql *out,
         qspinlock_classify(lock, flags, site);
 
     struct qspinlock_acq_scope chk;
-    qspinlock_acq_begin(&chk, lock, site, 0, flags);
+    qspinlock_acq_begin(&chk, lock, site, sc, flags);
 
     *out = irql_raise(IRQL_HIGH_LEVEL);
     if (qspin_trylock_physical(lock)) {
@@ -635,22 +634,43 @@ qspin_trylock_high_full(struct qspinlock *lock, enum irql *out,
     return false;
 }
 
-#define qspin_lock(lock_) qspin_lock_full((lock_), LOCK_CHK_SITE_HERE())
+#define qspin_lock(lock_)                                                      \
+    qspin_lock_full((lock_), LOCK_SUBCLASS_PRIMARY, LOCK_CHK_SITE_HERE())
 #define qspin_lock_subclass(lock_, subclass_)                                  \
-    qspin_lock_subclass_full((lock_), (subclass_), LOCK_CHK_SITE_HERE())
+    qspin_lock_full((lock_), (subclass_), LOCK_CHK_SITE_HERE())
+
 #define qspin_lock_high(lock_)                                                 \
-    qspin_lock_high_full((lock_), LOCK_CHK_SITE_HERE())
+    qspin_lock_high_full((lock_), LOCK_SUBCLASS_PRIMARY, LOCK_CHK_SITE_HERE())
+#define qspin_lock_high_subclass(lock_, subclass_)                             \
+    qspin_lock_high_full((lock_), (subclass_), LOCK_CHK_SITE_HERE())
+
+#define qspin_trylock(lock_, out_)                                             \
+    qspin_trylock_full((lock_), (out_), LOCK_SUBCLASS_PRIMARY,                 \
+                       LOCK_CHK_SITE_HERE())
+#define qspin_trylock_subclass(lock_, out_, subclass_)                         \
+    qspin_trylock_full((lock_), (out_), (subclass_), LOCK_CHK_SITE_HERE())
+
+#define qspin_trylock_high(lock_, out_)                                        \
+    qspin_trylock_high_full((lock_), (out_), LOCK_SUBCLASS_PRIMARY,            \
+                            LOCK_CHK_SITE_HERE())
+#define qspin_trylock_high_subclass(lock_, out_, subclass_)                    \
+    qspin_trylock_high_full((lock_), (out_), (subclass_), LOCK_CHK_SITE_HERE())
+
 #define qspin_unlock(lock_, old_)                                              \
     qspin_unlock_full((lock_), (old_), LOCK_CHK_SITE_HERE())
 #define qspin_unlock_irq_restore(lock_, old_)                                  \
     qspin_unlock_full((lock_), (old_), LOCK_CHK_SITE_HERE())
-#define qspin_trylock(lock_, out_)                                             \
-    qspin_trylock_full((lock_), (out_), LOCK_CHK_SITE_HERE())
-#define qspin_trylock_high(lock_, out_)                                        \
-    qspin_trylock_high_full((lock_), (out_), LOCK_CHK_SITE_HERE())
-#define qspin_lock_raw(lock_) qspin_lock_raw_full((lock_), LOCK_CHK_SITE_HERE())
+
+#define qspin_lock_raw(lock_)                                                  \
+    qspin_lock_raw_full((lock_), LOCK_SUBCLASS_PRIMARY, LOCK_CHK_SITE_HERE())
+#define qspin_lock_raw_subclass(lock_, subclass_)                              \
+    qspin_lock_raw_full((lock_), (subclass_), LOCK_CHK_SITE_HERE())
+
 #define qspin_trylock_raw(lock_)                                               \
-    qspin_trylock_raw_full((lock_), LOCK_CHK_SITE_HERE())
+    qspin_trylock_raw_full((lock_), LOCK_SUBCLASS_PRIMARY, LOCK_CHK_SITE_HERE())
+#define qspin_trylock_raw_subclass(lock_, subclass_)                           \
+    qspin_trylock_raw_full((lock_), (subclass_), LOCK_CHK_SITE_HERE())
+
 #define qspin_unlock_raw(lock_)                                                \
     qspin_unlock_raw_full((lock_), LOCK_CHK_SITE_HERE())
 
@@ -713,11 +733,20 @@ qspin_guard_high_enter(struct qspinlock *lock)
 }
 
 static inline cc_always_inline cc_maybe_unused struct qspinlock_guard
-qspin_guard_subclass_enter(struct qspinlock *lock, uint8_t subclass)
+qspin_guard_high_subclass_enter(struct qspinlock *lock, enum lock_subclass sc)
     TSA_ACQUIRES_SPIN_IRQL TSA_NO_ANALYSIS {
     return (struct qspinlock_guard) {
         .lock = lock,
-        .irql = qspin_lock_subclass(lock, subclass),
+        .irql = qspin_lock_high_subclass(lock, sc),
+    };
+}
+
+static inline cc_always_inline cc_maybe_unused struct qspinlock_guard
+qspin_guard_subclass_enter(struct qspinlock *lock, enum lock_subclass sc)
+    TSA_ACQUIRES_SPIN_IRQL TSA_NO_ANALYSIS {
+    return (struct qspinlock_guard) {
+        .lock = lock,
+        .irql = qspin_lock_subclass(lock, sc),
     };
 }
 
@@ -736,3 +765,9 @@ qspin_guard_subclass_enter(struct qspinlock *lock, uint8_t subclass)
         qspin_guard_, __COUNTER__) =                                           \
         (qspinlock_guard_assume(lock_),                                        \
          qspin_guard_subclass_enter((lock_), (subclass_)))
+
+#define qspin_guard_high_subclass(lock_, subclass_)                            \
+    cc_cleanup(qspinlock_guard_exit) struct qspinlock_guard PP_CONCAT(         \
+        qspin_guard_high_, __COUNTER__) =                                      \
+        (qspinlock_guard_assume(lock_),                                        \
+         qspin_guard_high_subclass_enter((lock_), (subclass_)))

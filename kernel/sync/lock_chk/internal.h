@@ -36,7 +36,7 @@ struct lock_chk_node {
     struct list_head in_edges;
     const struct lock_chk_class *class;
     uint16_t id;
-    uint8_t subclass;
+    enum lock_subclass subclass;
     uint8_t context_bits;
 };
 
@@ -115,7 +115,7 @@ struct lock_chk_fault {
     uint32_t capacity_limit;
     enum lock_chk_type type;
     enum lock_chk_mode mode;
-    uint8_t subclass;
+    enum lock_subclass subclass;
 };
 
 struct lock_chk_globals {
@@ -178,14 +178,14 @@ uint64_t lock_chk_calc_sig(const struct lock_chk_cycle_hop *hops,
 void lock_chk_report_fail(const struct lock_chk_fault *fault);
 enum lock_chk_result lock_chk_graph_resolve_node(const struct lock_chk_ctx *ctx,
                                                  struct lock_chk_map *map,
-                                                 uint8_t subclass,
+                                                 enum lock_subclass subclass,
                                                  struct lock_chk_node **out);
 enum lock_chk_result lock_chk_graph_add_dep(const struct lock_chk_ctx *ctx,
                                             struct lock_chk_dep from,
                                             struct lock_chk_dep to);
 enum lock_chk_result lock_chk_graph_prepare_acq(const struct lock_chk_ctx *ctx,
                                                 struct lock_chk_map *map,
-                                                uint8_t subclass,
+                                                enum lock_subclass subclass,
                                                 struct lock_chk_node **out);
 
 void lock_chk_deep_activate(void);
@@ -243,7 +243,7 @@ static inline struct lock_chk_fault
 lock_chk_fault_from_id(enum lock_chk_failure_kind kind, struct lock_chk_id lock,
                        const struct lock_chk_map *map,
                        const struct lock_chk_site *site,
-                       enum lock_chk_mode mode, uint8_t subclass) {
+                       enum lock_chk_mode mode, enum lock_subclass subclass) {
     return (struct lock_chk_fault) {
         .kind = kind,
         .class = map != NULL ? map->class : NULL,
@@ -333,7 +333,7 @@ static inline bool lock_op_irq_safe(enum lock_op_flags flags) {
 }
 
 static inline size_t lock_chk_class_hash(const struct lock_chk_class *class,
-                                         uint8_t subclass) {
+                                         enum lock_subclass subclass) {
     uintptr_t key = (uintptr_t) class;
     return ((key >> 4) ^ (key >> 13) ^ subclass) % LOCK_CHK_HASH_BUCKETS;
 }
