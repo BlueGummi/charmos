@@ -32,7 +32,7 @@ jobs:
       matrix:
         compiler: [gcc, clang]
     container:
-      image: ghcr.io/axvonx/charmos-x86-env@sha256:e5d54672d1b331f9b33e48d2b288c193505ae4df9b3d44df63cad38558184f17
+      image: ghcr.io/axvonx/charmos-x86-env@sha256:f65d35505d3e48ffe00651fd5da9a7568c2b266d3acd142c6d38f89ec4d57d1e
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
