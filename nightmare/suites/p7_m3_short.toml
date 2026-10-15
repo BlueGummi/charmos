@@ -2,7 +2,6 @@
 name          = "p7_m3_short"
 runners       = 1
 budget_hours  = 0.01
-overlap_ratio = 0.0
 
 [build]
 compiler = "gcc"

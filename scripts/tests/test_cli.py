@@ -35,15 +35,12 @@ def test_dry_run_campaign_succeeds(tmp_path: Path) -> None:
 
 
 def test_planner_round_trip(tmp_path: Path) -> None:
-    command, snapshot, plan = (tmp_path / n for n in ("c.json", "s.json", "p.json"))
-    inputs = ["--command-out", str(command), "--snapshot-out", str(snapshot)]
-    clock = ["--at", "2026-08-29T00:00:00Z"]
-    repository = ["--suite", "harness_smoke", "--repository", "axvonx/charmos"]
-    assert main(["nightmare", "repository-command", *repository, *clock, *inputs]) == 0
-    accept = ["nightmare", "plan", str(command), str(snapshot), "--out", str(plan)]
-    assert main([*accept, "--source-commit", COMMIT, "--runner-image", IMAGE]) == 0
+    plan = tmp_path / "p.json"
+    accept = ["nightmare", "plan", "harness_smoke", "--out", str(plan)]
+    accept += ["--repository", "axvonx/charmos", "--runner-image", IMAGE]
+    assert main([*accept, "--source-commit", COMMIT]) == 0
     assert main(["nightmare", "matrix", "build", str(plan)]) == 0
-    assert main([*accept, "--source-commit", "nope", "--runner-image", IMAGE]) == 2
+    assert main([*accept, "--source-commit", "nope"]) == 2
 
 
 def test_an_unreadable_input_is_an_error_not_a_traceback() -> None:

@@ -1,7 +1,6 @@
-"""Deterministic admission and placement behind one planning interface."""
+"""Deterministic admission and placement of one committed suite."""
 
 import re
-from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -10,9 +9,7 @@ from typing import Any
 from . import contracts
 from . import suite as suite_model
 
-# ---------------------------------------------------------------------------
-# Domain types (inlined from domain.py)
-# ---------------------------------------------------------------------------
+START_DELAY = timedelta(minutes=5)
 
 
 @dataclass(frozen=True)
@@ -22,53 +19,14 @@ class Source:
 
 
 @dataclass(frozen=True)
-class Runner:
-    id: str
-    number: int
-    state: str
-    label: str
-
-
-@dataclass(frozen=True)
-class OccupiedLease:
-    runner_ids: frozenset[str]
-    starts_at: datetime
-    ends_at: datetime
-
-
-@dataclass(frozen=True)
-class FleetSnapshot:
-    version: str
-    starts_at: datetime
-    ends_at: datetime
-    runners: tuple[Runner, ...]
-    occupied: tuple[OccupiedLease, ...]
-    document: dict[str, Any]
-
-
-@dataclass(frozen=True)
-class RegisteredSuite:
-    id: str
-    sha256: str
-    resolved: dict[str, Any]
-    model: suite_model.Suite
-    path: Path
-
-
-@dataclass(frozen=True)
 class PlannedTask:
     id: str
-    slice_id: str
     manifest_id: str
     campaign_id: str
     suite_id: str
     runner_id: str
     runner_index: int
     total_runners: int
-    instance: int | None
-    starts_at: datetime
-    nominal_ends_at: datetime
-    ends_at: datetime
     soft_budget_ms: int
     hard_budget_ms: int
     actions_job_budget_ms: int
@@ -103,19 +61,10 @@ class Rejected:
     code: str
     message: str
     diagnostics: tuple[dict[str, Any], ...]
-    alternatives: tuple[dict[str, Any], ...] = ()
     kind: str = "rejected"
 
 
-@dataclass(frozen=True)
-class Stale:
-    message: str
-    current_version: str
-    code: str = "snapshot_changed"
-    kind: str = "stale"
-
-
-PlanningResult = Accepted | Rejected | Stale
+PlanningResult = Accepted | Rejected
 
 
 @dataclass(frozen=True)
@@ -149,558 +98,191 @@ _IMAGE = re.compile(r"^ghcr\.io/[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@sha256:[0-9a-f]
 _REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
-def _parse_instant(value: Any, field: str) -> datetime:
-    if not isinstance(value, str):
-        raise ValueError(f"{field} must be an ISO-8601 string")
-    try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        raise ValueError(f"{field} must be an ISO-8601 instant") from None
-    if parsed.tzinfo is None:
-        raise ValueError(f"{field} must include a UTC offset")
-    return parsed.astimezone(UTC)
-
-
-def _snapshot(document: dict[str, Any]) -> FleetSnapshot:
-    if document.get("schemaVersion") != 1:
-        raise ValueError("snapshot.schemaVersion must be 1")
-    window = document["window"]
-    starts_at = _parse_instant(window["startsAt"], "window.startsAt")
-    ends_at = _parse_instant(window["endsAt"], "window.endsAt")
-    if ends_at <= starts_at:
-        raise ValueError("snapshot window must end after it starts")
-    runners = tuple(
-        Runner(item["id"], item["number"], item["state"], item["label"])
-        for item in sorted(document["runners"], key=lambda item: item["number"])
-    )
-    if not runners:
-        raise ValueError("snapshot must contain at least one runner")
-    if any(
-        not isinstance(runner.id, str)
-        or type(runner.number) is not int
-        or runner.number < 1
-        or runner.state not in ("idle", "running", "warning", "failed")
-        or not isinstance(runner.label, str)
-        or not runner.label
-        for runner in runners
-    ):
-        raise ValueError("snapshot contains an invalid runner")
-    if len({runner.id for runner in runners}) != len(runners) or len(
-        {runner.number for runner in runners}
-    ) != len(runners):
-        raise ValueError("snapshot runner IDs and numbers must be unique")
-    runner_ids = {runner.id for runner in runners}
-    occupied = []
-    for batch in document.get("batches", []):
-        lease = batch["lease"]
-        lease_runner_ids = lease["runnerIds"]
-        if (
-            not isinstance(lease_runner_ids, list)
-            or not lease_runner_ids
-            or not all(isinstance(item, str) for item in lease_runner_ids)
-            or len(set(lease_runner_ids)) != len(lease_runner_ids)
-            or not set(lease_runner_ids) <= runner_ids
-        ):
-            raise ValueError("snapshot contains an invalid runner lease")
-        lease_start = _parse_instant(lease["startsAt"], "batch.lease.startsAt")
-        lease_end = _parse_instant(lease["endsAt"], "batch.lease.endsAt")
-        if lease_end <= lease_start:
-            raise ValueError("snapshot lease must end after it starts")
-        occupied.append(
-            OccupiedLease(
-                frozenset(lease_runner_ids),
-                lease_start,
-                lease_end,
-            )
-        )
-    version = document["version"]
-    if not isinstance(version, str) or not version:
-        raise ValueError("snapshot.version must be a non-empty string")
-    return FleetSnapshot(
-        version=version,
-        starts_at=starts_at,
-        ends_at=ends_at,
-        runners=runners,
-        occupied=tuple(occupied),
-        document=document,
-    )
-
-
-def _catalog(suite_dir: Path) -> dict[str, RegisteredSuite]:
-    catalog: dict[str, RegisteredSuite] = {}
-    for path in sorted(suite_dir.glob("*.toml")):
-        suite = suite_model.load(path)
-        resolved = suite.resolved()
-        catalog[path.stem] = RegisteredSuite(
-            id=path.stem,
-            sha256=contracts.sha256_json(resolved),
-            resolved=resolved,
-            model=suite,
-            path=path,
-        )
-    return catalog
-
-
-def _available_runners(
-    snapshot: FleetSnapshot,
-    start: datetime,
-    end: datetime,
-    count: int,
-) -> tuple[Runner, ...] | None:
-    unavailable: set[str] = {
-        runner.id for runner in snapshot.runners if runner.state == "failed"
-    }
-    for lease in snapshot.occupied:
-        if start < lease.ends_at and end > lease.starts_at:
-            unavailable.update(lease.runner_ids)
-
-    for offset in range(0, len(snapshot.runners) - count + 1):
-        candidate = snapshot.runners[offset : offset + count]
-        numbers = [runner.number for runner in candidate]
-        if numbers != list(range(numbers[0], numbers[0] + count)):
-            continue
-        if all(runner.id not in unavailable for runner in candidate):
-            return candidate
-    return None
-
-
-def _runner_count(suite: suite_model.Suite, leased: int) -> int:
+def _runner_count(suite: suite_model.Suite) -> int:
     caps = [
         task.max_runners or suite.meta.runners
         for task in suite.tasks
         if task.mode == "horizontal"
     ]
-    if not caps:
-        return 1
-    return min(suite.meta.runners, leased, min(caps))
+    return min(suite.meta.runners, min(caps)) if caps else 1
 
 
-class Planner:
-    """Owns command validation, suite resolution, admission, and placement."""
+def _reject(*diagnostics: dict[str, Any]) -> Rejected:
+    return Rejected(
+        "invalid_definition", "The suite is not admissible.", tuple(diagnostics)
+    )
 
-    def __init__(self, suite_dir: Path, max_manifests: int = MAX_MANIFESTS):
-        self.suite_dir = suite_dir
-        self.max_manifests = max_manifests
 
-    def plan(
-        self,
-        command: dict[str, Any],
-        snapshot_document: dict[str, Any],
-        *,
-        source: Source,
-        runner_image: str,
-        now: datetime,
-        ownership: str = "ad-hoc",
-    ) -> PlanningResult:
-        try:
-            snapshot = _snapshot(snapshot_document)
-            payload = command["payload"]
-            definition = contracts.BatchDefinition.model_validate(payload["definition"])
-            base_version = payload["base_snapshot_version"]
-        except (KeyError, TypeError, ValueError) as error:
-            return Rejected(
-                "invalid_definition",
-                "The planning command is malformed.",
-                ({"field": "command", "message": str(error)},),
-            )
-
-        if base_version != snapshot.version:
-            return Stale(
-                "Fleet state changed. Validate this definition again.",
-                snapshot.version,
-            )
-
-        diagnostics: list[dict[str, Any]] = []
-        if command.get("operation") != "validate_batch":
-            diagnostics.append(
-                {"field": "operation", "message": "must be validate_batch"}
-            )
-        if command.get("repository", {}).get("id") != source.repository:
-            diagnostics.append(
-                {
-                    "field": "repository.id",
-                    "message": "does not match the immutable source repository",
-                }
-            )
-        if not _REPOSITORY.fullmatch(source.repository):
-            diagnostics.append(
-                {
-                    "field": "source.repository",
-                    "message": "must be an owner/repository identity",
-                }
-            )
-        if not _COMMIT.fullmatch(source.commit):
-            diagnostics.append(
-                {"field": "source.commit", "message": "must be a full 40-hex commit"}
-            )
-        if not _IMAGE.fullmatch(runner_image):
-            diagnostics.append(
-                {
-                    "field": "runner_image",
-                    "message": "must be an immutable ghcr.io sha256 reference",
-                }
-            )
-        if ownership not in ("ad-hoc", "repository"):
-            diagnostics.append(
-                {"field": "ownership", "message": "must be ad-hoc or repository"}
-            )
-        if now.tzinfo is None:
-            diagnostics.append(
-                {"field": "evaluated_at", "message": "must include a UTC offset"}
-            )
-
-        end = definition.start + timedelta(milliseconds=definition.window_ms)
-        if definition.start < snapshot.starts_at or end > snapshot.ends_at:
-            diagnostics.append(
-                {
-                    "field": "start_utc",
-                    "message": "requested window is outside the authoritative snapshot",
-                }
-            )
-        if definition.runners < 1 or definition.runners > len(snapshot.runners):
-            diagnostics.append(
-                {
-                    "field": "runners",
-                    "message": f"must be between 1 and {len(snapshot.runners)}",
-                }
-            )
-
-        try:
-            catalog = _catalog(self.suite_dir)
-        except suite_model.SuiteError as error:
-            diagnostics.append({"field": "tests", "message": str(error)})
-            catalog = {}
-        selected: list[RegisteredSuite] = []
-        for index, suite_id in enumerate(definition.tests):
-            suite = catalog.get(suite_id)
-            if suite is None:
-                diagnostics.append(
-                    {
-                        "field": f"tests[{index}]",
-                        "message": f"unknown registered suite {suite_id!r}",
-                    }
-                )
-            else:
-                selected.append(suite)
-
-        manifest_count = sum(
-            _runner_count(suite.model, definition.runners) for suite in selected
+def plan(
+    suite_dir: Path,
+    suite_id: str,
+    *,
+    source: Source,
+    runner_image: str,
+    now: datetime,
+    max_manifests: int = MAX_MANIFESTS,
+) -> PlanningResult:
+    """Place one committed suite on `suite.meta.runners` runners, one task each."""
+    diagnostics: list[dict[str, Any]] = []
+    if not _REPOSITORY.fullmatch(source.repository):
+        diagnostics.append(
+            {
+                "field": "source.repository",
+                "message": "must be an owner/repository identity",
+            }
         )
-        if manifest_count > self.max_manifests:
+    if not _COMMIT.fullmatch(source.commit):
+        diagnostics.append(
+            {"field": "source.commit", "message": "must be a full 40-hex commit"}
+        )
+    if not _IMAGE.fullmatch(runner_image):
+        diagnostics.append(
+            {
+                "field": "runner_image",
+                "message": "must be an immutable ghcr.io sha256 reference",
+            }
+        )
+    if now.tzinfo is None:
+        diagnostics.append(
+            {"field": "evaluated_at", "message": "must include a UTC offset"}
+        )
+    path = suite_dir / f"{suite_id}.toml"
+    suite: suite_model.Suite | None = None
+    try:
+        suite = suite_model.load(path)
+        if suite.meta.name != suite_id:
             diagnostics.append(
                 {
-                    "field": "tests",
-                    "message": f"materializes {manifest_count} manifests; limit is {self.max_manifests}",
+                    "field": "suite",
+                    "message": f"{suite_id!r} does not match {suite.meta.name!r}",
                 }
             )
-        if diagnostics:
-            return Rejected(
-                "invalid_definition",
-                "The batch definition is not admissible.",
-                tuple(diagnostics),
-            )
+    except suite_model.SuiteError as error:
+        diagnostics.append({"field": "suite", "message": str(error)})
+    if diagnostics or suite is None:
+        return _reject(*diagnostics)
 
-        leased = _available_runners(snapshot, definition.start, end, definition.runners)
-        if leased is None:
-            latest_end = max(
-                (
-                    lease.ends_at
-                    for lease in snapshot.occupied
-                    if definition.start < lease.ends_at and end > lease.starts_at
-                ),
-                default=end,
-            )
-            return Rejected(
-                "no_capacity",
-                f"No contiguous {definition.runners}-runner range is free for the requested window.",
-                (
-                    {
-                        "field": "runners",
-                        "message": "the requested lease overlaps authoritative ownership",
-                    },
-                ),
-                (
-                    {
-                        "startsAt": contracts.instant(latest_end),
-                        "runners": max(1, definition.runners - 1),
-                        "message": "retry after the active lease or request fewer runners",
-                    },
-                ),
-            )
-
-        try:
-            accepted = self._accepted(
-                command,
-                snapshot,
-                definition,
-                selected,
-                leased,
-                source,
-                runner_image,
-                now.astimezone(UTC),
-                ownership,
-            )
-        except ValueError as error:
-            return Rejected(
-                "invalid_definition",
-                "The batch budget cannot be placed.",
-                ({"field": "window_hours", "message": str(error)},),
-            )
-        return Accepted(accepted)
-
-    def _accepted(
-        self,
-        command: dict[str, Any],
-        snapshot: FleetSnapshot,
-        definition: contracts.BatchDefinition,
-        selected: list[RegisteredSuite],
-        leased: tuple[Runner, ...],
-        source: Source,
-        runner_image: str,
-        now: datetime,
-        ownership: str,
-    ) -> AcceptedPlan:
-        identity_input = {
-            "command": command,
-            "snapshot_version": snapshot.version,
+    runners = _runner_count(suite)
+    if runners > max_manifests:
+        return _reject(
+            {
+                "field": "suite",
+                "message": f"materializes {runners} manifests; limit is {max_manifests}",
+            }
+        )
+    resolved = suite.resolved()
+    suite_sha = contracts.sha256_json(resolved)
+    now = now.astimezone(UTC)
+    root_digest = contracts.sha256_json(
+        {
+            "suite": suite_sha,
             "source": {"repository": source.repository, "commit": source.commit},
             "runner_image": runner_image,
             "evaluated_at": contracts.instant(now),
-            "ownership": ownership,
         }
-        root_digest = contracts.sha256_json(identity_input)
-        plan_id = f"plan_{root_digest[:20]}"
-        batch_id = f"batch_{root_digest[20:40]}"
+    )
+    plan_id = f"plan_{root_digest[:20]}"
+    batch_id = f"batch_{root_digest[20:40]}"
 
-        occurrences = Counter(definition.tests)
-        seen: Counter[str] = Counter()
-        raw_tasks: list[dict[str, Any]] = []
-        runner_cursor = 0
-        for suite_ordinal, suite in enumerate(selected):
-            seen[suite.id] += 1
-            instance = seen[suite.id] if occurrences[suite.id] > 1 else None
-            total_runners = _runner_count(suite.model, len(leased))
-            for runner_index in range(total_runners):
-                runner = leased[(runner_cursor + runner_index) % len(leased)]
-                task_digest = contracts.sha256_json(
-                    {
-                        "plan": plan_id,
-                        "suite_ordinal": suite_ordinal,
-                        "runner_index": runner_index,
-                    }
-                )
-                raw_tasks.append(
-                    {
-                        "id": f"task_{task_digest[:20]}",
-                        "slice_id": f"slice_{task_digest[20:40]}",
-                        "manifest_id": f"manifest_{task_digest[40:60]}",
-                        "campaign_id": f"campaign_{task_digest[:20]}",
-                        "suite": suite,
-                        "runner": runner,
-                        "runner_index": runner_index,
-                        "total_runners": total_runners,
-                        "instance": instance,
-                        "weight": sum(task.weight for task in suite.model.tasks),
-                        "priority": max(task.priority for task in suite.model.tasks),
-                    }
-                )
-            runner_cursor += total_runners
+    # Each runner owns the whole suite budget; the host-boot floor is the only
+    # thing that can make the slice unplaceable.
+    window_ms = suite.meta.budget_ms
+    reserve_ms = max(2_000, min(300_000, window_ms // 10))
+    soft_ms = min(suite.meta.budget_ms, window_ms - reserve_ms)
+    required_ms = max(task.boot.host_timeout_ms for task in suite.tasks)
+    if soft_ms < required_ms:
+        return _reject(
+            {
+                "field": "window_hours",
+                "message": f"{suite_id} cannot fit a {required_ms}ms host boot "
+                f"in its {window_ms}ms runner slice",
+            }
+        )
+    hard_ms = soft_ms + reserve_ms // 2
+    actions_ms = max(hard_ms + 1, soft_ms + reserve_ms)
+    wants_seed = any(task.nightmare.wants_seed for task in suite.tasks)
 
-        by_runner: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        for raw_task in raw_tasks:
-            by_runner[raw_task["runner"].id].append(raw_task)
-
-        planned: list[PlannedTask] = []
-        for runner_id, lane in by_runner.items():
-            ordered = sorted(
-                enumerate(lane), key=lambda item: (-item[1]["priority"], item[0])
-            )
-            weight_total = sum(item["weight"] for _, item in ordered)
-            cursor = definition.start
-            remaining_ms = definition.window_ms
-            for position, (_, item) in enumerate(ordered):
-                if position == len(ordered) - 1:
-                    allocation_ms = remaining_ms
-                else:
-                    allocation_ms = int(
-                        definition.window_ms * item["weight"] / weight_total
-                    )
-                    remaining_ms -= allocation_ms
-                ratio = item["suite"].model.meta.overlap_ratio
-                nominal_ms = int(allocation_ms * (1 - ratio))
-                reserve_ms = max(2_000, min(300_000, allocation_ms // 10))
-                soft_ms = min(
-                    item["suite"].model.meta.budget_ms,
-                    allocation_ms - reserve_ms,
-                )
-                required_ms = max(
-                    task.boot.host_timeout_ms for task in item["suite"].model.tasks
-                )
-                if soft_ms < required_ms:
-                    raise ValueError(
-                        f"{item['suite'].id} cannot fit a {required_ms}ms host boot "
-                        f"in its {allocation_ms}ms runner slice"
-                    )
-                hard_ms = soft_ms + reserve_ms // 2
-                actions_ms = max(hard_ms + 1, soft_ms + reserve_ms)
-                nominal_end = cursor + timedelta(milliseconds=nominal_ms)
-                task_end = cursor + timedelta(milliseconds=allocation_ms)
-                seed: int | None = int(
-                    contracts.sha256_json({"plan": plan_id, "task": item["id"]})[:16],
-                    16,
-                )
-                if not any(
-                    task.nightmare.wants_seed for task in item["suite"].model.tasks
-                ):
-                    seed = None
-                planned.append(
-                    PlannedTask(
-                        id=item["id"],
-                        slice_id=item["slice_id"],
-                        manifest_id=item["manifest_id"],
-                        campaign_id=item["campaign_id"],
-                        suite_id=item["suite"].id,
-                        runner_id=runner_id,
-                        runner_index=item["runner_index"],
-                        total_runners=item["total_runners"],
-                        instance=item["instance"],
-                        starts_at=cursor,
-                        nominal_ends_at=nominal_end,
-                        ends_at=task_end,
-                        soft_budget_ms=soft_ms,
-                        hard_budget_ms=hard_ms,
-                        actions_job_budget_ms=actions_ms,
-                        base_seed=seed,
-                    )
-                )
-                cursor = task_end
-
-        planned.sort(
-            key=lambda planned_task: (
-                planned_task.starts_at,
-                planned_task.runner_id,
-                planned_task.id,
+    tasks: list[PlannedTask] = []
+    for runner_index in range(runners):
+        digest = contracts.sha256_json(
+            {"plan": plan_id, "suite_ordinal": 0, "runner_index": runner_index}
+        )
+        task_id = f"task_{digest[:20]}"
+        seed = int(contracts.sha256_json({"plan": plan_id, "task": task_id})[:16], 16)
+        tasks.append(
+            PlannedTask(
+                id=task_id,
+                manifest_id=f"manifest_{digest[40:60]}",
+                campaign_id=f"campaign_{digest[:20]}",
+                suite_id=suite_id,
+                runner_id=f"runner_{runner_index + 1}",
+                runner_index=runner_index,
+                total_runners=runners,
+                soft_budget_ms=soft_ms,
+                hard_budget_ms=hard_ms,
+                actions_job_budget_ms=actions_ms,
+                base_seed=seed if wants_seed else None,
             )
         )
-        groups_by_digest: dict[str, list[str]] = defaultdict(list)
-        configurations: dict[str, dict[str, Any]] = {}
-        suite_by_id = {suite.id: suite for suite in selected}
-        for planned_task in planned:
-            configuration = suite_by_id[planned_task.suite_id].resolved["build"]
-            request_digest = contracts.sha256_json(
-                {
-                    "source": {
-                        "repository": source.repository,
-                        "commit": source.commit,
-                    },
-                    "runner_image": runner_image,
-                    "configuration": configuration,
-                }
-            )
-            groups_by_digest[request_digest].append(planned_task.id)
-            configurations[request_digest] = configuration
-        build_groups = tuple(
-            BuildGroup(
-                id=f"build_{digest[:20]}",
-                request_sha256=digest,
-                configuration=configurations[digest],
-                task_ids=tuple(sorted(task_ids)),
-            )
-            for digest, task_ids in sorted(groups_by_digest.items())
-        )
+    tasks.sort(key=lambda task: (task.runner_id, task.id))
 
-        suites = tuple({suite.id: suite for suite in selected}.values())
-        document = self._wire(
-            plan_id,
-            batch_id,
-            now,
-            source,
-            runner_image,
-            ownership,
-            tuple(planned),
-            suites,
-            build_groups,
-        )
-        return AcceptedPlan(
-            id=plan_id,
-            batch_id=batch_id,
-            tasks=tuple(planned),
-            build_groups=build_groups,
-            document=document,
-        )
-
-    def _wire(
-        self,
-        plan_id: str,
-        batch_id: str,
-        now: datetime,
-        source: Source,
-        runner_image: str,
-        ownership: str,
-        tasks: tuple[PlannedTask, ...],
-        suites: tuple[RegisteredSuite, ...],
-        build_groups: tuple[BuildGroup, ...],
-    ) -> dict[str, Any]:
-        group_for_task = {
-            task_id: group.id for group in build_groups for task_id in group.task_ids
-        }
-        return {
-            "schemaVersion": 1,
-            "id": plan_id,
-            "batchId": batch_id,
-            "evaluatedAt": contracts.instant(now),
-            "ownership": ownership,
+    configuration = resolved["build"]
+    request_digest = contracts.sha256_json(
+        {
             "source": {"repository": source.repository, "commit": source.commit},
-            "runnerImage": runner_image,
-            "suites": [
-                {"id": suite.id, "sha256": suite.sha256, "resolved": suite.resolved}
-                for suite in suites
-            ],
-            "buildGroups": [
-                {
-                    "id": group.id,
-                    "requestSha256": group.request_sha256,
-                    "configuration": group.configuration,
-                    "taskIds": list(group.task_ids),
-                }
-                for group in build_groups
-            ],
-            "manifests": [
-                {
-                    "manifestId": task.manifest_id,
-                    "taskId": task.id,
-                    "suiteId": task.suite_id,
-                    "buildGroupId": group_for_task[task.id],
-                    "runnerId": task.runner_id,
-                    "runnerIndex": task.runner_index,
-                    "totalRunners": task.total_runners,
-                    "campaignId": task.campaign_id,
-                    "baseSeed": hex(task.base_seed)
-                    if task.base_seed is not None
-                    else None,
-                    "softBudgetMs": task.soft_budget_ms,
-                    "hardBudgetMs": task.hard_budget_ms,
-                    "actionsJobBudgetMs": task.actions_job_budget_ms,
-                }
-                for task in tasks
-            ],
+            "runner_image": runner_image,
+            "configuration": configuration,
         }
+    )
+    group = BuildGroup(
+        id=f"build_{request_digest[:20]}",
+        request_sha256=request_digest,
+        configuration=configuration,
+        task_ids=tuple(sorted(task.id for task in tasks)),
+    )
+    document = {
+        "schemaVersion": 1,
+        "id": plan_id,
+        "batchId": batch_id,
+        "evaluatedAt": contracts.instant(now),
+        "source": {"repository": source.repository, "commit": source.commit},
+        "runnerImage": runner_image,
+        "suites": [{"id": suite_id, "sha256": suite_sha, "resolved": resolved}],
+        "buildGroups": [
+            {
+                "id": group.id,
+                "requestSha256": group.request_sha256,
+                "configuration": group.configuration,
+                "taskIds": list(group.task_ids),
+            }
+        ],
+        "manifests": [
+            {
+                "manifestId": task.manifest_id,
+                "taskId": task.id,
+                "suiteId": task.suite_id,
+                "buildGroupId": group.id,
+                "runnerId": task.runner_id,
+                "runnerIndex": task.runner_index,
+                "totalRunners": task.total_runners,
+                "campaignId": task.campaign_id,
+                "baseSeed": hex(task.base_seed) if task.base_seed is not None else None,
+                "softBudgetMs": task.soft_budget_ms,
+                "hardBudgetMs": task.hard_budget_ms,
+                "actionsJobBudgetMs": task.actions_job_budget_ms,
+            }
+            for task in tasks
+        ],
+    }
+    return Accepted(AcceptedPlan(plan_id, batch_id, tuple(tasks), (group,), document))
 
 
 def render_result(result: PlanningResult) -> dict[str, Any]:
     if isinstance(result, Accepted):
         return {"kind": "accepted", "plan": result.plan.document}
-    if isinstance(result, Stale):
-        return {
-            "kind": "stale",
-            "code": result.code,
-            "message": result.message,
-            "currentVersion": result.current_version,
-        }
     return {
         "kind": "rejected",
         "code": result.code,
         "message": result.message,
         "diagnostics": list(result.diagnostics),
-        "alternatives": list(result.alternatives),
     }

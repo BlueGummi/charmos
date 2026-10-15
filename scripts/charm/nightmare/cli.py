@@ -1,7 +1,6 @@
 """charm nightmare: suite TOML, the cmdline codec, and the orchestrated runs"""
 
 import json
-import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,7 +17,6 @@ from . import grammar as NG
 from . import materialize as OM
 from . import planner as OP
 from . import suite as NS
-from . import waker as NW
 from . import workflow as OW
 
 app = App(name="nightmare", help=__doc__)
@@ -293,42 +291,40 @@ def replay(
 
 @app.command
 def plan(
-    command: Path,
-    snapshot: Path,
+    suite: str,
     *,
+    repository: str,
     source_commit: str,
     runner_image: str,
     suite_dir: Path = SUITE_DIR,
-    ownership: Literal["ad-hoc", "repository"] = "ad-hoc",
     out: Path | None = None,
+    at: str | None = None,
 ) -> int:
-    """Validate and place one batch against a fleet snapshot.
+    """Validate and place one committed suite.
 
     Exits 0 only when the plan is accepted.
 
     Parameters
     ----------
-    command
-        Normalized validate_batch command JSON.
-    snapshot
-        Authoritative fleet snapshot JSON.
+    suite
+        Committed suite id (a file in the suite directory).
+    repository
+        owner/repository the source commit belongs to.
     source_commit
         Exact 40-hex source commit.
     runner_image
         Immutable GHCR image digest.
     out
         Accepted/rejected result JSON (default: stdout).
+    at
+        Injected ISO-8601 clock.
     """
-    command_doc = _json_object(command)
-    result = OP.Planner(suite_dir).plan(
-        command_doc,
-        _json_object(snapshot),
-        source=OP.Source(
-            command_doc.get("repository", {}).get("id", ""), source_commit
-        ),
+    result = OP.plan(
+        suite_dir,
+        suite,
+        source=OP.Source(repository, source_commit),
         runner_image=runner_image,
-        now=datetime.now(UTC),
-        ownership=ownership,
+        now=_instant(at),
     )
     document = OP.render_result(result)
     if out:
@@ -342,11 +338,8 @@ def plan(
             file=sys.stderr,
         )
         return 0
-    if isinstance(result, OP.Stale):
-        print(f"stale: current snapshot is {result.current_version}", file=sys.stderr)
-    else:
-        for diagnostic in result.diagnostics:
-            print(f"{diagnostic['field']}: {diagnostic['message']}", file=sys.stderr)
+    for diagnostic in result.diagnostics:
+        print(f"{diagnostic['field']}: {diagnostic['message']}", file=sys.stderr)
     return 2
 
 
@@ -414,78 +407,6 @@ def materialize(
     return 0
 
 
-def _planner_inputs(
-    command: dict[str, Any],
-    snapshot: dict[str, Any],
-    command_out: Path,
-    snapshot_out: Path,
-) -> int:
-    _write_json(command_out, command)
-    _write_json(snapshot_out, snapshot)
-    print(f"{command['command_id']} {snapshot['version']}")
-    return 0
-
-
-@app.command(name="repository-command")
-def repository_command(
-    *,
-    suite: str,
-    repository: str,
-    command_out: Path,
-    snapshot_out: Path,
-    ref: str = "main",
-    suite_dir: Path = SUITE_DIR,
-    runner_capacity: int = 12,
-    at: str | None = None,
-) -> int:
-    """Create trusted planner inputs for one committed repository suite.
-
-    Parameters
-    ----------
-    at
-        Injected ISO-8601 clock.
-    """
-    command, snapshot = OW.repository_command(
-        suite_id=suite,
-        suite_dir=suite_dir,
-        repository=repository,
-        ref=ref,
-        now=_instant(at),
-        runner_capacity=runner_capacity,
-    )
-    return _planner_inputs(command, snapshot, command_out, snapshot_out)
-
-
-@app.command(name="inline-command")
-def inline_command(
-    *,
-    toml: str,
-    repository: str,
-    command_out: Path,
-    snapshot_out: Path,
-    ref: str = "main",
-    runner_capacity: int = 12,
-    at: str | None = None,
-) -> int:
-    """Create trusted planner inputs for one inline TOML batch definition.
-
-    Parameters
-    ----------
-    toml
-        Raw batch TOML definition string.
-    at
-        Injected ISO-8601 clock.
-    """
-    command, snapshot = OW.inline_command(
-        toml_text=toml,
-        repository=repository,
-        ref=ref,
-        now=_instant(at),
-        runner_capacity=runner_capacity,
-    )
-    return _planner_inputs(command, snapshot, command_out, snapshot_out)
-
-
 @app.command
 def matrix(kind: Literal["build", "runner"], document: Path, *, limit: int = 64) -> int:
     """Emit a bounded trusted Actions matrix."""
@@ -530,49 +451,3 @@ def aggregate_(
             handle.write(text)
     sys.stdout.write(text)
     return 0 if report.ok else 1
-
-
-@app.command(name="queue-command")
-def queue_command(
-    command: Path, *, batch_id: str, source_sha: str, out: Path, at: str | None = None
-) -> int:
-    """Classify one accepted command for deferred execution; prints true/false.
-
-    Parameters
-    ----------
-    at
-        Injected ISO-8601 clock.
-    """
-    metadata = OW.queue_metadata(
-        _json_object(command),
-        batch_id=batch_id,
-        source_sha=source_sha,
-        now=_instant(at),
-    )
-    _write_json(out, metadata)
-    print("true" if metadata["deferred"] else "false")
-    return 0
-
-
-@app.command(name="wake-queue")
-def wake_queue(
-    *,
-    repository: str,
-    workflow: str = "nightmare-orchestrator.yml",
-    ref: str = "main",
-    api_url: str = "https://api.github.com",
-    token_env: str = "GITHUB_TOKEN",
-) -> int:
-    """Dispatch all due artifact-backed Nightmare plans."""
-    due = NW.wake_due(
-        token=os.environ.get(token_env, ""),
-        repository=repository,
-        workflow=workflow,
-        ref=ref,
-        api_url=api_url,
-    )
-    for queue in due:
-        print(f"dispatched {queue.batch_id} from queued run {queue.run_id}")
-    if not due:
-        print("no deferred Nightmare plans are due")
-    return 0

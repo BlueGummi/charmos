@@ -3,7 +3,6 @@
 name          = "harness_smoke"
 runners       = 1
 budget_hours  = 0.1
-overlap_ratio = 0.0
 
 [build]
 compiler = "gcc"

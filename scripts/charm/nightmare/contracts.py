@@ -10,7 +10,6 @@ from typing import Annotated, Any, Literal
 
 from pydantic import (
     AfterValidator,
-    AwareDatetime,
     BaseModel,
     ConfigDict,
     Field,
@@ -125,25 +124,6 @@ class RunnerManifest(Contract):
     build: BuildIdentity
     campaign: CampaignContract
     result: ResultTarget
-
-
-class BatchDefinition(Contract):
-    """One requested batch: which suites, on how many runners, when"""
-
-    name: str = Field(min_length=1, max_length=128)
-    start_utc: AwareDatetime = Field(strict=False)
-    window_hours: float = Field(gt=0, le=168)
-    runners: int = Field(ge=1, le=256)
-    color: str = Field("#a7c080", pattern=r"^#[0-9A-Fa-f]{6}$")
-    tests: list[Annotated[str, Field(min_length=1)]] = Field(min_length=1)
-
-    @property
-    def start(self) -> datetime:
-        return self.start_utc.astimezone(UTC)
-
-    @property
-    def window_ms(self) -> int:
-        return int(self.window_hours * 3_600_000)
 
 
 def instant(value: datetime) -> str:

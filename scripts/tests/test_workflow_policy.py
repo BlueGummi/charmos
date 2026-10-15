@@ -107,9 +107,9 @@ def test_every_ghcr_runner_tag_is_mutable_even_when_it_looks_versioned() -> None
 def test_charm_invocation_without_pythonpath_is_a_violation() -> None:
     text = """
 jobs:
-  wake:
+  plan:
     steps:
-      - run: python3 -m charm nightmare wake-queue
+      - run: python3 -m charm nightmare plan x
 """
     violations = WP.check_text(Path("workflow.yml"), text)
     assert [(v.line, v.rule) for v in violations] == [(5, "charm_not_importable")]
@@ -118,9 +118,9 @@ jobs:
 def test_charm_invocation_through_uv_is_clean() -> None:
     text = """
 jobs:
-  wake:
+  plan:
     steps:
-      - run: uv run --locked charm nightmare wake-queue
+      - run: uv run --locked charm nightmare plan x
 """
     assert WP.check_text(Path("workflow.yml"), text) == []
 

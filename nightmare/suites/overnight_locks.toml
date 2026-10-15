@@ -7,7 +7,6 @@
 name          = "overnight_locks"
 runners       = 8
 budget_hours  = 2.0
-overlap_ratio = 0.15
 
 [build]
 compiler = "clang"

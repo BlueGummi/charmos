@@ -11,13 +11,12 @@
   },
   "suite": {
     "id": "contract_smoke",
-    "sha256": "280ffff2fa38406ec0eb8a2b1f442d49bff6aade16d5f1f761f0cea92cee5698",
+    "sha256": "2e80e91d0f4cf8f6f03e29dc9386c97e12ad9158558e0bb013e7cd14f1b82ba6",
     "resolved": {
       "suite": {
         "name": "contract_smoke",
         "runners": 1,
-        "budget_hours": 0.01,
-        "overlap_ratio": 0.0
+        "budget_hours": 0.01
       },
       "build": {
         "compiler": "gcc",

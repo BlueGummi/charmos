@@ -11,13 +11,12 @@
   },
   "suite": {
     "id": "p7_m3_short",
-    "sha256": "dd5584642e2c1d34d8572ef2697ca762b087d5f3116e92e66c4550fb0242c4c6",
+    "sha256": "1c83b61182c4ee192f43399aa5619a193c09a8dba7b1bb30edf0d36649ef71df",
     "resolved": {
       "suite": {
         "name": "p7_m3_short",
         "runners": 1,
-        "budget_hours": 0.01,
-        "overlap_ratio": 0.0
+        "budget_hours": 0.01
       },
       "build": {
         "compiler": "gcc",

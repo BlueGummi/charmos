@@ -9,13 +9,10 @@ from .paths import repo_root
 EXECUTION_WORKFLOWS = (
     "build.yml",
     "nightmare-orchestrator.yml",
-    "nightmare-waker.yml",
     "nightmare.yml",
     "test.yml",
     "tools.yml",
 )
-
-PROTECTED_WORKFLOWS = EXECUTION_WORKFLOWS
 
 _EXECUTION_RULES = (
     (
@@ -130,11 +127,6 @@ def _check_charm_importable(path: Path, text: str) -> list[Violation]:
 
 def workflows_dir(root: Path | None = None) -> Path:
     return (root or repo_root()) / ".github" / "workflows"
-
-
-def protected_paths(root: Path | None = None) -> tuple[Path, ...]:
-    base = workflows_dir(root)
-    return tuple(base / name for name in EXECUTION_WORKFLOWS)
 
 
 def all_paths(root: Path | None = None) -> tuple[Path, ...]:

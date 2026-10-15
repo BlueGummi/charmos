@@ -111,7 +111,6 @@ class SuiteMeta(Model):
     name: str = Field(pattern=g.NAME_RE.pattern)
     runners: int = Field(ge=1)
     budget_hours: float = Field(gt=0)
-    overlap_ratio: float = Field(0.0, ge=0, lt=1)
 
     @property
     def budget_ms(self) -> int:
