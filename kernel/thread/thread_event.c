@@ -465,13 +465,25 @@ void thread_add_sleep_reason(struct thread *t, thread_act_reason_t reason) {
 }
 
 void thread_set_timesharing(struct thread *t) {
-    spin_guard_high(&t->pi_lock);
+    struct scheduler *out;
+    enum irql irql = thread_lock_scheduler(t, &out);
+    enum irql pirql = spin_lock_high(&t->pi_lock);
+
     t->base_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
     t->perceived_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
+
+    spin_unlock(&t->pi_lock, pirql);
+    spin_unlock(&out->lock, irql);
 }
 
 void thread_set_background(struct thread *t) {
-    spin_guard_high(&t->pi_lock);
+    struct scheduler *out;
+    enum irql irql = thread_lock_scheduler(t, &out);
+    enum irql pirql = spin_lock_high(&t->pi_lock);
+
     t->base_prio_class = THREAD_PRIO_CLASS_BACKGROUND;
     t->perceived_prio_class = THREAD_PRIO_CLASS_BACKGROUND;
+
+    spin_unlock(&t->pi_lock, pirql);
+    spin_unlock(&out->lock, irql);
 }

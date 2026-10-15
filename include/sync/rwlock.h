@@ -11,16 +11,6 @@
 #include <thread/thread_types.h>
 #include <tsa.h>
 
-typedef BITMAP_DECLARE(rwlock_mask_t, THREAD_RW_READER_ID_BITS);
-typedef uint8_t rwlock_id_t;
-static_assert(BITS_PER_BYTE * sizeof(rwlock_id_t) >=
-                  BITS_NEEDED(THREAD_RW_READER_ID_BITS),
-              "rwlock_id_t needs to be wider");
-/*
- * Our rwlocks perform a variant of priority ceiling protocols lazily through
- * the use of a strategy similar to a bloom filter.
- */
-
 /* rwlock: pointer sized shared reader writer lock
  *
  * note: the writer bit leads to two separate
