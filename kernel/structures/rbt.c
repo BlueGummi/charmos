@@ -6,6 +6,119 @@
 #include <stdint.h>
 #include <structures/rbt.h>
 
+#ifdef DEBUG_RBT
+
+#define RBT_DEBUG_MAX_DEPTH 128
+
+static inline void rbt_debug_step(size_t *steps, const struct rbt_node *at,
+                                  const char *caller) {
+    if (cc_unlikely(++*steps > RBT_DEBUG_MAX_DEPTH))
+        panic("%s: walk passed %d steps at node %p -- cycle?", caller,
+              RBT_DEBUG_MAX_DEPTH, at);
+}
+
+static void rbt_debug_check_linked(const struct rbt *tree,
+                                   const struct rbt_node *node,
+                                   const char *caller) {
+    const struct rbt_node *n = node;
+    size_t steps = 0;
+
+    while (n->parent) {
+        const struct rbt_node *p = n->parent;
+        if (cc_unlikely(p->left != n && p->right != n))
+            panic("%s: node %p (from %p) claims parent %p, whose children are "
+                  "%p/%p, tree %p",
+                  caller, n, node, p, p->left, p->right, tree);
+
+        n = p;
+        rbt_debug_step(&steps, n, caller);
+    }
+
+    if (cc_unlikely(n != tree->root))
+        panic("%s: node %p is under root %p, not tree %p (root %p)", caller,
+              node, n, tree, tree->root);
+}
+
+#else
+
+static inline void rbt_debug_step(size_t *steps, const struct rbt_node *at,
+                                  const char *caller) {
+    cc_ignore(steps, at, caller);
+}
+
+static inline void rbt_debug_check_linked(const struct rbt *tree,
+                                          const struct rbt_node *node,
+                                          const char *caller) {
+    cc_ignore(tree, node, caller);
+}
+
+#endif /* DEBUG_RBT */
+
+#ifdef DEBUG_RBT_DEEP
+
+static size_t rbt_debug_validate_subtree(const struct rbt *tree,
+                                         const struct rbt_node *node,
+                                         size_t depth, const char *caller) {
+    if (!node)
+        return 1;
+
+    if (cc_unlikely(depth > RBT_DEBUG_MAX_DEPTH))
+        panic("%s: tree %p deeper than %d at node %p -- cycle?", caller, tree,
+              RBT_DEBUG_MAX_DEPTH, node);
+
+    if (cc_unlikely(node->left && node->left == node->right))
+        panic("%s: node %p has %p as both children, tree %p", caller, node,
+              node->left, tree);
+
+    if (cc_unlikely(node->left && node->left->parent != node))
+        panic("%s: node %p left child %p has parent %p, tree %p", caller, node,
+              node->left, node->left->parent, tree);
+
+    if (cc_unlikely(node->right && node->right->parent != node))
+        panic("%s: node %p right child %p has parent %p, tree %p", caller, node,
+              node->right, node->right->parent, tree);
+
+    if (cc_unlikely(node->color == TREE_NODE_RED &&
+                    ((node->left && node->left->color == TREE_NODE_RED) ||
+                     (node->right && node->right->color == TREE_NODE_RED))))
+        panic("%s: red-red violation at node %p, tree %p", caller, node, tree);
+
+    size_t lh = rbt_debug_validate_subtree(tree, node->left, depth + 1, caller);
+    size_t rh =
+        rbt_debug_validate_subtree(tree, node->right, depth + 1, caller);
+
+    if (cc_unlikely(lh != rh))
+        panic("%s: black-height violation at node %p (left %zu, right %zu), "
+              "tree %p",
+              caller, node, lh, rh, tree);
+
+    return lh + (node->color == TREE_NODE_BLACK ? 1 : 0);
+}
+
+static void rbt_debug_validate(const struct rbt *tree, const char *caller) {
+    const struct rbt_node *root = tree->root;
+    if (!root)
+        return;
+
+    if (cc_unlikely(root->parent))
+        panic("%s: root %p of tree %p has parent %p", caller, root, tree,
+              root->parent);
+
+    if (cc_unlikely(root->color != TREE_NODE_BLACK))
+        panic("%s: root %p of tree %p is red", caller, root, tree);
+
+    rbt_debug_validate_subtree(tree, root, 0, caller);
+}
+
+#else
+
+static inline void rbt_debug_validate(const struct rbt *tree,
+                                      const char *caller) {
+    cc_ignore(tree, caller);
+}
+
+#endif /* DEBUG_RBT_DEEP */
+
 struct rbt *rbt_create(rbt_get_data get, rbt_compare cmp) {
     struct rbt *tree = vnew(tree);
     if (!tree)
@@ -18,15 +131,20 @@ struct rbt *rbt_create(rbt_get_data get, rbt_compare cmp) {
 }
 
 struct rbt_node *rbt_find_min(struct rbt_node *node) {
-    while (node && node->left != NULL)
+    size_t steps = 0;
+    while (node && node->left != NULL) {
         node = node->left;
+        rbt_debug_step(&steps, node, __func__);
+    }
 
     return node;
 }
 
 struct rbt_node *rbt_find_max(struct rbt_node *node) {
+    size_t steps = 0;
     while (node && node->right != NULL) {
         node = node->right;
+        rbt_debug_step(&steps, node, __func__);
     }
 
     return node;
@@ -47,10 +165,12 @@ struct rbt_node *rbt_next(struct rbt_node *node) {
     if (node->right)
         return rbt_find_min(node->right);
 
+    size_t steps = 0;
     struct rbt_node *parent = node->parent;
     while (parent && node == parent->right) {
         node = parent;
         parent = parent->parent;
+        rbt_debug_step(&steps, node, __func__);
     }
     return parent;
 }
@@ -143,9 +263,12 @@ static bool rbt_is_black(const struct rbt_node *node) {
 
 static void fix_deletion(struct rbt *tree, struct rbt_node *x,
                          struct rbt_node *x_parent) {
+    size_t steps = 0;
     while (x != tree->root && (!x || x->color == TREE_NODE_BLACK)) {
         if (!x_parent)
             break;
+
+        rbt_debug_step(&steps, x_parent, __func__);
 
         struct rbt_node *sibling;
 
@@ -226,6 +349,8 @@ void rbt_delete(struct rbt *tree, struct rbt_node *z) {
     enforce(z->parent != NULL || z == tree->root,
             "rbt_delete: node %p is not linked into tree %p (root %p)", z, tree,
             tree->root);
+    rbt_debug_check_linked(tree, z, __func__);
+    rbt_debug_validate(tree, __func__);
 
     struct rbt_node *y = z;
     struct rbt_node *x = NULL;
@@ -269,6 +394,8 @@ void rbt_delete(struct rbt *tree, struct rbt_node *z) {
     z->left = NULL;
     z->right = NULL;
     z->parent = NULL;
+
+    rbt_debug_validate(tree, __func__);
 }
 
 static struct rbt_node *
@@ -337,7 +464,9 @@ void rbt_remove(struct rbt *tree, uint64_t data) {
 }
 
 static void fix_insertion(struct rbt *tree, struct rbt_node *node) {
+    size_t steps = 0;
     while (node != tree->root && node->parent->color == TREE_NODE_RED) {
+        rbt_debug_step(&steps, node, __func__);
         struct rbt_node *parent = node->parent;
         struct rbt_node *grandparent = parent->parent;
 
@@ -381,6 +510,8 @@ static void fix_insertion(struct rbt *tree, struct rbt_node *node) {
 }
 
 void rbt_insert(struct rbt *tree, struct rbt_node *new_node) {
+    rbt_debug_validate(tree, __func__);
+
     new_node->left = NULL;
     new_node->right = NULL;
     new_node->color = TREE_NODE_RED;
@@ -395,7 +526,15 @@ void rbt_insert(struct rbt *tree, struct rbt_node *new_node) {
     struct rbt_node *current = tree->root;
     struct rbt_node *parent = NULL;
     int32_t cmp = 0;
+    size_t steps = 0;
     while (current != NULL) {
+#ifdef DEBUG_RBT
+        /* Only finds a duplicate whose key still places it on this path */
+        if (cc_unlikely(current == new_node))
+            panic("rbt_insert: node %p is already in tree %p", new_node, tree);
+#endif
+
+        rbt_debug_step(&steps, current, __func__);
         parent = current;
         cmp = tree->compare(new_node, current);
         if (cmp < 0)
@@ -423,6 +562,8 @@ void rbt_insert(struct rbt *tree, struct rbt_node *new_node) {
     if (parent)
         enforce(!(parent->color == TREE_NODE_RED &&
                   new_node->color == TREE_NODE_RED));
+
+    rbt_debug_validate(tree, __func__);
 }
 
 void rbt_link_node(struct rbt_node *node, struct rbt_node *parent,
@@ -436,6 +577,7 @@ void rbt_link_node(struct rbt_node *node, struct rbt_node *parent,
 
 void rbt_insert_color(struct rbt *tree, struct rbt_node *node) {
     fix_insertion(tree, node);
+    rbt_debug_validate(tree, __func__);
 }
 
 struct rbt *rbt_init(struct rbt *tree, rbt_get_data get_data, rbt_compare cmp) {

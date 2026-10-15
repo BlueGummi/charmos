@@ -118,6 +118,18 @@ static inline uint32_t hash_jenkins_one_at_a_time(const void *key, size_t len) {
     return hash;
 }
 
+static inline size_t hash_pointer(void *ptr) {
+    uintptr_t key = (uintptr_t) ptr;
+    key = (~key) + (key << 21);
+    key = key ^ (key >> 24);
+    key = (key + (key << 3)) + (key << 8);
+    key = key ^ (key >> 14);
+    key = (key + (key << 2)) + (key << 4);
+    key = key ^ (key >> 28);
+    key = key + (key << 31);
+    return key;
+}
+
 #define HASH_MURMUR3_SEED_DEFAULT 104729
 static inline uint32_t hash_murmur3_32(const void *key, size_t len,
                                        uint32_t seed) {

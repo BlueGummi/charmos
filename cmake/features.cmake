@@ -42,6 +42,8 @@ set(DEBUG_FLAGS
     #
     # Misc.
     DEBUG_LIST
+    DEBUG_RBT
+    DEBUG_RBT_DEEP
     DEBUG_CMDLINE
     DEBUG_ENFORCE # Debug enforcement
 )
