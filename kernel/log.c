@@ -415,6 +415,7 @@ static void log_dump_site_pinned(struct log_site *site,
 
         if (site->dropped) {
             printf_unlocked("!! dropped %u log records !!\n", site->dropped);
+            site->dropped = 0;
         }
 
         log_dump_record(site, &rec, opts, printf_unlocked);

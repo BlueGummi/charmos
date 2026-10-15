@@ -26,6 +26,7 @@ set(DEBUG_FLAGS
     DEBUG_LOCK_CHK
     #
     # Scheduling and threads
+    DEBUG_SCHED
     DEBUG_SCHED_NESTING
     DEBUG_CLIMB
     #

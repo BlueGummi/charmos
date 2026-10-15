@@ -82,7 +82,8 @@ static bool chaos(struct test_fleet *f, struct test_conc_worker *w) {
     return true;
 }
 
-TEST_DEFINE_INTEGRATION(mutex, mt_chaos, TEST_INTENSITY(20, 50, 100)) {
+static struct test_verdict mt_chaos_run(struct test_context *ctx,
+                                        const char *const *noise) {
     struct test_fleet *fleet = test_fleet_init(ctx, NULL);
     TEST_ASSERT_NONNULL(fleet);
 
@@ -97,6 +98,9 @@ TEST_DEFINE_INTEGRATION(mutex, mt_chaos, TEST_INTENSITY(20, 50, 100)) {
     for (size_t i = 0; i < num_threads; i++)
         TEST_ASSERT_NONNULL(test_fleet_spawn(fleet, "ch", chaos, fix));
 
+    if (noise)
+        test_fleet_spawn_perturbers(fleet, noise, TEST_PERTURB_VICTIM_ANY);
+
     test_fleet_start_all(fleet);
 
     struct test_verdict v = test_fleet_join(fleet);
@@ -105,4 +109,20 @@ TEST_DEFINE_INTEGRATION(mutex, mt_chaos, TEST_INTENSITY(20, 50, 100)) {
 
     TEST_ASSERT_EQ(atomic_load(&fix->completed), num_threads);
     return TEST_SUCCESS;
+}
+
+TEST_DEFINE_INTEGRATION(mutex, mt_chaos, TEST_INTENSITY(20, 50, 100)) {
+    return mt_chaos_run(ctx, NULL);
+}
+
+/* Noise */
+static const char *const mt_chaos_noise[] = {
+    "migrator",
+    "ipi_storm",
+    "dpc_storm",
+    NULL,
+};
+
+TEST_DEFINE_INTEGRATION(mutex, mt_chaos_noisy, TEST_INTENSITY(20, 50, 100)) {
+    return mt_chaos_run(ctx, mt_chaos_noise);
 }

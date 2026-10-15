@@ -94,9 +94,20 @@ struct scheduler {
     enum irql other_locked_irql;
 
     struct rt_scheduler_percpu *rt;
+
+#ifdef DEBUG_SCHED
+    /* Runqueue progress, racily read by detector */
+    atomic_uint64_t debug_progress_ms;
+#endif
 };
 
 void scheduler_init();
+
+#ifdef DEBUG_SCHED
+void scheduler_debug_start(void);
+#else
+static inline void scheduler_debug_start(void) {}
+#endif
 
 struct scheduler *scheduler_select_best_for_thread(struct thread *t);
 void scheduler_add_thread_locked(struct scheduler *sched, struct thread *thread)
@@ -203,7 +214,14 @@ static inline bool scheduler_core_idle(struct core *c) {
 
 static inline void scheduler_force_resched(struct scheduler *sched) {
     scheduler_mark_core_needs_resched(global.cores[sched->core_id], true);
-    ipi_send_try(sched->core_id, IRQ_SCHEDULER);
+    ipi_send(sched->core_id, IRQ_SCHEDULER);
+}
+
+/* caller has to handle failure */
+static inline bool cc_warn_unused_result
+scheduler_try_force_resched(struct scheduler *sched) {
+    scheduler_mark_core_needs_resched(global.cores[sched->core_id], true);
+    return ipi_send_try(sched->core_id, IRQ_SCHEDULER);
 }
 
 enum irql thread_lock_scheduler(struct thread *t, struct scheduler **out_sched)

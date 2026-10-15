@@ -25,6 +25,15 @@ void nightmare_park(struct test_conc_worker *worker) {
     test_conc_park(&nightmare_runtime.conc, worker);
 }
 
+static void nightmare_perturb_finding(const char *kind, const char *msg) {
+    nightmare_finding_at(
+        &(const struct nightmare_finding_site){.kind = kind,
+                                               .tier = NIGHTMARE_TIER_AMBIGUOUS,
+                                               .file = __RELFILE__,
+                                               .line = __LINE__},
+        0, "%s", msg);
+}
+
 void nightmare_thread_main(void *arg) {
     struct test_conc_worker *worker = arg;
     completion_wait(&nightmare_runtime.conc.start);
@@ -39,9 +48,14 @@ void nightmare_thread_main(void *arg) {
             size_t pidx = worker->index - nightmare_runtime.ctx.worker_count;
             if (pidx < nightmare_runtime.perturber_count &&
                 nightmare_runtime.perturbers[pidx] &&
-                nightmare_runtime.perturbers[pidx]->thread) {
-                nightmare_runtime.perturbers[pidx]->thread(
-                    &nightmare_runtime.ctx, worker);
+                nightmare_runtime.perturbers[pidx]->fn) {
+                const struct test_perturb_env env = {
+                    .conc = &nightmare_runtime.conc,
+                    .subject_count = nightmare_runtime.ctx.worker_count,
+                    .victim_cpu = TEST_PERTURB_VICTIM_ANY,
+                    .finding = nightmare_perturb_finding,
+                };
+                nightmare_runtime.perturbers[pidx]->fn(&env, worker);
             }
         }
     }

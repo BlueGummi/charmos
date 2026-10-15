@@ -15,9 +15,9 @@ static size_t scheduler_thread_get_data(struct rbt_node *n) {
 
 static int32_t scheduler_cmp_threads(const struct rbt_node *a,
                                      const struct rbt_node *b) {
-    int32_t vrla = thread_from_rq_rbt_node(a)->virtual_runtime_left;
-    int32_t vrlb = thread_from_rq_rbt_node(b)->virtual_runtime_left;
-    return vrla - vrlb;
+    int64_t vrla = thread_from_rq_rbt_node(a)->virtual_runtime_left;
+    int64_t vrlb = thread_from_rq_rbt_node(b)->virtual_runtime_left;
+    return (vrla > vrlb) - (vrla < vrlb);
 }
 
 static void scheduler_tick(struct timer *t) {

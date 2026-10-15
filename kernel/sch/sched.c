@@ -111,6 +111,7 @@ static inline void re_enqueue_thread(struct scheduler *sched,
         thread->queued_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
         retire_thread(sched, thread);
         scheduler_increment_thread_count(sched, thread);
+        scheduler_debug_validate(sched);
     } else {
         scheduler_add_thread_locked(sched, thread);
     }
@@ -165,6 +166,10 @@ static inline bool migrate_to_destination(struct thread *t, time_ms_t time) {
     save_thread(other, t, time);
     thread_set_runqueue(t, other);
 
+    /* An idle destination sits in a tickless hlt and won't look at its
+     * runqueue until its next interrupt, so tell it the thread is there */
+    scheduler_force_resched(other);
+
     thread_post_migrate(t, us->core_id, dst);
     return true;
 }
@@ -214,6 +219,8 @@ static struct thread *pick_thread(struct scheduler *sched, time_ms_t now_ms) {
             "picked a %d thread off the %d queue",
             (int) next->queued_prio_class, (int) prio);
     scheduler_decrement_thread_count(sched, next);
+    scheduler_debug_note_progress(sched);
+    scheduler_debug_validate(sched);
 
     /* make sure we are not idle */
     scheduler_mark_self_idle(false);

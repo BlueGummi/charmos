@@ -373,7 +373,7 @@ bool nightmare_load_perturb_verdict(struct nightmare_verdict *out) {
     *out = nightmare_runtime.perturb_verdict;
     return true;
 }
-static void nightmare_add_perturber(const struct nightmare_perturb_desc *desc) {
+static void nightmare_add_perturber(const struct test_perturb_desc *desc) {
     if (!desc || nightmare_runtime.perturber_count >= NIGHTMARE_MAX_PERTURBERS)
         return;
     for (size_t i = 0; i < nightmare_runtime.perturber_count; i++) {

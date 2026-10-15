@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <sync/once_token.h>
 #include <test/conc.h>
+#include <test/perturb.h>
 #include <test/test.h>
 #include <time/time.h>
 #include <time/timer.h>
@@ -76,6 +77,11 @@ struct test_fleet {
      */
     struct test_fleet_alloc *allocs;
 
+    /* workers[0, subject_count) are subjects, and the rest are perturbers */
+    size_t subject_count;
+    bool has_perturbers;
+    struct test_perturb_env perturb_env;
+
     /* Whoever fails first, gets it first */
     ONCE_TOKEN_DEFINE(bool, failed);
     const char *fail_file;
@@ -113,6 +119,11 @@ struct test_conc_worker *test_fleet_spawn_on_core(struct test_fleet *f,
 size_t test_fleet_spawn_per_core(struct test_fleet *f, const char *role,
                                  test_worker_fn body, void *arg,
                                  size_t per_core);
+
+/* Background noise against every worker, one perturber per name */
+size_t test_fleet_spawn_perturbers(struct test_fleet *f,
+                                   const char *const *names,
+                                   int64_t victim_cpu);
 
 /* Open the gates for the workers */
 void test_fleet_start_all(struct test_fleet *f);

@@ -330,7 +330,7 @@ static void allocate_slices(struct scheduler *s, uint64_t now_ms) {
     s->period_start_ms = now_ms;
 
     uint64_t total_weight = 0;
-    struct rbt_node *node;
+    struct rbt_node *node, *tmp;
     rbt_for_each(node, &s->thread_rbt) {
         struct thread *t = thread_from_rq_rbt_node(node);
         total_weight += t->weight;
@@ -339,7 +339,7 @@ static void allocate_slices(struct scheduler *s, uint64_t now_ms) {
     if (total_weight == 0)
         total_weight = 1;
 
-    rbt_for_each(node, &s->thread_rbt) {
+    rbt_for_each_safe(node, tmp, &s->thread_rbt) {
         struct thread *t = thread_from_rq_rbt_node(node);
 
         uint64_t budget_ms = (s->period_ms * t->weight) / total_weight;
@@ -356,7 +356,10 @@ static void allocate_slices(struct scheduler *s, uint64_t now_ms) {
 
         t->virtual_period_runtime = 0;
         t->virtual_budget = budget_ms * mult;
+        t->virtual_runtime_left = thread_virtual_runtime_left(t);
         t->completed_period = s->current_period - 1;
+
+        rbt_reinsert(&s->thread_rbt, node);
     }
 }
 
@@ -365,9 +368,17 @@ static void scheduler_update_thread_weights(struct scheduler *s) {
     rbt_for_each(node, &s->thread_rbt) {
         struct thread *t = rbt_entry(node, struct thread, rq_tree_node);
 
+        /* The penalty refreshes virtual_runtime_left, the tree's key, but
+         * allocate_slices() sets the real one right after. Keep the key
+         * where it is so the tree stays ordered, since a node moved here
+         * could be visited and penalized twice */
+        uint32_t key = t->virtual_runtime_left;
+
         /* This will recalculate activity data
          * and update the effective priority */
         thread_apply_cpu_penalty(t);
+
+        t->virtual_runtime_left = key;
     }
 }
 
@@ -379,4 +390,5 @@ void scheduler_period_start(struct scheduler *s, uint64_t now_ms) {
     allocate_slices(s, now_ms);
 
     s->period_enabled = true;
+    scheduler_debug_validate(s);
 }

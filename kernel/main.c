@@ -192,6 +192,7 @@ void k_sch_main(void *nop) {
 
     smp_enable_all_ticks();
     watchdog_start();
+    scheduler_debug_start();
 
     rcu_init();
     workqueues_permanent_init();

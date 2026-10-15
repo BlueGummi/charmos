@@ -11,6 +11,8 @@ void scheduler_idle_main(void *nop) {
     cc_unused(nop);
     struct scheduler *sched = global.schedulers[smp_id_raw()];
 
+    bool woken = false;
+
     while (true) {
         irq_disable();
 
@@ -24,7 +26,16 @@ void scheduler_idle_main(void *nop) {
             continue;
         }
 
+        /* Go yield to try to pick up some work */
+        if (woken && atomic_load(&scheduler_data.total_threads) > 0) {
+            woken = false;
+            irq_enable();
+            scheduler_yield();
+            continue;
+        }
+
         rcu_idle_enter();
         cpu_idle();
+        woken = true;
     }
 }

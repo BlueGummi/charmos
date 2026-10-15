@@ -9,44 +9,6 @@
  * and we ALWAYS acquire thread
  * locks AFTER any scheduler locks! */
 
-/*
- * # Small Idea: Thread being_moved locking
- *
- * ## Credits: gummi
- *
- * ## Context: This flag is used to ensure that everyone reads an accurate
- *             `last_ran` field on a thread. Basically, READY threads can be
- *             arbitrarily migrated at any time if it is possible. All
- *             migrations must occur whilst both scheduler locks are held.
- *
- *             Threads also have to have their core's scheduler lock
- *             acquired when the being_moved is being locked.
- *
- * ## Problem: We need to guarantee that this lock is used appropriately
- *             alongside thread flags to make sure that an invalid
- *             last_ran field is NEVER read. This must be done
- *             because if an invalid last_ran field is read, we will
- *             lock the WRONG scheduler and can cause catastrophic races.
- *
- * ## Strategy: Upon any thread migration within the scheduler, we spin
- *              on the lock and try to set it. Upon any read of the
- *              thread's last_ran field, we spin on the lock and wait
- *              for it to become free but never set it. Prior to any
- *              spin_raw on the lock from outside the scheduler,
- *              we ALWAYS set the thread as NO_STEAL so that it cannot
- *              possibly be migrated after the lock is available.
- *
- *              Every time we read the flags to see if the thread can
- *              be migrated, we must hold the lock prior to reading the
- *              flags, and release the lock if we are able to migrate
- *              the thread and only after we set last_ran.
- *
- * ## Changelog:
- *    12/4/2025 - gummi - Created Idea
- *
- *
- */
-
 void thread_post_migrate(struct thread *t, size_t old_cpu, size_t new_cpu) {
     /* assert that both scheduler/runqueue locks are held,
      * migrate relevant things */
@@ -90,6 +52,7 @@ void thread_migrate(struct thread *t, size_t dest_core) TSA_NO_ANALYSIS {
     } else if (thread_get_state(t) == THREAD_STATE_READY) {
         scheduler_remove_thread_locked(src, t);
         scheduler_add_thread_locked(dst, t);
+        scheduler_force_resched(dst);
     }
 
     thread_set_runqueue(t, dst);

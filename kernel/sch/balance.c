@@ -242,10 +242,15 @@ size_t scheduler_try_push_to_idle_core(struct scheduler *sched) {
      * over there. otherwise, we push (1 / distance * scale) of our threads */
 
 out:
+    if (migrated) {
+        scheduler_debug_validate(sched);
+        scheduler_debug_validate(other);
+    }
+
     spin_unlock_raw(&other->lock);
 
     if (migrated)
-        ipi_send(other->core_id, IRQ_SCHEDULER);
+        scheduler_force_resched(other);
 
     return migrated;
 }

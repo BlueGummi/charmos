@@ -95,10 +95,17 @@ struct test_fleet *test_fleet_init(struct test_context *ctx,
     return f;
 }
 
+static bool test_fleet_perturb_body(struct test_fleet *f,
+                                    struct test_conc_worker *self);
+
 static struct test_conc_worker *test_fleet_claim(struct test_fleet *f,
                                                  const char *role,
                                                  test_worker_fn body,
                                                  void *arg) {
+    /* Perturbers target workers[0, subject_count) */
+    enforce(!f->has_perturbers || body == test_fleet_perturb_body,
+            "fleet subjects must be spawned before perturbers");
+
     if (f->count >= TEST_FLEET_MAX_WORKERS) {
         f->spawn_failed = true;
         return NULL;
@@ -185,6 +192,47 @@ size_t test_fleet_spawn_per_core(struct test_fleet *f, const char *role,
     return spawned;
 }
 
+static bool test_fleet_perturb_body(struct test_fleet *f,
+                                    struct test_conc_worker *self) {
+    const struct test_perturb_desc *desc = self->arg;
+    desc->fn(&f->perturb_env, self);
+    return true;
+}
+
+size_t test_fleet_spawn_perturbers(struct test_fleet *f,
+                                   const char *const *names,
+                                   int64_t victim_cpu) {
+    if (!f->has_perturbers) {
+        /* One victim for the whole fleet */
+        if (victim_cpu == TEST_PERTURB_VICTIM_ANY) {
+            uint64_t seed = test_rng_seed_for(f->ctx ? f->ctx->seed : 0,
+                                              TEST_FLEET_MAX_WORKERS);
+            victim_cpu = (int64_t) (seed % global.core_count);
+        }
+
+        f->subject_count = f->count;
+        f->perturb_env = (struct test_perturb_env){
+            .conc = &f->conc,
+            .subject_count = f->subject_count,
+            .victim_cpu = victim_cpu,
+        };
+        f->has_perturbers = true;
+    }
+
+    size_t spawned = 0;
+    for (const char *const *name = names; *name; name++) {
+        const struct test_perturb_desc *desc = test_perturb_lookup(*name);
+        enforce(desc, "no such perturber");
+
+        if (!test_fleet_spawn(f, desc->name, test_fleet_perturb_body,
+                              (void *) desc))
+            break;
+        spawned++;
+    }
+
+    return spawned;
+}
+
 void test_fleet_start_all(struct test_fleet *f) {
     atomic_store_release(&f->conc.active, true);
 
@@ -206,11 +254,18 @@ static void test_fleet_dump_worker(const struct test_conc_worker *w) {
         return;
     }
 
-    test_err("  %s[%zu] '%s': state=%d flags=0x%x wait_type=%d parked=%d",
+    struct scheduler *rq = atomic_load_acq(&t->scheduler);
+
+    test_err("  %s[%zu] '%s': state=%d flags=0x%x wait_type=%d parked=%d "
+             "rq=%ld",
              w->role ? w->role : "worker", w->index, t->name,
              (int) thread_get_state(t), (unsigned) thread_get_flags(t),
              (int) thread_get_wait_type(t),
-             (int) atomic_load(&((struct test_conc_worker *) w)->parked));
+             (int) atomic_load(&((struct test_conc_worker *) w)->parked),
+             rq ? (long) rq->core_id : -1L);
+
+    if (thread_get_state(t) == THREAD_STATE_ZOMBIE)
+        return;
 
     test_err("  %s[%zu]   apcs_pending=0x%x apcs_ran=%u ctxsw=%zu",
              w->role ? w->role : "worker", w->index,
@@ -231,6 +286,11 @@ static void test_fleet_dump(struct test_fleet *f,
              atomic_load(&f->started), atomic_load(&f->finished),
              test_stop_to_str(atomic_load(&f->conc.stop)));
 
+    if (f->has_perturbers)
+        test_err("fleet: %zu subject(s), perturbers from [%zu], victim cpu %ld",
+                 f->subject_count, f->subject_count,
+                 (long) f->perturb_env.victim_cpu);
+
     for (size_t i = 0; i < f->count; i++)
         test_fleet_dump_worker(&f->workers[i]);
 }
@@ -250,15 +310,27 @@ static void test_fleet_disarm_hard_deadline(struct test_fleet *f) {
     }
 }
 
-static void test_fleet_drain(struct test_fleet *f, enum test_stop reason) {
-    test_conc_publish_stop(&f->conc, reason);
-    test_fleet_arm_hard_deadline(f);
-
-    for (size_t i = 0; i < f->count; i++) {
+static void test_fleet_join_range(struct test_fleet *f, size_t from,
+                                  size_t to) {
+    for (size_t i = from; i < to; i++) {
         struct thread *t = atomic_load_acq(&f->workers[i].th);
 
         if (t)
             thread_join(t);
+    }
+}
+
+static void test_fleet_drain(struct test_fleet *f, enum test_stop reason) {
+    test_conc_publish_stop(&f->conc, reason);
+    test_fleet_arm_hard_deadline(f);
+
+    size_t subjects = f->has_perturbers ? f->subject_count : f->count;
+    test_fleet_join_range(f, 0, subjects);
+
+    /* Perturbers run until told to stop */
+    if (subjects < f->count) {
+        test_conc_publish_stop(&f->conc, TEST_STOP_BUDGET);
+        test_fleet_join_range(f, subjects, f->count);
     }
 
     test_fleet_disarm_hard_deadline(f);

@@ -159,6 +159,7 @@ struct thread *scheduler_steal_work(struct scheduler *new,
     if (stolen) {
         thread_set_runqueue(stolen, new);
         thread_post_migrate(stolen, victim->core_id, new->core_id);
+        scheduler_debug_validate(victim);
     }
 
     spin_unlock_raw(&victim->lock);
@@ -233,5 +234,9 @@ uint64_t scheduler_compute_steal_threshold() {
 bool scheduler_can_steal_work(struct scheduler *sched) {
     uint64_t val = atomic_load(&scheduler_data.total_threads);
     uint64_t avg_core_threads = val / global.core_count;
+
+    if (sched->total_thread_count == 0)
+        return val > 0;
+
     return sched->total_thread_count < avg_core_threads;
 }

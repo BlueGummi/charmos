@@ -41,6 +41,8 @@ void scheduler_add_thread_locked(struct scheduler *sched, struct thread *task) {
         sched->period_enabled = true;
         scheduler_period_start(sched, time_get_ms());
     }
+
+    scheduler_debug_validate(sched);
 }
 
 void scheduler_add_thread(struct scheduler *sched, struct thread *task) {
@@ -59,6 +61,7 @@ void scheduler_remove_thread_locked(struct scheduler *sched, struct thread *t) {
     }
 
     scheduler_decrement_thread_count(sched, t);
+    scheduler_debug_validate(sched);
 }
 
 void scheduler_remove_thread(struct scheduler *sched, struct thread *t) {

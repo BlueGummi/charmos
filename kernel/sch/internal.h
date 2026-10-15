@@ -6,6 +6,7 @@
 #include <sch/sched.h>
 #include <thread/apc.h>
 #include <thread/thread.h>
+#include <time/time.h>
 
 static inline void scheduler_set_queue_bitmap(struct scheduler *sched,
                                               uint8_t prio) {
@@ -38,6 +39,22 @@ static inline bool thread_exhausted_period(struct scheduler *sched,
     return thread->completed_period == sched->current_period;
 }
 
+#ifdef DEBUG_SCHED
+void scheduler_debug_validate(struct scheduler *sched);
+
+static inline void scheduler_debug_note_progress(struct scheduler *sched) {
+    atomic_store_rlx(&sched->debug_progress_ms, (uint64_t) time_get_ms());
+}
+#else
+static inline void scheduler_debug_validate(struct scheduler *sched) {
+    cc_unused(sched);
+}
+
+static inline void scheduler_debug_note_progress(struct scheduler *sched) {
+    cc_unused(sched);
+}
+#endif
+
 static inline void scheduler_decrement_thread_count(struct scheduler *sched,
                                                     struct thread *t) {
     sched->total_thread_count--;
@@ -54,7 +71,9 @@ static inline void scheduler_decrement_thread_count(struct scheduler *sched,
 
 static inline void scheduler_increment_thread_count(struct scheduler *sched,
                                                     struct thread *t) {
-    sched->total_thread_count++;
+    if (sched->total_thread_count++ == 0)
+        scheduler_debug_note_progress(sched);
+
     sched->thread_count[t->queued_prio_class]++;
     scheduler_set_queue_bitmap(sched, t->queued_prio_class);
 

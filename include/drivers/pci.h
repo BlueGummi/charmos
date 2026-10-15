@@ -189,7 +189,7 @@ LOG_SITE_EXTERN(pci);
 #define pci_log(log_level, fmt, ...)                                           \
     log(LOG_SITE(pci), LOG_HANDLE(pci), log_level, fmt, ##__VA_ARGS__)
 
-const char *pci_class_name(uint8_t class_code, enum lock_subclass subclass);
+const char *pci_class_name(uint8_t class_code, uint8_t subclass);
 
 void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out);
 uint32_t pci_read_bar(uint8_t bus, uint8_t device, uint8_t function,

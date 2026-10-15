@@ -55,7 +55,7 @@ struct nightmare_runtime {
     char perturb_reason[64];
     char perturb_msg[256];
     size_t perturber_count;
-    const struct nightmare_perturb_desc *perturbers[NIGHTMARE_MAX_PERTURBERS];
+    const struct test_perturb_desc *perturbers[NIGHTMARE_MAX_PERTURBERS];
     struct timer soft_timer;
     struct timer hard_timer;
     time_ms_t started_ms;
