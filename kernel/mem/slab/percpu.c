@@ -236,6 +236,6 @@ void slab_domain_percpu_init(struct slab_domain *domain) {
         }
 
         domain->percpu_caches[i]->domain = domain;
-        mpsc_slist_init(&domain->percpu_caches[i]->defer_frees);
+        mpsc_lifo_list_init(&domain->percpu_caches[i]->defer_frees);
     }
 }

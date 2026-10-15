@@ -1,12 +1,13 @@
 #include <math/bit.h>
 #include <math/min_max.h>
 #include <mem/alloc.h>
-#include <structures/mpmc_queue.h>
+#include <structures/mpmc_fifo_ring.h>
 
-#define MPMC_QUEUE_MIN_CAPACITY ((size_t) 2)
+#define MPMC_FIFO_RING_MIN_CAPACITY ((size_t) 2)
 
-void *mpmc_slots_alloc(struct mpmc_hdr *h, size_t cap, size_t stride) {
-    cap = MAX(next_pow2(cap), MPMC_QUEUE_MIN_CAPACITY);
+void *mpmc_fifo_ring_slots_alloc(struct mpmc_fifo_ring_hdr *h, size_t cap,
+                                 size_t stride) {
+    cap = MAX(next_pow2(cap), MPMC_FIFO_RING_MIN_CAPACITY);
 
     uint8_t *slots = valloc(stride * cap, ALLOC_ZERO);
     if (!slots)
@@ -21,7 +22,7 @@ void *mpmc_slots_alloc(struct mpmc_hdr *h, size_t cap, size_t stride) {
     return slots;
 }
 
-void mpmc_slots_free(struct mpmc_hdr *h, void *slots) {
+void mpmc_fifo_ring_slots_free(struct mpmc_fifo_ring_hdr *h, void *slots) {
     if (slots)
         vfree(slots);
 

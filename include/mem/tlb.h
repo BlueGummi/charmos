@@ -5,7 +5,7 @@
 #include <math/range.h>
 #include <stdint.h>
 #include <structures/cpu_mask.h>
-#include <structures/mpmc_queue.h>
+#include <structures/mpmc_fifo_ring.h>
 #include <types/types.h>
 
 /* per-cpu */

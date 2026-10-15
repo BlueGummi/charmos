@@ -4,7 +4,7 @@
 #include <mem/arena.h>
 #include <structures/bitmap.h>
 #include <structures/hlist.h>
-#include <structures/mpmc_list.h>
+#include <structures/mpmc_lifo_list.h>
 #include <structures/rbt.h>
 #include <sync/mutex.h>
 #include <sync/once_token.h>
@@ -254,7 +254,7 @@ struct arena_bin {
     arena_identity_t identity;
     refcount_t refcount;
 
-    struct mpmc_slist arenas;
+    struct mpmc_lifo_list arenas;
     struct arena_dumpster *dumpster;
 
     struct rcu_cb rcu;
@@ -402,7 +402,7 @@ struct arena {
          * this is safe is because the GC structures explicitly track
          * their arena_desc objects, so we can easily get the
          * *desc pointer back for this arena */
-        struct mpmc_slist_node list_node;
+        struct mpmc_lifo_list_node list_node;
     };
 
 #ifdef DEBUG_ARENA

@@ -16,8 +16,8 @@
 #include <stat_series.h>
 #include <stdint.h>
 #include <structures/list.h>
-#include <structures/mpmc_queue.h>
-#include <structures/mpsc_list.h>
+#include <structures/mpmc_fifo_ring.h>
+#include <structures/mpsc_lifo_list.h>
 #include <structures/rbt.h>
 #include <sync/spinlock.h>
 #include <thread/workqueue.h>
@@ -270,7 +270,7 @@ struct slab_magazine {
 /* NOTE: This is *why* we disable preemption when entering the slab allocator,
  * in both the alloc and free paths: shadow_objs and entry_handle */
 struct slab_percpu_cache {
-    struct mpsc_slist defer_frees;
+    struct mpsc_lifo_list defer_frees;
     struct dpc defer_dpc;
 
     /* Magazines are always nonpageable */
@@ -281,7 +281,7 @@ struct slab_percpu_cache {
                                                 * stack allocations */
 };
 
-MPMC_QUEUE_DECLARE(slab_free_ring, vaddr_t);
+MPMC_FIFO_RING_DECLARE(slab_free_ring, vaddr_t);
 
 struct slab_free_queue {
     struct slab_free_ring mpmc;

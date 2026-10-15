@@ -37,10 +37,10 @@ static void slab_defer_free_dpc(void *unused_arg, void *unused_arg2) {
      * and so long as we actually steal something, we
      * drain whatever is on that list */
 
-    struct mpsc_slist_node *tmp, *iter, *got = NULL;
-    while ((got = mpsc_slist_drain(&c->defer_frees))) {
-        got = mpsc_slist_reverse(got);
-        mpsc_slist_for_each_safe(iter, tmp, got) {
+    struct mpsc_lifo_list_node *tmp, *iter, *got = NULL;
+    while ((got = mpsc_lifo_list_drain(&c->defer_frees))) {
+        got = mpsc_lifo_list_reverse(got);
+        mpsc_lifo_list_for_each_safe(iter, tmp, got) {
             vfree(iter);
         }
     }
@@ -103,7 +103,7 @@ void vfree_defer_irq(void *ptr) {
         return;
 
     struct slab_percpu_cache *pc = slab_percpu_cache_local();
-    struct mpsc_slist_node *n = ptr;
-    mpsc_slist_push(&pc->defer_frees, n);
+    struct mpsc_lifo_list_node *n = ptr;
+    mpsc_lifo_list_push(&pc->defer_frees, n);
     dpc_enqueue_local(&pc->defer_dpc);
 }

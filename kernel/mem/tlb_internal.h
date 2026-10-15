@@ -10,7 +10,7 @@ struct tlb_queue_entry {
     struct tlb_payload payload;
 };
 
-MPMC_QUEUE_DECLARE(tlb_queue, struct tlb_queue_entry);
+MPMC_FIFO_RING_DECLARE(tlb_queue, struct tlb_queue_entry);
 
 struct tlb_ring {
     struct tlb_queue queue;

@@ -1,15 +1,15 @@
 #include "structures/tests/test_internal.h"
 
-TEST_GROUP_DEFINE(mpmc_queue);
+TEST_GROUP_DEFINE(mpmc_fifo_ring);
 
-MPMC_QUEUE_DECLARE(test_mpmc_word, uintptr_t);
+MPMC_FIFO_RING_DECLARE(test_mpmc_word, uintptr_t);
 
 /* Odd-sized payload: slot stride must keep every seq 8-byte aligned */
 struct test_mpmc_odd {
     uint32_t a, b, c;
 };
 
-TEST_DEFINE_UNIT(mpmc_queue, fifo_capacity_and_wrap) {
+TEST_DEFINE_UNIT(mpmc_fifo_ring, fifo_capacity_and_wrap) {
     struct test_mpmc_word q;
     bool ok = test_mpmc_word_init(&q, 8);
     TEST_ASSERT(ok);
@@ -48,7 +48,7 @@ TEST_DEFINE_UNIT(mpmc_queue, fifo_capacity_and_wrap) {
     return TEST_SUCCESS;
 }
 
-TEST_DEFINE_UNIT(mpmc_queue, drain_empty_partial_full) {
+TEST_DEFINE_UNIT(mpmc_fifo_ring, drain_empty_partial_full) {
     struct test_mpmc_word q;
     TEST_ASSERT(test_mpmc_word_init(&q, 8));
 

@@ -115,9 +115,13 @@ ForEachMacros:
   - list_for_each_entry_safe_continue_rev
   - stat_series_for_each
   - minheap_for_each
-  - mpsc_slist_for_each
-  - mpsc_slist_for_each_safe
-  - mpsc_slist_for_each_entry
+  - mpmc_lifo_list_for_each
+  - mpmc_lifo_list_for_each_safe
+  - mpmc_lifo_list_for_each_entry
+  - mpmc_lifo_list_for_each_entry_safe
+  - mpsc_lifo_list_for_each
+  - mpsc_lifo_list_for_each_safe
+  - mpsc_lifo_list_for_each_entry
   - watchdog_cpu_for_each
   - rbit_for_each
   - rbit_for_each_safe
