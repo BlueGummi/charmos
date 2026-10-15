@@ -34,11 +34,12 @@ TEST_DEFINE_UNIT(wait_block, io_boost_and_cancel) {
     io_wait_begin(&token, &request);
     io_wait_signal(&request);
     io_wait_complete(&token);
-    TEST_ASSERT_EQ(t->perceived_prio_class, THREAD_PRIO_CLASS_URGENT);
+    TEST_ASSERT_EQ((enum thread_prio_class) t->perceived_prio_class,
+                   THREAD_PRIO_CLASS_URGENT);
     TEST_ASSERT(io_wait_token_active(&token));
     TEST_ASSERT(list_head_empty(&request.waiters));
     io_wait_end(&token, IO_WAIT_END_NO_OP);
-    TEST_ASSERT_EQ(t->perceived_prio_class, base);
+    TEST_ASSERT_EQ((enum thread_prio_class) t->perceived_prio_class, base);
     TEST_ASSERT(!io_wait_token_active(&token));
 
     /* Submission failed before yield and cancellation must restore RUNNING */

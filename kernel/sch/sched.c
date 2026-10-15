@@ -96,7 +96,7 @@ static inline void update_thread_before_save(struct thread *thread,
 }
 
 static inline bool thread_done_for_period(struct thread *thread) {
-    return THREAD_PRIO_IS_TIMESHARING(thread->perceived_prio_class) &&
+    return thread->perceived_prio_class == THREAD_PRIO_CLASS_TIMESHARE &&
            thread->virtual_budget > 0 &&
            thread->virtual_period_runtime >= thread->virtual_budget;
 }
@@ -108,7 +108,7 @@ static inline void re_enqueue_thread(struct scheduler *sched,
         thread->virtual_runtime_left = thread->virtual_budget;
         thread->completed_period = sched->current_period;
         /* thread_done_for_period() already established it as timesharing */
-        thread->queued_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
+        thread->perceived_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
         retire_thread(sched, thread);
         scheduler_increment_thread_count(sched, thread);
         scheduler_debug_validate(sched);
@@ -215,9 +215,9 @@ static struct thread *pick_thread(struct scheduler *sched, time_ms_t now_ms) {
     }
 
     enforce(next); /* cannot be NULL - if it is the bitmap is lying */
-    enforce(next->queued_prio_class == prio,
+    enforce(next->perceived_prio_class == prio,
             "picked a %d thread off the %d queue",
-            (int) next->queued_prio_class, (int) prio);
+            (int) next->perceived_prio_class, (int) prio);
     scheduler_decrement_thread_count(sched, next);
     scheduler_debug_note_progress(sched);
     scheduler_debug_validate(sched);

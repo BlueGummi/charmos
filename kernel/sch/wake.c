@@ -56,6 +56,7 @@ static void resume_thread(struct thread *t, enum thread_resume_reason reason,
         goto out;
     }
 
+    enum irql pirql = spin_lock_high(&t->pi_lock);
     bool yielded = thread_test_flag(t, THREAD_FLAG_YIELDED);
 
     /* A prepared waiter can preempt before complete(), so we need
@@ -92,6 +93,8 @@ static void resume_thread(struct thread *t, enum thread_resume_reason reason,
     } else if (!completion) {
         scheduler_force_resched(last);
     }
+
+    spin_unlock(&t->pi_lock, pirql);
 
 out:
     thread_release(t, tirql);

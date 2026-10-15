@@ -2,6 +2,7 @@
 #pragma once
 #include <atomic.h>
 #include <compiler/core.h>
+#include <math/bit.h>
 #include <sch/irql.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -9,6 +10,16 @@
 #include <sync/lock_general.h>
 #include <thread/thread_types.h>
 #include <tsa.h>
+
+typedef BITMAP_DECLARE(rwlock_mask_t, THREAD_RW_READER_ID_BITS);
+typedef uint8_t rwlock_id_t;
+static_assert(BITS_PER_BYTE * sizeof(rwlock_id_t) >=
+                  BITS_NEEDED(THREAD_RW_READER_ID_BITS),
+              "rwlock_id_t needs to be wider");
+/*
+ * Our rwlocks perform a variant of priority ceiling protocols lazily through
+ * the use of a strategy similar to a bloom filter.
+ */
 
 /* rwlock: pointer sized shared reader writer lock
  *
@@ -22,11 +33,11 @@
  *                └─────────────────────────┘
  *
  *
- * w - writer bit   -> a writer holds the lock
- * a - waiter bit   -> threads are waiting on the lock
- * W - writer want  -> a writer wants the lock
- * R - reader count -> used to store the number of readers
- * p - prio. ceil.  -> boosts threads to this ceiling
+ * w - writer bit     -> a writer holds the lock
+ * a - waiter bit     -> threads are waiting on the lock
+ * W - writer want    -> a writer wants the lock
+ * R - reader count   -> used to store the number of readers
+ * m - max prio class -> panic if reader > this
  *
  * %%%% - pointer to owner thread
  *
@@ -70,7 +81,7 @@ void rwlock_assert_not_held_full(struct rwlock *lock,
 #define RWLOCK_ASSERT_NOT_HELD(lock)                                           \
     rwlock_assert_not_held_full((lock), LOCK_CHK_SITE_HERE())
 
-#define RWLOCK_PRIO_CEIL_SHIFT (1)
+#define RWLOCK_PRIO_CEIL_SHIFT 1
 
 #ifdef DEBUG_LOCK_CHK
 

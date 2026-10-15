@@ -70,7 +70,7 @@ static void move_ts_thread_raw(struct scheduler *dest, struct scheduler *source,
     rbt_delete(tree, &thread->rq_tree_node);
     scheduler_decrement_thread_count(source, thread);
 
-    thread->queued_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
+    thread->perceived_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
     rbt_insert(&dest->thread_rbt, &thread->rq_tree_node);
     scheduler_increment_thread_count(dest, thread);
     thread_set_runqueue(thread, dest);

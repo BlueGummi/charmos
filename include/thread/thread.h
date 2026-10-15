@@ -85,11 +85,10 @@ struct thread_event_reason {
     uint64_t cycle;
 };
 
-#define THREAD_PRIO_IS_TIMESHARING(prio) (prio == THREAD_PRIO_CLASS_TIMESHARE)
-
 /* Background threads share timeslices */
 #define THREAD_PRIO_HAS_TIMESLICE(prio)                                        \
-    (THREAD_PRIO_IS_TIMESHARING(prio) || prio == THREAD_PRIO_CLASS_BACKGROUND)
+    (prio == THREAD_PRIO_CLASS_TIMESHARE ||                                    \
+     prio == THREAD_PRIO_CLASS_BACKGROUND)
 
 #define THREAD_ACTIVITY_BUCKET_COUNT 4
 #define THREAD_ACTIVITY_BUCKET_DURATION 1000 /* 1 second per bucket */
@@ -286,19 +285,29 @@ struct thread {
 
     /* ========== Thread activity stats ========== */
 
-    enum thread_activity_class activity_class;
+    enum thread_activity_class activity_class : 4;
 
-    enum thread_prio_class base_prio_class; /* for class boosts */
-    enum thread_prio_class perceived_prio_class;
+    enum thread_prio_class base_prio_class : 2; /* for class boosts */
+    enum thread_prio_class perceived_prio_class : 2;
 
-    struct spinlock pi_lock; /* Synchronize accesses to priority changes
-                              * from other threads */
-
-    /* We have this because perceived_prio_class can change arbitrarily,
-     * which can corrupt state if it's in a different runqueue.
+    /*
+     * Rules with this lock:
      *
-     * Only meaningful when queued to run though */
-    enum thread_prio_class queued_prio_class;
+     * This lock is meant to synchronize updates to perceived_prio_class
+     * and base_prio_class. It is only meant to be used when
+     *
+     * (1) you are updating a thread on another CPU and ALSO have the
+     * runqueue lock held prior to taking this, and will update
+     * the thread positions after doing this, OR
+     *
+     * (2) you are updating a thread on THIS CPU, which it is OK to not
+     * have the runqueue lock held.
+     *
+     * In either case, the scheduler will not see an invalid
+     * perceived_prio_class, and should be able to make decisions
+     * based on it, as it would be properly locked.
+     */
+    struct spinlock pi_lock;
 
     /* Activity data */
     struct thread_activity_data *activity_data;

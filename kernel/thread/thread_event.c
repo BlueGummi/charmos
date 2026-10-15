@@ -465,11 +465,13 @@ void thread_add_sleep_reason(struct thread *t, thread_act_reason_t reason) {
 }
 
 void thread_set_timesharing(struct thread *t) {
+    spin_guard_high(&t->pi_lock);
     t->base_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
     t->perceived_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
 }
 
 void thread_set_background(struct thread *t) {
+    spin_guard_high(&t->pi_lock);
     t->base_prio_class = THREAD_PRIO_CLASS_BACKGROUND;
     t->perceived_prio_class = THREAD_PRIO_CLASS_BACKGROUND;
 }

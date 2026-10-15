@@ -208,7 +208,6 @@ static struct thread *thread_init(struct thread *thread,
     thread->base_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
     thread->niceness = 0;
     thread->perceived_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
-    thread->queued_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
     atomic_init(&thread->state, THREAD_STATE_READY);
     thread->regs.r12 = (uint64_t) entry;
     thread->regs.r13 = (uint64_t) params->arg;
