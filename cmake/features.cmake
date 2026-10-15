@@ -29,6 +29,7 @@ set(DEBUG_FLAGS
     DEBUG_SCHED
     DEBUG_SCHED_NESTING
     DEBUG_CLIMB
+    DEBUG_WROOST
     #
     # Drivers
     DEBUG_USB

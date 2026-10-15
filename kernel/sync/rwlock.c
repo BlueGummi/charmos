@@ -202,7 +202,8 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
 
     /* fastpath */
     if (rwlock_try_lock(lock, curr, acq_type)) {
-        thread_boost_self(RWLOCK_GET_PRIO_CEIL(lword));
+        if (acq_type == RWLOCK_READ)
+            thread_boost_self(RWLOCK_GET_PRIO_CEIL(lword));
 #ifdef DEBUG_LOCK_CHK
         if (checked_deep)
             lock_chk_acqd(&token);
@@ -441,7 +442,7 @@ void rw_unlock_full(struct rwlock *lock,
                 new |= RWLOCK_WRITER_WANT_BIT;
 
             RWLOCK_WRITE_LOCK_WORD(lock, new);
-            turnstile_wake(ts, TURNSTILE_WRITER_QUEUE, 1, irql_out);
+            turnstile_wake_handoff(ts, TURNSTILE_WRITER_QUEUE, irql_out);
         } else {
             /* give the lock to all waiters at once */
             new = to_wake * RWLOCK_READER_COUNT_ONE;
@@ -469,7 +470,7 @@ void rw_unlock_full(struct rwlock *lock,
     crash_unwind_exit_rwlock(lock);
 
     if (!is_writer)
-        thread_unboost_self();
+        thread_unboost_self(RWLOCK_GET_PRIO_CEIL(lock_word));
 }
 
 bool rwlock_locked(struct rwlock *lock, enum rwlock_acquire_type type) {

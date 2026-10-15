@@ -77,7 +77,7 @@ static void resume_thread(struct thread *t, enum thread_resume_reason reason,
         thread_apply_wake_boost(t);
 
         if (reason == THREAD_WAKE_REASON_BLOCKING_IO)
-            t->perceived_prio_class = THREAD_PRIO_CLASS_URGENT;
+            thread_io_boost_locked(t);
     }
 
     bool queuable =

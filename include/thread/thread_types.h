@@ -125,6 +125,17 @@ enum wake_reason {
     WAKE_REASON_TIMEOUT = 2, /* Timeout */
 };
 
+struct thread_class_donation {
+    struct thread *target;
+    enum thread_prio_class class : 2;
+    bool active;
+};
+
+#define THREAD_CLASS_DONATION_EMPTY                                            \
+    ((struct thread_class_donation) {.target = NULL,                           \
+                                     .class = THREAD_PRIO_CLASS_BACKGROUND,    \
+                                     .active = false})
+
 struct thread *thread_create_full(char *name, thread_entry_fn_t entry,
                                   struct thread_create_params *params,
                                   va_list args) cc_printf_like(1, 0);

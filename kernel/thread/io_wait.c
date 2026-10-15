@@ -37,7 +37,7 @@ void io_wait_end(struct io_wait_token *t, enum io_wait_end_action act) {
     t->active = false;
 
     if (list_head_empty(&c->io_wait_tokens)) {
-        thread_unboost_self();
+        thread_io_unboost_self();
         if (act == IO_WAIT_END_YIELD)
             scheduler_yield();
     }

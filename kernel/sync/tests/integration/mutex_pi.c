@@ -65,7 +65,9 @@ TEST_DEFINE_INTEGRATION(mutex, pi_boost) {
                           .flags = THREAD_FLAG_PINNED);
     pi_dum = thread_create("pi_dum", pi_dummy, .joinable = true,
                            .flags = THREAD_FLAG_PINNED);
+    pi_rt->base_prio_class = THREAD_PRIO_CLASS_REALTIME;
     pi_rt->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;
+    pi_dum->base_prio_class = THREAD_PRIO_CLASS_REALTIME;
     pi_dum->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;
 
     thread_enqueue_on_core(pi_ts, cpu);
@@ -151,6 +153,7 @@ TEST_DEFINE_INTEGRATION(mutex, pi_chain, .min_cores = 2) {
     pi_rt2 = thread_create("pi_rt2", pi_chain_rt, .joinable = true,
                            .flags = THREAD_FLAG_PINNED);
 
+    pi_rt2->base_prio_class = THREAD_PRIO_CLASS_REALTIME;
     pi_rt2->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;
 
     thread_enqueue_on_core(pi_ts2, cpu);
@@ -220,6 +223,7 @@ TEST_DEFINE_INTEGRATION(mutex, pi_multi_waiters,
     for (size_t i = 0; i < num_rt; i++) {
         rt[i] = thread_create("pi_rt", pi_multi_rt, .joinable = true,
                               .flags = THREAD_FLAG_PINNED);
+        rt[i]->base_prio_class = THREAD_PRIO_CLASS_REALTIME;
         rt[i]->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;
     }
 
@@ -283,6 +287,7 @@ TEST_DEFINE_INTEGRATION(mutex, pi_revert, .min_cores = 2) {
     struct thread *rt = thread_create("pi_rt", pi_revert_rt, .joinable = true,
                                       .flags = THREAD_FLAG_PINNED);
 
+    rt->base_prio_class = THREAD_PRIO_CLASS_REALTIME;
     rt->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;
     enforce(thread_getref(ts));
 
@@ -299,6 +304,93 @@ TEST_DEFINE_INTEGRATION(mutex, pi_revert, .min_cores = 2) {
     thread_putref(ts);
     TEST_ASSERT_EQ(boosts, 1);
     TEST_ASSERT(atomic_load(&pi_reverted));
+
+    return TEST_SUCCESS;
+}
+
+static struct mutex pi_ooo_l1 = MUTEX_INIT;
+static struct mutex pi_ooo_l2 = MUTEX_INIT;
+static atomic_bool pi_ooo_held_both = false;
+static atomic_bool pi_ooo_rt_ready = false;
+static atomic_bool pi_ooo_held_urgent_after_l1 = false;
+static atomic_bool pi_ooo_reverted_after_l2 = false;
+
+static void pi_ooo_owner(void *arg) {
+    cc_ignore(arg);
+    struct thread *curr = thread_get_current();
+    enum thread_prio_class base = curr->base_prio_class;
+
+    mutex_lock(&pi_ooo_l1);
+    mutex_lock(&pi_ooo_l2);
+    atomic_store(&pi_ooo_held_both, true);
+
+    while (curr->perceived_prio_class != THREAD_PRIO_CLASS_REALTIME)
+        cpu_pause();
+
+    atomic_store(&pi_ooo_rt_ready, true);
+
+    while (curr->perceived_prio_class != THREAD_PRIO_CLASS_URGENT)
+        cpu_pause();
+
+    mutex_unlock(&pi_ooo_l1);
+    atomic_store(&pi_ooo_held_urgent_after_l1,
+                 curr->perceived_prio_class == THREAD_PRIO_CLASS_URGENT);
+
+    mutex_unlock(&pi_ooo_l2);
+    atomic_store(&pi_ooo_reverted_after_l2, curr->perceived_prio_class == base);
+}
+
+static void pi_ooo_waiter_l1(void *arg) {
+    cc_ignore(arg);
+    mutex_lock(&pi_ooo_l1);
+    mutex_unlock(&pi_ooo_l1);
+}
+
+static void pi_ooo_waiter_l2(void *arg) {
+    cc_ignore(arg);
+    mutex_lock(&pi_ooo_l2);
+    mutex_unlock(&pi_ooo_l2);
+}
+
+TEST_DEFINE_INTEGRATION(mutex, pi_out_of_order_unlock, .min_cores = 2) {
+    atomic_store(&pi_ooo_held_both, false);
+    atomic_store(&pi_ooo_rt_ready, false);
+    atomic_store(&pi_ooo_held_urgent_after_l1, false);
+    atomic_store(&pi_ooo_reverted_after_l2, false);
+
+    cpu_id_t cpu = 1;
+
+    struct thread *ts =
+        thread_create("pi_ooo_ts", pi_ooo_owner, .joinable = true,
+                      .flags = THREAD_FLAG_PINNED);
+    struct thread *rt =
+        thread_create("pi_ooo_rt", pi_ooo_waiter_l1, .joinable = true,
+                      .flags = THREAD_FLAG_PINNED);
+    struct thread *urg =
+        thread_create("pi_ooo_urg", pi_ooo_waiter_l2, .joinable = true,
+                      .flags = THREAD_FLAG_PINNED);
+
+    rt->base_prio_class = THREAD_PRIO_CLASS_REALTIME;
+    rt->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;
+    urg->base_prio_class = THREAD_PRIO_CLASS_URGENT;
+    urg->perceived_prio_class = THREAD_PRIO_CLASS_URGENT;
+
+    thread_enqueue_on_core(ts, cpu);
+    while (!atomic_load(&pi_ooo_held_both))
+        scheduler_yield();
+
+    thread_enqueue_on_core(rt, cpu);
+    while (!atomic_load(&pi_ooo_rt_ready))
+        scheduler_yield();
+
+    thread_enqueue_on_core(urg, cpu);
+
+    thread_join(ts);
+    thread_join(rt);
+    thread_join(urg);
+
+    TEST_ASSERT(atomic_load(&pi_ooo_held_urgent_after_l1));
+    TEST_ASSERT(atomic_load(&pi_ooo_reverted_after_l2));
 
     return TEST_SUCCESS;
 }

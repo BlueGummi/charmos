@@ -309,6 +309,12 @@ struct thread {
      */
     struct spinlock pi_lock;
 
+    /* Also protected by pi_lock, perceived_prio_class = max(base_prio_class,
+     * highest class with a boost). remember to
+     * thread_recompute_prio_class_locked after changing things */
+    uint16_t class_boosts[THREAD_PRIO_CLASS_COUNT];
+    bool io_class_boost; /* has an URGENT boost*/
+
     /* Activity data */
     struct thread_activity_data *activity_data;
     struct thread_activity_stats *activity_stats;
@@ -475,16 +481,25 @@ void thread_add_sleep_reason(struct thread *t, thread_act_reason_t reason);
 void thread_set_timesharing(struct thread *t);
 void thread_set_background(struct thread *t);
 void thread_migrate(struct thread *t, size_t dest_core);
-enum thread_prio_class thread_unboost_self();
-enum thread_prio_class thread_boost_self(enum thread_prio_class new);
+
+void thread_boost_self(enum thread_prio_class class);
+void thread_unboost_self(enum thread_prio_class class);
+
+void thread_io_boost_locked(struct thread *t);
+void thread_io_unboost_self(void);
 
 void thread_enqueue(struct thread *t);
 void thread_enqueue_on_core(struct thread *t, uint64_t core_id);
 
-bool thread_inherit_priority(struct thread *boosted, struct thread *from,
-                             enum thread_prio_class *old_class_out);
+void thread_recompute_prio_class_locked(struct thread *t);
 
-void thread_uninherit_priority(enum thread_prio_class class);
+bool thread_inherit_priority(struct thread *boosted, struct thread *from,
+                             struct thread_class_donation *d);
+
+void thread_donate_class(struct thread *boosted, enum thread_prio_class class,
+                         struct thread_class_donation *d);
+
+void thread_uninherit_priority(struct thread_class_donation *d);
 void thread_remove_boost();
 
 cc_noreturn void thread_exit_with_status(int status);

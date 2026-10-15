@@ -25,8 +25,7 @@ struct turnstile {
     struct thread_wait_header wait;
     struct thread *owner;
 
-    bool applied_pi_boost;
-    enum thread_prio_class old_prio_class;
+    struct thread_class_donation pi;
     struct list_node hash_list;
 
     union {
@@ -73,5 +72,8 @@ enum irql turnstile_lookup(void *obj, struct turnstile **out_ts);
 void turnstile_unlock(void *obj, enum irql irql);
 void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,
                     enum irql lock_irql);
+
+void turnstile_wake_handoff(struct turnstile *ts, size_t queue,
+                            enum irql lock_irql);
 size_t turnstile_get_waiter_count(void *lock_obj);
 int32_t turnstile_thread_priority(struct thread *t);

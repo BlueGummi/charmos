@@ -112,6 +112,7 @@ struct turnstile *turnstile_init(struct turnstile *ts) {
     ts->waiters = 0;
     ts->state = TURNSTILE_STATE_UNUSED;
     ts->owner = NULL;
+    ts->pi = THREAD_CLASS_DONATION_EMPTY;
 
     rbt_init(&ts->queues[TURNSTILE_READER_QUEUE], turnstile_thread_get_data,
              turnstile_thread_cmp);
@@ -239,11 +240,9 @@ enum irql turnstile_lookup(void *obj, struct turnstile **out_ts) {
 }
 
 void turnstile_pi_remove(struct turnstile *ts) {
-    if (ts->applied_pi_boost)
-        thread_uninherit_priority(ts->old_prio_class);
+    SPINLOCK_ASSERT_HELD(&turnstile_chain_for(ts->lock_obj)->lock);
 
-    ts->old_prio_class = THREAD_PRIO_CLASS_BACKGROUND;
-    ts->applied_pi_boost = false;
+    thread_uninherit_priority(&ts->pi);
 }
 
 struct thread *turnstile_dequeue_first(struct turnstile *ts, size_t queue) {
@@ -299,6 +298,57 @@ void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,
     turnstile_hash_chain_unlock(chain, lock_irql);
 }
 
+static enum thread_prio_class turnstile_waiter_class(struct rbt_node *n) {
+    struct thread *t = thread_from_wq_rbt_node(n);
+    spin_guard_high(&t->pi_lock);
+    return t->perceived_prio_class;
+}
+
+void turnstile_wake_handoff(struct turnstile *ts, size_t queue,
+                            enum irql lock_irql) {
+    void *obj = ts->lock_obj;
+    struct turnstile_hash_chain *chain = turnstile_chain_for(obj);
+    SPINLOCK_ASSERT_HELD(&chain->lock);
+
+    /* un-inherit the priority we inherited */
+    turnstile_pi_remove(ts);
+    ts->owner = NULL;
+
+    struct rbt_node *first = rbt_last(&ts->queues[queue]);
+    enforce(first);
+    struct thread *new_owner = thread_from_wq_rbt_node(first);
+
+    if (ts->waiters > 1) {
+        bool any_pi = false;
+        enum thread_prio_class top = THREAD_PRIO_CLASS_BACKGROUND;
+
+        for (size_t q = 0; q < TURNSTILE_NUM_QUEUES; q++) {
+            struct rbt_node *n =
+                q == queue ? rbt_prev(first) : rbt_last(&ts->queues[q]);
+            if (!n)
+                continue;
+
+            enum thread_prio_class prio_class = turnstile_waiter_class(n);
+            if (!any_pi || prio_class > top)
+                top = prio_class;
+
+            any_pi = true;
+        }
+
+        if (any_pi) {
+            ts->owner = new_owner;
+            thread_donate_class(new_owner, top, &ts->pi);
+        }
+    }
+
+    struct thread *to_wake = turnstile_dequeue_first(ts, queue);
+    enforce(to_wake == new_owner);
+    enforce(thread_wait_satisfy(&to_wake->wait_blocks[THREAD_WAIT_BLOCK_SYNC],
+                                THREAD_WAKE_REASON_BLOCKING_MANUAL, NULL));
+
+    turnstile_hash_chain_unlock(chain, lock_irql);
+}
+
 void turnstile_unlock(void *obj, enum irql irql) {
     struct turnstile_hash_chain *chain = turnstile_chain_for(obj);
     turnstile_hash_chain_unlock(chain, irql);
@@ -320,17 +370,8 @@ turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
         if (!owner)
             break;
 
-        enum thread_prio_class old_class;
-
-        /* If it fails, that means the owner did not inherit our
-         * priority. Thus, we must short circuit the walk */
-        if (!thread_inherit_priority(owner, boosting_from, &old_class))
+        if (!thread_inherit_priority(owner, boosting_from, &cur_ts->pi))
             break;
-
-        if (!cur_ts->applied_pi_boost) {
-            cur_ts->old_prio_class = old_class;
-            cur_ts->applied_pi_boost = true;
-        }
 
         struct turnstile_wait_snapshot next_wait, current_wait;
         if (!turnstile_snapshot_wait(owner, &next_wait))
@@ -411,6 +452,11 @@ struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
     }
 
     current_thread->turnstile = NULL;
+
+    /* Re-initialize */
+    if (ts->pi.active && ts->pi.target != owner)
+        turnstile_pi_remove(ts);
+
     ts->owner = owner;
 
     ts->waiters++;
