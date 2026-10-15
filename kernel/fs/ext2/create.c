@@ -16,8 +16,8 @@ struct link_ctx {
 static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
                           void *ctx_ptr, uint32_t block_num, uint32_t e,
                           uint32_t o) {
-    cc_unused(fs); // dont complain compiler
-    cc_unused(block_num, e, o);
+    cc_ignore(fs); // dont complain compiler
+    cc_ignore(block_num, e, o);
     struct link_ctx *ctx = (struct link_ctx *) ctx_ptr;
 
     size_t current_name_len = entry->name_len;

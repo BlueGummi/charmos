@@ -32,7 +32,7 @@ PERCPU_DEFINE(struct tsc_sync_mailbox, mailboxes);
 static struct clock *tsc_clock_inst = NULL;
 
 uint64_t tsc_clock_read(struct clock *clk) {
-    cc_unused(clk);
+    cc_ignore(clk);
     return rdtsc_ordered();
 }
 

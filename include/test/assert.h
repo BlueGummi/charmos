@@ -484,7 +484,7 @@ cc_analyzer_noreturn static inline void test_assert_void_failed(void) {}
 #define TEST_WORKER_EXPECT(fleet, cond)                                        \
     do {                                                                       \
         if (cc_unlikely(!(cond))) {                                            \
-            cc_unused(fleet);                                                  \
+            cc_ignore(fleet);                                                  \
             test_err("worker expect \"%s\" failed", #cond);                    \
             test_global.current_test->soft_fails++;                            \
         }                                                                      \

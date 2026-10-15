@@ -172,7 +172,7 @@ struct arena *arena_create_full(struct arena_seg_desc *seg_descs,
         }
     }
 
-    size_t cc_maybe_unused cursor_offset = 0;
+    size_t cc_unused cursor_offset = 0;
     for (uint16_t i = 0; i < seg_count; i++) {
         uint16_t size;
 
@@ -230,7 +230,7 @@ struct arena_seg arena_seg_lookup(struct arena *a, uint16_t seg_id) {
     enforce(found, "segment %u not found", seg_id);
 #endif
 
-    size_t cc_maybe_unused cursor = 0;
+    size_t cc_unused cursor = 0;
     for (int i = 0; i < ARENA_MAX_SEG; i++) {
         cursor += inmem_descs[i].offset_bump;
         if (inmem_descs[i].id == seg_id) {

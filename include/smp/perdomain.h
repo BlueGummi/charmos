@@ -22,7 +22,7 @@ struct perdomain_descriptor {
 LINKER_SECTION_EXTERN(struct perdomain_descriptor, perdomain_desc);
 
 #define PERDOMAIN_DEFINE_3(type_, name_, ctor_)                                \
-    static typeof(type_) __perdomain_##name_ cc_fn_unused;                     \
+    static typeof(type_) __perdomain_##name_ cc_unused;                        \
     static struct perdomain_descriptor __perdomain_desc_##name_;               \
     static void __perdomain_ctor_##name_(void *inst, size_t domain) {          \
         void (*const __typed_ctor)(typeof(type_) *, size_t) = (ctor_);         \
@@ -41,7 +41,7 @@ LINKER_SECTION_EXTERN(struct perdomain_descriptor, perdomain_desc);
             .ready = false,                                                    \
     };                                                                         \
     static struct perdomain_descriptor *const __perdomain_desc_ref_##name_     \
-        cc_fn_unused = &__perdomain_desc_##name_
+        cc_unused = &__perdomain_desc_##name_
 
 #define PERDOMAIN_DEFINE_2(type_, name_) PERDOMAIN_DEFINE_3(type_, name_, NULL)
 #define PERDOMAIN_DEFINE(...) PP_CALL(PERDOMAIN_DEFINE, __VA_ARGS__)
@@ -54,9 +54,9 @@ LINKER_SECTION_EXTERN(struct perdomain_descriptor, perdomain_desc);
 
 #define PERDOMAIN_EXTERN_AS(type, name, sym_name)                              \
     extern struct perdomain_descriptor __perdomain_desc_sym_##sym_name;        \
-    static typeof(type) __perdomain_##name cc_fn_unused;                       \
+    static typeof(type) __perdomain_##name cc_unused;                          \
     static struct perdomain_descriptor *const __perdomain_desc_ref_##name      \
-        cc_fn_unused = &__perdomain_desc_sym_##sym_name
+        cc_unused = &__perdomain_desc_sym_##sym_name
 
 #define PERDOMAIN_EXTERN(type, name) PERDOMAIN_EXTERN_AS(type, name, name)
 

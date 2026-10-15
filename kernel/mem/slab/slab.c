@@ -479,7 +479,7 @@ struct slab *slab_create(struct slab_cache *cache,
 static void *slab_alloc_from(struct slab_cache *cache, stack_handle_t handle,
                              struct slab *slab) {
 #ifndef DEBUG_SLAB_DEEP
-    cc_unused(handle);
+    cc_ignore(handle);
 #endif
     slab_check_assert(slab);
 
@@ -926,7 +926,7 @@ void *valloc_try_from_magazine(struct slab_domain *domain,
                                stack_handle_t handle, size_t size,
                                enum alloc_flags flags) {
 #ifndef DEBUG_SLAB_DEEP
-    cc_unused(handle);
+    cc_ignore(handle);
 #endif
     enum slab_magazine_type mtype = (flags & ALLOC_FLAG_ZERO_ON_ALLOC)
                                         ? SLAB_MAGAZINE_ZERO
@@ -1532,7 +1532,7 @@ void *valloc_init(size_t size, struct alloc_params params) {
 }
 
 void vfree_init(void *p, enum alloc_behavior b) {
-    cc_unused(b);
+    cc_ignore(b);
     vfree_old(p);
 }
 

@@ -8,7 +8,7 @@
 #include <thread/workqueue.h>
 
 void scheduler_idle_main(void *nop) {
-    cc_unused(nop);
+    cc_ignore(nop);
     struct scheduler *sched = global.schedulers[smp_id_raw()];
 
     bool woken = false;

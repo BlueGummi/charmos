@@ -4,7 +4,7 @@
 static struct completion lock_two_release;
 
 static void lock_two_parked(void *arg) {
-    cc_unused(arg);
+    cc_ignore(arg);
     completion_wait(&lock_two_release);
 }
 

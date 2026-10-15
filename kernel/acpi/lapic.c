@@ -48,7 +48,7 @@ uint32_t lapic_this_id(void) {
 }
 
 void lapic_eoi(struct irq_desc *unused) {
-    cc_unused(unused);
+    cc_ignore(unused);
     lapic_write(LAPIC_REG_EOI, 0);
 }
 

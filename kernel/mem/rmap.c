@@ -67,14 +67,14 @@ void folio_add_anon_rmap(struct folio *f, struct vma_range *vr, vaddr_t va) {
 
 /* e.g. fork: parent and child keep the PTE, folio gains a mapper */
 void folio_add_anon_rmap_shared(struct folio *f, struct vma_range *vr) {
-    cc_unused(vr);
+    cc_ignore(vr);
     enforce(folio_is_anon(f));
 
     folio_mapcount_inc(f);
 }
 
 void folio_remove_rmap(struct folio *f, struct vma_range *vr) {
-    cc_unused(vr);
+    cc_ignore(vr);
     enforce(folio_is_anon(f));
 
     folio_mapcount_dec(f); /* true at 0 -> folio is no longer mapped anywhere */

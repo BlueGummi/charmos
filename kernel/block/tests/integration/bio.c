@@ -18,7 +18,7 @@ TEST_GROUP_DEFINE(bio, .intensity_desc = {
 
 static atomic_bool done = false;
 static void bio_callback(struct bio_request *req) {
-    cc_unused(req);
+    cc_ignore(req);
     atomic_store(&done, true);
 }
 

@@ -8,7 +8,7 @@
 
 static uint8_t chacha_key[32] = {0};
 static uint8_t chacha_nonce[12] = {0};
-static cc_fn_unused uint32_t chacha_counter = 0;
+static cc_unused uint32_t chacha_counter = 0;
 static uint64_t chacha_reseed_counter = 0;
 
 void entropy_pool_init(struct entropy_pool *pool) {

@@ -129,7 +129,7 @@ static void daemon_wait(struct daemon *daemon, struct daemon_thread *self) {
 }
 
 void daemon_main(void *a) {
-    cc_unused(a);
+    cc_ignore(a);
 
     struct daemon_thread *self = current_daemon_thread();
     struct daemon *daemon = self->daemon;

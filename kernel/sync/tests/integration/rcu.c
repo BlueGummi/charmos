@@ -22,7 +22,7 @@ static atomic_bool rcu_test_failed = false;
 static atomic_uint32_t rcu_reads_done = 0;
 
 static void rcu_reader_thread(void *arg) {
-    cc_unused(arg);
+    cc_ignore(arg);
     uint64_t end = time_get_ms() + rcu_test_duration_ms;
 
     while (time_get_ms() < end) {
@@ -54,7 +54,7 @@ static void rcu_free_fn(struct rcu_cb *cb) {
 }
 
 static void rcu_writer_thread(void *arg) {
-    cc_unused(arg);
+    cc_ignore(arg);
     sleep_spin_ms(30);
 
     struct rcu_test_data *old = atomic_load_rlx(&shared_ptr);
@@ -142,7 +142,7 @@ static void stress_free_cb(struct rcu_cb *cb) {
 }
 
 static void rcu_stress_reader(void *arg) TSA_NO_ANALYSIS {
-    cc_unused(arg);
+    cc_ignore(arg);
 
     time_ms_t last_print = time_get_ms();
     size_t iter = 0;
@@ -158,7 +158,7 @@ static void rcu_stress_reader(void *arg) TSA_NO_ANALYSIS {
                 break;
             }
             volatile uint64_t seq = p->seq;
-            cc_unused(seq);
+            cc_ignore(seq);
         }
 
         rcu_read_unlock();
@@ -179,7 +179,7 @@ static void rcu_stress_reader(void *arg) TSA_NO_ANALYSIS {
 }
 
 static void rcu_stress_writer(void *arg) {
-    cc_unused(arg);
+    cc_ignore(arg);
     uint64_t local_iter = 0;
 
     while (!atomic_load(&stress_stop)) {
@@ -210,7 +210,7 @@ static void rcu_stress_writer(void *arg) {
 }
 
 static void rcu_stress_reclaimer(void *arg) {
-    cc_unused(arg);
+    cc_ignore(arg);
     while (!atomic_load(&stress_stop)) {
         rcu_synchronize();
         sleep_spin_ms(5);
@@ -333,7 +333,7 @@ static void rcu_irq_free_cb(struct rcu_cb *cb) {
 
 static enum irq_result rcu_irq_reader(void *ctx, uint8_t vector,
                                       struct irq_context *ictx) {
-    cc_unused(ctx, vector, ictx);
+    cc_ignore(ctx, vector, ictx);
 
     rcu_read_lock();
     struct rcu_irq_node *p = rcu_dereference(rcu_irq_shared);

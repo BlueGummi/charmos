@@ -2,7 +2,7 @@
 
 #define EXT2_ROOT struct vfs_node *root = global.root_node
 
-static cc_fn_unused bool done2 = false;
+static cc_unused bool done2 = false;
 static uint64_t avg_complete_time[BIO_SCHED_LEVELS] = {0};
 static uint64_t total_complete_time[BIO_SCHED_LEVELS] = {0};
 static atomic_uint32_t runs = 0;

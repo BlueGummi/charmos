@@ -21,7 +21,7 @@ LOG_HANDLE_DEFINE_PRINT(address_range);
 
 static struct rbt ar_tree;
 
-static cc_fn_unused void print_bytes(uint64_t bytes) {
+static cc_unused void print_bytes(uint64_t bytes) {
     const uint64_t kib = KIB(1);
     const uint64_t mib = MIB(1);
     const uint64_t gib = GIB(1);

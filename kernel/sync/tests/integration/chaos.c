@@ -77,7 +77,7 @@ static void chaos_diag_release(struct thread *t, size_t slot) {
 }
 
 static void chaos_apc_fn(void *arg) {
-    cc_unused(arg);
+    cc_ignore(arg);
     CHAOS_LOG("apc executed on %p", thread_get_current());
 
     enum irql irql;
@@ -93,7 +93,7 @@ static void chaos_apc_fn(void *arg) {
 }
 
 static void chaos_apc_spammer(void *arg) {
-    cc_unused(arg);
+    cc_ignore(arg);
     CHAOS_LOG("apc spammer start");
 
     size_t pass = 0;
@@ -196,7 +196,7 @@ static void chaos_sleeper(void *arg) {
 }
 
 static void chaos_waker(void *arg) {
-    cc_unused(arg);
+    cc_ignore(arg);
     CHAOS_LOG("waker start");
 
     while (!atomic_load(&chaos_stop)) {

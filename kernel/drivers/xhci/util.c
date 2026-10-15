@@ -69,12 +69,12 @@ void xhci_controller_enable_ints(struct xhci_device *dev) {
 
 void xhci_wake_waiter(struct xhci_device *dev, struct xhci_request *req) {
     xhci_trace("wake waiter for %s", xhci_request_command_type_str(req->type));
-    cc_unused(dev);
+    cc_ignore(dev);
     io_wait_signal(&req->wait);
 }
 
 void xhci_cleanup(struct xhci_device *dev, struct xhci_request *req) {
-    cc_unused(dev);
+    cc_ignore(dev);
 
     struct usb_request *urb  = req->urb;
     struct usb_device  *udev = urb->dev;

@@ -15,7 +15,7 @@ static void try_rq_reorder(struct bio_scheduler *sched) {
 }
 
 static void bio_sched_tick(void *ctx, void *unused) {
-    cc_unused(unused);
+    cc_ignore(unused);
     struct bio_scheduler *sched = ctx;
 
     mutex_lock(&sched->lock);

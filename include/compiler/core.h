@@ -13,7 +13,7 @@
 #define cc_noinline __attribute__((noinline))
 #define cc_always_inline __attribute__((always_inline))
 #define cc_noreturn __attribute__((noreturn))
-#define cc_fn_unused __attribute__((unused))
+#define cc_unused __attribute__((unused))
 #define cc_maybe_unused __attribute__((unused))
 #define cc_warn_unused_result __attribute__((warn_unused_result))
 #define cc_nodiscard __attribute__((warn_unused_result))
@@ -272,7 +272,7 @@
 #define PP_UNPAREN_ESC__(...) PP_UNPAREN_VAN_##__VA_ARGS__
 #define PP_UNPAREN_VAN_PP_UNPAREN_ISH_
 
-#define cc_unused(...) PP_CALL(PP_CC_VAR_UNUSED, __VA_ARGS__)
+#define cc_ignore(...) PP_CALL(PP_CC_VAR_UNUSED, __VA_ARGS__)
 
 /* ==== ct_ Compile-Time & Static Assertions ==== */
 

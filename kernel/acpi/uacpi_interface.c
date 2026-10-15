@@ -155,7 +155,7 @@ uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler handler,
                                          uacpi_handle irq_handle) {
     uint32_t irq = (uint32_t) (uintptr_t) irq_handle;
 
-    cc_unused(handler);
+    cc_ignore(handler);
 
     if (irq >= 256)
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -186,7 +186,7 @@ void uacpi_kernel_free_mutex(uacpi_handle a) {
 
 uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle m,
                                         uacpi_u16 b) TSA_NO_ANALYSIS {
-    cc_unused(b);
+    cc_ignore(b);
     mutex_simple_lock(m);
     return UACPI_STATUS_OK;
 }
@@ -222,7 +222,7 @@ uacpi_thread_id uacpi_kernel_get_thread_id(void) {
 uacpi_status uacpi_kernel_schedule_work(uacpi_work_type type,
                                         uacpi_work_handler handler,
                                         uacpi_handle ctx) {
-    cc_unused(type, handler, ctx);
+    cc_ignore(type, handler, ctx);
     return UACPI_STATUS_OK;
 }
 
@@ -241,18 +241,18 @@ void uacpi_kernel_free_event(uacpi_handle a) {
 }
 
 uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle handle, uacpi_u16 timeout) {
-    cc_unused(handle, timeout);
+    cc_ignore(handle, timeout);
     return false;
 }
 void uacpi_kernel_signal_event(uacpi_handle handle) {
-    cc_unused(handle);
+    cc_ignore(handle);
 }
 
 void uacpi_kernel_reset_event(uacpi_handle handle) {
-    cc_unused(handle);
+    cc_ignore(handle);
 }
 
 uacpi_status uacpi_kernel_handle_firmware_request(uacpi_firmware_request *req) {
-    cc_unused(req);
+    cc_ignore(req);
     return UACPI_STATUS_UNIMPLEMENTED;
 }

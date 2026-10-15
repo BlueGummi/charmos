@@ -238,7 +238,7 @@ void buddy_free_pages_global(paddr_t addr, uint64_t count) {
 }
 
 paddr_t buddy_alloc_pages_global(size_t count, enum alloc_flags f) {
-    cc_unused(f);
+    cc_ignore(f);
     enum irql irql = spin_lock(&buddy_lock);
     paddr_t ret = buddy_alloc_pages(global.buddy_free_area, count);
     spin_unlock(&buddy_lock, irql);

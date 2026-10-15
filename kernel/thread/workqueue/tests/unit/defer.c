@@ -12,7 +12,7 @@ static char msg[100] = {0};
 static struct delayed_work test_dwork;
 
 static void defer_func(void *boo, void *unused) {
-    cc_unused(boo, unused);
+    cc_ignore(boo, unused);
     finish_ms = time_get_ms();
 
     snprintf(msg, sizeof(msg), "Start ms was %lu, end ms was %lu, took %lu ms",

@@ -6,7 +6,7 @@
 #include <sync/rcu.h>
 
 static void percpu_rc_switch_to_atomic_rcu(struct rcu_cb *cb) {
-    cc_unused(cb);
+    cc_ignore(cb);
     struct percpu_rc *rc = container_of(cb, struct percpu_rc, rcu);
     uintptr_t pcpu = atomic_load_rlx(&rc->percpu_count_ptr);
 

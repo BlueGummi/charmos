@@ -691,7 +691,7 @@ locks_storm_quiesce_check(struct nightmare_ctx *ctx) {
 }
 
 static struct nightmare_verdict locks_storm_finish(struct nightmare_ctx *ctx) {
-    cc_unused(ctx);
+    cc_ignore(ctx);
     return NIGHTMARE_OK;
 }
 

@@ -109,7 +109,7 @@ struct xhci_disable_slot_async {
 
 static void xhci_disable_slot_done(struct xhci_device  *dev,
                                    struct xhci_request *req) {
-    cc_unused(dev);
+    cc_ignore(dev);
     vfree(container_of(req, struct xhci_disable_slot_async, req));
 }
 

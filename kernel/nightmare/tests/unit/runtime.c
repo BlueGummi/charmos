@@ -57,7 +57,7 @@ TEST_DEFINE_UNIT(nightmare, stop_priority) {
 static atomic_size_t stop_sleepers_waiting;
 
 static void heartbeat_waiter(void *arg) {
-    cc_unused(arg);
+    cc_ignore(arg);
     atomic_inc_release(&stop_sleepers_waiting);
     thread_park();
 }

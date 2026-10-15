@@ -104,7 +104,7 @@ static void worker_exit(struct workqueue *queue, struct worker *worker,
 }
 
 void worker_main(void *unused) TSA_NO_ANALYSIS {
-    cc_unused(unused);
+    cc_ignore(unused);
 
     struct worker *w = thread_get_current()->private;
     struct workqueue *queue = w->workqueue;

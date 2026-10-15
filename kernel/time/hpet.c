@@ -6,7 +6,7 @@
 #include "internal.h"
 
 static uint64_t hpet_clock_read(struct clock *clk) {
-    cc_unused(clk);
+    cc_ignore(clk);
     return hpet_read64(HPET_MAIN_COUNTER_OFFSET);
 }
 

@@ -94,7 +94,7 @@ void test_perturb_waker(const struct test_perturb_env *env,
 }
 
 static void perturb_apc_probe(void *arg) {
-    cc_unused(arg);
+    cc_ignore(arg);
 }
 
 void test_perturb_apc_spammer(const struct test_perturb_env *env,
@@ -261,7 +261,7 @@ static void dpc_storm_spin(void) {
 }
 
 static void dpc_storm_fn(void *a, void *b) {
-    cc_unused(a, b);
+    cc_ignore(a, b);
     dpc_storm_spin();
 }
 

@@ -85,7 +85,7 @@ static void tlb_shootdown_internal(void) {
 
 enum irq_result tlb_shootdown_isr(void *ctx, irq_t irq,
                                   struct irq_context *rsp) {
-    cc_unused(ctx, irq, rsp);
+    cc_ignore(ctx, irq, rsp);
 
     tlb_shootdown_internal();
     return IRQ_HANDLED;

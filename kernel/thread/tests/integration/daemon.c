@@ -7,7 +7,7 @@ TEST_GROUP_DEFINE(daemon, .intensity_desc = {
 
 static atomic_bool daemon_work_run = false;
 static enum daemon_thread_command daemon_work(void *a, void *b) {
-    cc_unused(a, b);
+    cc_ignore(a, b);
     atomic_store(&daemon_work_run, true);
     return DAEMON_THREAD_COMMAND_SLEEP;
 }

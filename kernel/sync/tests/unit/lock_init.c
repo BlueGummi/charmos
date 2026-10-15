@@ -46,7 +46,7 @@ static bool lock_init_state_valid(struct spinlock *spin,
                                   struct qspinlock *qspin, struct mutex *mutex,
                                   struct mutex_simple *simple,
                                   struct rwlock *rw, struct seqlock *seq) {
-    cc_unused(spin, qspin, mutex, simple, rw, seq);
+    cc_ignore(spin, qspin, mutex, simple, rw, seq);
     return true;
 }
 
@@ -55,7 +55,7 @@ static bool lock_reinit_state_valid(struct spinlock *spin,
                                     struct mutex *mutex,
                                     struct mutex_simple *simple,
                                     struct rwlock *rw) {
-    cc_unused(spin, qspin, mutex, simple, rw);
+    cc_ignore(spin, qspin, mutex, simple, rw);
     return true;
 }
 

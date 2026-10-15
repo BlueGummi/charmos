@@ -34,7 +34,7 @@ void condvar_init(struct condvar *cv) {
 }
 
 static void nop_callback(struct thread *unused) {
-    cc_unused(unused);
+    cc_ignore(unused);
 }
 
 struct thread *condvar_signal_callback(struct condvar *cv,

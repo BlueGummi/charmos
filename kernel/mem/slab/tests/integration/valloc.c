@@ -6,7 +6,7 @@
 static atomic_int valloc_done = 0;
 
 static void mt_valloc_worker(void *arg) {
-    cc_unused(arg);
+    cc_ignore(arg);
     void *ptrs[MT_ALLOC_TIMES] = {0};
 
     for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
@@ -68,7 +68,7 @@ struct stress_arg {
 };
 
 static void stress_worker(void *arg) {
-    cc_unused(arg);
+    cc_ignore(arg);
     struct stress_arg *a = NULL;
     /* wait until private field is visible */
     while (!(a = thread_get_current()->private))

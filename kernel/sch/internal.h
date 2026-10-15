@@ -47,11 +47,11 @@ static inline void scheduler_debug_note_progress(struct scheduler *sched) {
 }
 #else
 static inline void scheduler_debug_validate(struct scheduler *sched) {
-    cc_unused(sched);
+    cc_ignore(sched);
 }
 
 static inline void scheduler_debug_note_progress(struct scheduler *sched) {
-    cc_unused(sched);
+    cc_ignore(sched);
 }
 #endif
 

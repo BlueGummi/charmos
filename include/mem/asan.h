@@ -68,28 +68,28 @@ void asan_unpoison(void *addr, size_t size);
 static inline void asan_init(void) {}
 
 static inline enum err asan_shadow_install(vaddr_t base, size_t len) {
-    cc_unused(base, len);
+    cc_ignore(base, len);
     return ERR_OK;
 }
 
 static inline void asan_shadow_release(vaddr_t base, size_t len) {
-    cc_unused(base, len);
+    cc_ignore(base, len);
 }
 
 static inline void asan_alloc(void *addr, size_t requested, size_t slot) {
-    cc_unused(addr, requested, slot);
+    cc_ignore(addr, requested, slot);
 }
 
 static inline void asan_free(void *addr, size_t slot) {
-    cc_unused(addr, slot);
+    cc_ignore(addr, slot);
 }
 
 static inline void asan_poison(void *addr, size_t size) {
-    cc_unused(addr, size);
+    cc_ignore(addr, size);
 }
 
 static inline void asan_unpoison(void *addr, size_t size) {
-    cc_unused(addr, size);
+    cc_ignore(addr, size);
 }
 
 #endif

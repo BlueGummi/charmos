@@ -45,7 +45,7 @@ struct cpu_mask {
     }
 
 static inline void cpu_mask_init(struct cpu_mask *m, size_t nbits) {
-    cc_unused(nbits);
+    cc_ignore(nbits);
     memset(m->bits, 0, sizeof(m->bits));
 }
 

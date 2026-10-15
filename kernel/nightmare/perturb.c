@@ -53,7 +53,7 @@ CMDLINE_SCHEMA_DEFINE(
 
 void nightmare_perturb_stutter(const struct test_perturb_env *env,
                                struct test_conc_worker *worker) {
-    cc_unused(env, worker);
+    cc_ignore(env, worker);
     struct nightmare_ctx *ctx = &nightmare_runtime.ctx;
     const struct test_perturb_config *cfg =
         test_perturb_config_lookup("stutter");

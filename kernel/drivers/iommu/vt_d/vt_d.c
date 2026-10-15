@@ -127,7 +127,7 @@ enum iommu_error vtd_root_table_init(struct vtd_unit *u) {
  * One PML4 entry covers all 512 PDPT slots = 512 GiB
  */
 static paddr_t vtd_build_identity_sl(struct vtd_unit *u) {
-    cc_unused(u);
+    cc_ignore(u);
 
     paddr_t pml4_phys = pmm_alloc_page();
     if (!pml4_phys)

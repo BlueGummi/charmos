@@ -22,7 +22,7 @@ struct percpu_descriptor {
 LINKER_SECTION_EXTERN(struct percpu_descriptor, percpu_desc);
 
 #define PERCPU_DEFINE_3(type_, name_, ctor_)                                   \
-    static typeof(type_) __percpu_##name_ cc_fn_unused;                        \
+    static typeof(type_) __percpu_##name_ cc_unused;                           \
     static struct percpu_descriptor __percpu_desc_##name_;                     \
     static void __percpu_ctor_##name_(void *inst, size_t cpu) {                \
         void (*const __typed_ctor)(typeof(type_) *, size_t) = (ctor_);         \
@@ -41,7 +41,7 @@ LINKER_SECTION_EXTERN(struct percpu_descriptor, percpu_desc);
             .ready = false,                                                    \
     };                                                                         \
     static struct percpu_descriptor *const __percpu_desc_ref_##name_           \
-        cc_fn_unused = &__percpu_desc_##name_
+        cc_unused = &__percpu_desc_##name_
 
 #define PERCPU_DEFINE_2(type_, name_) PERCPU_DEFINE_3(type_, name_, NULL)
 #define PERCPU_DEFINE(...) PP_CALL(PERCPU_DEFINE, __VA_ARGS__)
@@ -54,9 +54,9 @@ LINKER_SECTION_EXTERN(struct percpu_descriptor, percpu_desc);
 
 #define PERCPU_EXTERN_AS(type, name, sym_name)                                 \
     extern struct percpu_descriptor __percpu_desc_sym_##sym_name;              \
-    static typeof(type) __percpu_##name cc_fn_unused;                          \
+    static typeof(type) __percpu_##name cc_unused;                             \
     static struct percpu_descriptor *const __percpu_desc_ref_##name            \
-        cc_fn_unused = &__percpu_desc_sym_##sym_name
+        cc_unused = &__percpu_desc_sym_##sym_name
 
 #define PERCPU_EXTERN(type, name) PERCPU_EXTERN_AS(type, name, name)
 

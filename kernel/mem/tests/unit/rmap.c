@@ -33,7 +33,7 @@ struct visit_rec {
 
 static void record_visit(struct mm *mm, vaddr_t va, struct folio *f,
                          void *priv) {
-    cc_unused(f);
+    cc_ignore(f);
     struct visit_rec *v = priv;
     v->mm[v->n] = mm;
     v->va[v->n] = va;

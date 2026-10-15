@@ -99,10 +99,10 @@ extern uint64_t PTRS_PER_BLOCK;
     (EXT2_FL_USER_VISIBLE & ~(EXT2_SECRM_FL | EXT2_UNRM_FL))
 
 #define MAKE_NOP_CALLBACK                                                      \
-    static cc_fn_unused bool nop_callback(                                     \
+    static cc_unused bool nop_callback(                                        \
         struct ext2_fs *fs, struct ext2_dir_entry *entry, void *ctx_ptr,       \
         uint32_t block_num, uint32_t entry_num, uint32_t entry_offset) {       \
-        cc_unused(fs, entry_offset, entry, ctx_ptr, block_num, entry_num);     \
+        cc_ignore(fs, entry_offset, entry, ctx_ptr, block_num, entry_num);     \
         return false;                                                          \
     }
 

@@ -573,7 +573,7 @@ static void rcu_gp_wait(uint64_t seq) {
 }
 
 static void rcu_gp_worker(void *unused_arg) {
-    cc_unused(unused_arg);
+    cc_ignore(unused_arg);
 
     while (true) {
         semaphore_wait(&rcu_global.sem);

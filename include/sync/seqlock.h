@@ -110,7 +110,7 @@ typedef struct seqlock seqlock_t;
 static inline void seqlock_init_chk_full(struct seqlock *sl,
                                          const struct lock_chk_class *class,
                                          enum lock_chk_flags flags) {
-    cc_unused(class, flags);
+    cc_ignore(class, flags);
     seqcount_init(&sl->seqcount);
     spinlock_init_chk(&sl->lock, class, flags);
 }
@@ -245,12 +245,12 @@ static inline bool seqlock_held(const struct seqlock *sl) {
 #define SEQLOCK_ASSERT_HELD(sl) enforce(seqlock_held(sl))
 
 static inline cc_always_inline
-cc_maybe_unused void seqcount_write_guard_exit(struct seqcount **s) {
+cc_unused void seqcount_write_guard_exit(struct seqcount **s) {
     if (*s)
         seqcount_end_write(*s);
 }
 
-static inline cc_always_inline cc_maybe_unused struct seqcount *
+static inline cc_always_inline cc_unused struct seqcount *
 seqcount_write_guard_enter(struct seqcount *s) {
     seqcount_begin_write(s);
     return s;
@@ -265,19 +265,19 @@ struct seqlock_write_raw_guard {
     struct seqlock *sl;
 };
 
-static inline cc_always_inline cc_maybe_unused void
+static inline cc_always_inline cc_unused void
 seqlock_write_guard_assume(struct seqlock *sl)
     TSA_ASSERT_CAPABILITY(&sl->lock) {
-    cc_unused(sl);
+    cc_ignore(sl);
 }
 
-static inline cc_always_inline cc_maybe_unused void seqlock_write_guard_exit(
+static inline cc_always_inline cc_unused void seqlock_write_guard_exit(
     struct seqlock_write_guard *g) TSA_RELEASES_SPIN_IRQL TSA_NO_ANALYSIS {
     if (g->sl)
         seq_write_unlock(g->sl, g->irql);
 }
 
-static inline cc_always_inline cc_maybe_unused struct seqlock_write_guard
+static inline cc_always_inline cc_unused struct seqlock_write_guard
 seqlock_write_guard_enter(struct seqlock *sl)
     TSA_ACQUIRES_SPIN_IRQL TSA_NO_ANALYSIS {
     return (struct seqlock_write_guard) {
@@ -286,7 +286,7 @@ seqlock_write_guard_enter(struct seqlock *sl)
     };
 }
 
-static inline cc_always_inline cc_maybe_unused struct seqlock_write_guard
+static inline cc_always_inline cc_unused struct seqlock_write_guard
 seqlock_write_high_guard_enter(struct seqlock *sl)
     TSA_ACQUIRES_SPIN_IRQL TSA_NO_ANALYSIS {
     return (struct seqlock_write_guard) {
@@ -295,14 +295,13 @@ seqlock_write_high_guard_enter(struct seqlock *sl)
     };
 }
 
-static inline cc_always_inline cc_maybe_unused void
-seqlock_write_raw_guard_exit(struct seqlock_write_raw_guard *g)
-    TSA_NO_ANALYSIS {
+static inline cc_always_inline cc_unused void seqlock_write_raw_guard_exit(
+    struct seqlock_write_raw_guard *g) TSA_NO_ANALYSIS {
     if (g->sl)
         seq_write_unlock_raw(g->sl);
 }
 
-static inline cc_always_inline cc_maybe_unused struct seqlock_write_raw_guard
+static inline cc_always_inline cc_unused struct seqlock_write_raw_guard
 seqlock_write_raw_guard_enter(struct seqlock *sl) TSA_NO_ANALYSIS {
     seq_write_lock_raw(sl);
     return (struct seqlock_write_raw_guard) {.sl = sl};

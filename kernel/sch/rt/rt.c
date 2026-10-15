@@ -221,7 +221,7 @@ static void rt_scheduler_destroy_internal(struct rt_scheduler_static *rts) {
 }
 
 static void destroy_work(void *a, void *b) {
-    cc_unused(b);
+    cc_ignore(b);
     rt_sched_trace("Destroying realtime scheduler %p", a);
     struct rt_scheduler_static *rts = a;
     rt_scheduler_destroy_internal(rts);

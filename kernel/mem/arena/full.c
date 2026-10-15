@@ -34,7 +34,7 @@ static void do_checks(struct arena *a) {
 }
 #else
 static void do_checks(struct arena *a) {
-    cc_unused(a);
+    cc_ignore(a);
 }
 #endif
 

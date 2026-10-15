@@ -88,7 +88,7 @@ struct stack_depot_record *stack_depot_get_record(stack_handle_t key) {
 
 stack_handle_t stack_depot_save(uintptr_t *entries, size_t num_entries,
                                 enum alloc_flags flags) {
-    cc_unused(flags); /* TODO: not handled for now */
+    cc_ignore(flags); /* TODO: not handled for now */
 
     uint32_t hash = stack_depot_hash(entries, num_entries);
     struct stack_depot_record_chain *this_chain =

@@ -76,7 +76,8 @@ mpmc_fifo_ring_claim_range(struct mpmc_fifo_ring_hdr *h, void *slots,
     }
 }
 
-static inline bool mpmc_fifo_ring_hdr_empty(const struct mpmc_fifo_ring_hdr *h) {
+static inline bool
+mpmc_fifo_ring_hdr_empty(const struct mpmc_fifo_ring_hdr *h) {
     uint64_t hd = atomic_load_rlx(&h->head);
     uint64_t tl = atomic_load_rlx(&h->tail);
     return hd == tl;
@@ -87,57 +88,57 @@ static inline bool mpmc_fifo_ring_hdr_empty(const struct mpmc_fifo_ring_hdr *h) 
         atomic_uint64_t seq;                                                   \
         T val;                                                                 \
     };                                                                         \
-                                                                                \
+                                                                               \
     struct name {                                                              \
         struct name##_slot *slots;                                             \
         struct mpmc_fifo_ring_hdr hdr;                                         \
     };                                                                         \
-                                                                                \
+                                                                               \
     static inline bool name##_init(struct name *q, size_t cap) {               \
-        q->slots = mpmc_fifo_ring_slots_alloc(&q->hdr, cap,                    \
-                                              sizeof(*q->slots));              \
+        q->slots =                                                             \
+            mpmc_fifo_ring_slots_alloc(&q->hdr, cap, sizeof(*q->slots));       \
         return q->slots != NULL;                                               \
     }                                                                          \
-                                                                                \
+                                                                               \
     static inline void name##_destroy(struct name *q) {                        \
         mpmc_fifo_ring_slots_free(&q->hdr, q->slots);                          \
         q->slots = NULL;                                                       \
     }                                                                          \
-                                                                                \
+                                                                               \
     static inline bool name##_enqueue(struct name *q, T v) {                   \
         uint64_t pos;                                                          \
         if (!mpmc_fifo_ring_claim(&q->hdr.head, q->hdr.mask, q->slots,         \
                                   sizeof(*q->slots), 0, &pos))                 \
             return false;                                                      \
-                                                                                \
+                                                                               \
         struct name##_slot *s = &q->slots[pos & q->hdr.mask];                  \
         s->val = v;                                                            \
         atomic_store_release(&s->seq, pos + 1);                                \
         return true;                                                           \
     }                                                                          \
-                                                                                \
+                                                                               \
     static inline bool name##_dequeue(struct name *q, T *out) {                \
         uint64_t pos;                                                          \
         if (!mpmc_fifo_ring_claim(&q->hdr.tail, q->hdr.mask, q->slots,         \
                                   sizeof(*q->slots), 1, &pos))                 \
             return false;                                                      \
-                                                                                \
+                                                                               \
         struct name##_slot *s = &q->slots[pos & q->hdr.mask];                  \
         if (out)                                                               \
             *out = s->val;                                                     \
-                                                                                \
+                                                                               \
         s->val = (T) {0};                                                      \
         atomic_store_release(&s->seq, pos + q->hdr.mask + 1);                  \
         return true;                                                           \
     }                                                                          \
-                                                                                \
+                                                                               \
     /* Drain and return how many were drained */                               \
     static inline size_t name##_drain(struct name *q) {                        \
         uint64_t first, count;                                                 \
         if (!mpmc_fifo_ring_claim_range(&q->hdr, q->slots, sizeof(*q->slots),  \
                                         &first, &count))                       \
             return 0;                                                          \
-                                                                                \
+                                                                               \
         for (uint64_t pos = first; pos != first + count; pos++) {              \
             struct name##_slot *s = &q->slots[pos & q->hdr.mask];              \
             s->val = (T) {0};                                                  \
@@ -145,22 +146,22 @@ static inline bool mpmc_fifo_ring_hdr_empty(const struct mpmc_fifo_ring_hdr *h) 
         }                                                                      \
         return count;                                                          \
     }                                                                          \
-                                                                                \
+                                                                               \
     static inline bool name##_empty(const struct name *q) {                    \
         return mpmc_fifo_ring_hdr_empty(&q->hdr);                              \
     }                                                                          \
-                                                                                \
+                                                                               \
     static inline size_t name##_capacity(const struct name *q) {               \
         return q->hdr.mask + 1;                                                \
     }                                                                          \
-                                                                                \
-    static inline cc_maybe_unused uint64_t name##_produced(struct name *q) {   \
+                                                                               \
+    static inline cc_unused uint64_t name##_produced(struct name *q) {         \
         return atomic_load_acq(&q->hdr.head);                                  \
     }                                                                          \
-                                                                                \
-    static inline cc_maybe_unused uint64_t name##_consumed(struct name *q) {   \
+                                                                               \
+    static inline cc_unused uint64_t name##_consumed(struct name *q) {         \
         return atomic_load_acq(&q->hdr.tail);                                  \
     }                                                                          \
-                                                                                \
+                                                                               \
     static_assert(ct_field_offset(struct name##_slot, seq) == 0,               \
                   #name ": seq must lead the slot")

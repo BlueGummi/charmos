@@ -38,12 +38,12 @@
 
 #define BITFLAG_RESERVED_DECLARE(type, name, ...)                              \
     static_assert(PP_NARG(__VA_ARGS__) > 0);                                   \
-    static const size_t cc_maybe_unused PP_CONCAT(__bitflag_index_rsvd_,       \
-                                                  name)[] = {__VA_ARGS__};     \
-    static const size_t cc_maybe_unused PP_CONCAT(name, _RSVD_COUNT) =         \
+    static const size_t                                                        \
+        cc_unused PP_CONCAT(__bitflag_index_rsvd_, name)[] = {__VA_ARGS__};    \
+    static const size_t cc_unused PP_CONCAT(name, _RSVD_COUNT) =               \
         sizeof(PP_CONCAT(__bitflag_index_rsvd_, name)) /                       \
         sizeof(PP_CONCAT(__bitflag_index_rsvd_, name)[0]);                     \
-    static const type cc_maybe_unused PP_CONCAT(name, _RSVD_MASK) =            \
+    static const type cc_unused PP_CONCAT(name, _RSVD_MASK) =                  \
         BR_MAKE_MASK(type, __VA_ARGS__)
 
 #define BITFLAG_RSVD_BIT_IDX(name, idx)                                        \
@@ -66,12 +66,12 @@
 
 #define BITFLAG_AVAILABLE_DECLARE(type, name, ...)                             \
     static_assert(PP_NARG(__VA_ARGS__) > 0);                                   \
-    static const size_t cc_maybe_unused PP_CONCAT(__bitflag_index_avail_,      \
-                                                  name)[] = {__VA_ARGS__};     \
-    static const size_t cc_maybe_unused PP_CONCAT(name, _AVAIL_COUNT) =        \
+    static const size_t                                                        \
+        cc_unused PP_CONCAT(__bitflag_index_avail_, name)[] = {__VA_ARGS__};   \
+    static const size_t cc_unused PP_CONCAT(name, _AVAIL_COUNT) =              \
         sizeof(PP_CONCAT(__bitflag_index_avail_, name)) /                      \
         sizeof(PP_CONCAT(__bitflag_index_avail_, name)[0]);                    \
-    static const type cc_maybe_unused PP_CONCAT(name, _AVAIL_MASK) =           \
+    static const type cc_unused PP_CONCAT(name, _AVAIL_MASK) =                 \
         BR_MAKE_MASK(type, __VA_ARGS__)
 
 #define BITFLAG_AVAIL_BIT_IDX(name, idx)                                       \

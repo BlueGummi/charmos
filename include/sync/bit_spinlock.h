@@ -146,13 +146,13 @@ bit_spin_unlock_sized_raw(uint8_t bit, void *ptr, uint8_t size) {
     }
 }
 
-static inline cc_always_inline cc_maybe_unused void
+static inline cc_always_inline cc_unused void
 bit_spin_raw_guard_exit(struct bit_spinlock_raw_guard *g) {
     if (g->ptr)
         bit_spin_unlock_sized_raw(g->bit, g->ptr, g->size);
 }
 
-static inline cc_always_inline cc_maybe_unused void
+static inline cc_always_inline cc_unused void
 bit_spin_guard_exit(struct bit_spinlock_guard *g)
     TSA_RELEASES(IRQL_RAISED) TSA_NO_ANALYSIS {
     if (g->ptr) {

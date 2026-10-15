@@ -31,7 +31,7 @@ static struct spinlock pf_lock = SPINLOCK_INIT;
 
 enum irq_result page_fault_isr(void *context, uint8_t vector,
                                struct irq_context *rsp) {
-    cc_unused(context, vector);
+    cc_ignore(context, vector);
     /* Synchronization here is actually OK: we can only receive one
      * IRQ per CPU at any moment, and the caller passes the thread-local buffer
      * to the exception_sync_cb below, this is just how the ISR
@@ -51,7 +51,7 @@ enum irq_result page_fault_isr(void *context, uint8_t vector,
 static enum exception_sync_cb_result
 page_fault_sync_cb(struct exception_sync_cb *this, struct irq_context *irqc,
                    uint8_t buf[EXCEPTION_SYNC_CB_SCRATCH_BUFFER_SIZE]) {
-    cc_unused(this);
+    cc_ignore(this);
     struct page_fault_scratch_buffer *pfsb =
         (struct page_fault_scratch_buffer *) buf;
 

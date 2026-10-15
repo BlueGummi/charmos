@@ -38,11 +38,11 @@ static void thread_lock_chk_exit(struct thread *thread) {
 #else
 
 static void thread_lock_chk_init(struct thread *thread) {
-    cc_unused(thread);
+    cc_ignore(thread);
 }
 
 static void thread_lock_chk_exit(struct thread *thread) {
-    cc_unused(thread);
+    cc_ignore(thread);
 }
 
 #endif

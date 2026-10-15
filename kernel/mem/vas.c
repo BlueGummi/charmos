@@ -46,7 +46,7 @@ static bool magazines_enabled(struct vas *vas) {
     if (vas->magazines_disabled)
         return false;
 #else
-    cc_unused(vas);
+    cc_ignore(vas);
 #endif
     /* IRQL is a no-op during bootstrap */
     return global.current_bootstage >= BOOTSTAGE_LATE;

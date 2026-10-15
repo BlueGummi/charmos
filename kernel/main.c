@@ -168,7 +168,7 @@ cc_no_asan void k_main(void) TSA_ACQUIRES_IRQS {
 }
 
 void k_sch_main(void *nop) {
-    cc_unused(nop);
+    cc_ignore(nop);
     /* make sure everyone else is idle before we
      * advance the bootstage here... */
     smp_wait_for_others_to_idle();

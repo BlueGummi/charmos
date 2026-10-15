@@ -6,7 +6,7 @@ TEST_GROUP_DEFINE(log, .intensity_desc = {
                        });
 
 static void log_event(const char *msg) {
-    cc_unused(msg);
+    cc_ignore(msg);
 }
 
 TEST_DEFINE_SMOKE(log, emit_event) {

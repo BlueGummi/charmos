@@ -11,7 +11,7 @@ static atomic_uint32_t times_2 = 0;
 static size_t wq_2_items_per_thread = 512;
 
 static void wq_test_2(void *a, void *b) {
-    cc_unused(a, b);
+    cc_ignore(a, b);
 
     atomic_inc(&times_2);
     for (uint64_t i = 0; i < 500; i++)
@@ -22,7 +22,7 @@ static struct workqueue *wq = NULL;
 static atomic_uint32_t threads_left = WQ_2_THREADS;
 
 static void enqueue_thread(void *arg) {
-    cc_unused(arg);
+    cc_ignore(arg);
     struct work works[wq_2_items_per_thread];
 
     for (size_t i = 0; i < wq_2_items_per_thread; i++) {

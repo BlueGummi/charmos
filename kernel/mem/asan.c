@@ -349,7 +349,7 @@ static void asan_report_owner(const void *addr) {
 out:
     reporting = false;
 #else
-    cc_unused(addr);
+    cc_ignore(addr);
 #endif
 }
 
@@ -493,7 +493,7 @@ void __asan_register_globals(struct __asan_global *globals, size_t n) {
 }
 
 void __asan_unregister_globals(void *globals, size_t n) {
-    cc_unused(globals, n);
+    cc_ignore(globals, n);
 }
 
 #define ASAN_MAX_STACK_RECORDS 1024
@@ -596,75 +596,75 @@ void __asan_report_store_n(void *addr, size_t size) {
 int __asan_option_detect_stack_use_after_return = 0;
 
 void *__asan_stack_malloc_0(size_t size) {
-    cc_unused(size);
+    cc_ignore(size);
     return NULL;
 }
 void *__asan_stack_malloc_1(size_t size) {
-    cc_unused(size);
+    cc_ignore(size);
     return NULL;
 }
 void *__asan_stack_malloc_2(size_t size) {
-    cc_unused(size);
+    cc_ignore(size);
     return NULL;
 }
 void *__asan_stack_malloc_3(size_t size) {
-    cc_unused(size);
+    cc_ignore(size);
     return NULL;
 }
 void *__asan_stack_malloc_4(size_t size) {
-    cc_unused(size);
+    cc_ignore(size);
     return NULL;
 }
 void *__asan_stack_malloc_5(size_t size) {
-    cc_unused(size);
+    cc_ignore(size);
     return NULL;
 }
 void *__asan_stack_malloc_6(size_t size) {
-    cc_unused(size);
+    cc_ignore(size);
     return NULL;
 }
 void *__asan_stack_malloc_7(size_t size) {
-    cc_unused(size);
+    cc_ignore(size);
     return NULL;
 }
 void *__asan_stack_malloc_8(size_t size) {
-    cc_unused(size);
+    cc_ignore(size);
     return NULL;
 }
 void *__asan_stack_malloc_9(size_t size) {
-    cc_unused(size);
+    cc_ignore(size);
     return NULL;
 }
 
 void __asan_stack_free_0(void *p, size_t size) {
-    cc_unused(p, size);
+    cc_ignore(p, size);
 }
 void __asan_stack_free_1(void *p, size_t size) {
-    cc_unused(p, size);
+    cc_ignore(p, size);
 }
 void __asan_stack_free_2(void *p, size_t size) {
-    cc_unused(p, size);
+    cc_ignore(p, size);
 }
 void __asan_stack_free_3(void *p, size_t size) {
-    cc_unused(p, size);
+    cc_ignore(p, size);
 }
 void __asan_stack_free_4(void *p, size_t size) {
-    cc_unused(p, size);
+    cc_ignore(p, size);
 }
 void __asan_stack_free_5(void *p, size_t size) {
-    cc_unused(p, size);
+    cc_ignore(p, size);
 }
 void __asan_stack_free_6(void *p, size_t size) {
-    cc_unused(p, size);
+    cc_ignore(p, size);
 }
 void __asan_stack_free_7(void *p, size_t size) {
-    cc_unused(p, size);
+    cc_ignore(p, size);
 }
 void __asan_stack_free_8(void *p, size_t size) {
-    cc_unused(p, size);
+    cc_ignore(p, size);
 }
 void __asan_stack_free_9(void *p, size_t size) {
-    cc_unused(p, size);
+    cc_ignore(p, size);
 }
 
 void *__asan_malloc(size_t size) {
@@ -678,10 +678,10 @@ void __asan_free(void *p) {
 }
 
 void __asan_malloc_hook(void *ptr, size_t size) {
-    cc_unused(ptr, size);
+    cc_ignore(ptr, size);
 }
 void __asan_free_hook(void *ptr) {
-    cc_unused(ptr);
+    cc_ignore(ptr);
 }
 
 void __asan_init(void) {
@@ -689,7 +689,7 @@ void __asan_init(void) {
 }
 
 void __asan_before_dynamic_init(const char *module_name) {
-    cc_unused(module_name);
+    cc_ignore(module_name);
 }
 void __asan_after_dynamic_init(void) {}
 

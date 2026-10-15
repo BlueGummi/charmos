@@ -62,7 +62,7 @@ struct qspin_contention_fix {
 static bool qspinlock_contention_worker(struct test_fleet *f,
                                         struct test_conc_worker *w) {
     struct qspin_contention_fix *fix = w->arg;
-    cc_unused(f);
+    cc_ignore(f);
 
     for (size_t i = 0; i < QSPINLOCK_CONTENTION_ITERS; i++) {
         enum irql irql = qspin_lock(&fix->lock);

@@ -47,6 +47,6 @@ TEST_DEFINE_UNIT(arena, create_lookup_basic) {
         TEST_ASSERT_NONNULL(found);
     }
 
-    cc_unused(a);
+    cc_ignore(a);
     return TEST_SUCCESS;
 }

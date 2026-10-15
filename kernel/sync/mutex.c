@@ -100,31 +100,31 @@ static void mutex_chk_before_lock(struct mutex_chk_acq_state *state,
                                   struct mutex *mutex,
                                   enum lock_subclass subclass,
                                   const struct lock_chk_site *site) {
-    cc_unused(state, mutex, subclass, site);
+    cc_ignore(state, mutex, subclass, site);
 }
 
 static void mutex_chk_locked(struct mutex_chk_acq_state *state) {
-    cc_unused(state);
+    cc_ignore(state);
 }
 
 static void mutex_chk_before_unlock(struct mutex_chk_rel_state *state,
                                     struct mutex *mutex,
                                     const struct lock_chk_site *site) {
-    cc_unused(state, mutex, site);
+    cc_ignore(state, mutex, site);
 }
 
 static void mutex_chk_unlocked(struct mutex_chk_rel_state *state) {
-    cc_unused(state);
+    cc_ignore(state);
 }
 
 static void mutex_chk_state_init(struct mutex *mtx,
                                  const struct lock_chk_class *class,
                                  enum lock_chk_flags flags) {
-    cc_unused(mtx, class, flags);
+    cc_ignore(mtx, class, flags);
 }
 
 void mutex_set_chk_flags(struct mutex *mtx, enum lock_chk_flags flags) {
-    cc_unused(mtx, flags);
+    cc_ignore(mtx, flags);
 }
 
 void mutex_reinit_chk(struct mutex *mtx, const struct lock_chk_class *class,
@@ -333,7 +333,7 @@ void mutex_assert_held_full(struct mutex *mtx,
                                   /*want_held=*/true, site))
         return;
 #else
-    cc_unused(site);
+    cc_ignore(site);
 #endif
     enforce(mutex_read_owner(mtx) == thread_get_current(),
             "mutex not held by current thread");
@@ -348,7 +348,7 @@ void mutex_assert_not_held_full(struct mutex *mtx,
                                   /*want_held=*/false, site))
         return;
 #else
-    cc_unused(site);
+    cc_ignore(site);
 #endif
     enforce(mutex_read_owner(mtx) != thread_get_current(),
             "mutex unexpectedly held by current thread");

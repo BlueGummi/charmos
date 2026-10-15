@@ -132,12 +132,12 @@ void lock_chk_assert_schedulable(const struct lock_chk_site *site);
 static inline void lock_chk_note_lock_use(struct lock_chk_lock *lock,
                                           bool manages_irql,
                                           bool raw_operation) {
-    cc_unused(lock, manages_irql, raw_operation);
+    cc_ignore(lock, manages_irql, raw_operation);
 }
 
 static inline void
 lock_chk_assert_schedulable(const struct lock_chk_site *site) {
-    cc_unused(site);
+    cc_ignore(site);
 }
 
 #endif /* DEBUG_LOCK_CHK */

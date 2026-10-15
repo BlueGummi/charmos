@@ -71,6 +71,6 @@ void nightmare_request_external_fail(const char *kind, uint64_t discriminator,
 #else
 void nightmare_request_external_fail(const char *kind, uint64_t discriminator,
                                      const char *fmt, ...) {
-    cc_unused(kind, discriminator, fmt);
+    cc_ignore(kind, discriminator, fmt);
 }
 #endif

@@ -188,7 +188,7 @@ static bool detect_int(const char *text, void *out) {
 }
 
 static bool detect_string(const char *text, void *out) {
-    cc_unused(out);
+    cc_ignore(out);
     return text != NULL;
 }
 

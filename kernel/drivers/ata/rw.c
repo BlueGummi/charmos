@@ -38,7 +38,7 @@ static enum bio_request_status translate_status(uint8_t status, uint8_t error) {
 
 enum irq_result ide_irq_handler(void *ctx, irq_t irq_num,
                                 struct irq_context *rsp) {
-    cc_unused(irq_num, rsp);
+    cc_ignore(irq_num, rsp);
 
     struct ide_channel *chan = ctx;
     enum irql           irql = spin_lock_high(&chan->lock);

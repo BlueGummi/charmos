@@ -42,17 +42,17 @@ void list_splice_check(const struct list_node *list,
 static inline void list_add_check(const struct list_node *new,
                                   const struct list_node *prev,
                                   const struct list_node *next) {
-    cc_unused(new, prev, next);
+    cc_ignore(new, prev, next);
 }
 
 static inline void list_del_check(const struct list_node *entry) {
-    cc_unused(entry);
+    cc_ignore(entry);
 }
 
 static inline void list_splice_check(const struct list_node *list,
                                      const struct list_node *prev,
                                      const struct list_node *next) {
-    cc_unused(list, prev, next);
+    cc_ignore(list, prev, next);
 }
 #endif /* DEBUG_LIST */
 

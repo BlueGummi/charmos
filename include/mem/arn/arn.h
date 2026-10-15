@@ -137,8 +137,8 @@
     ARN_EACH_(ARN_FWD_, id, ops_)                                              \
     ARN_UNPAREN_ extra_fwd static const struct arn_##id##_ns {                 \
         ARN_UNPAREN_ extra_memb ARN_EACH_(ARN_MEMB_, id, ops_)                 \
-    } arn_##id cc_maybe_unused = {                                             \
-        ARN_UNPAREN_ extra_init ARN_EACH_(ARN_INIT_, id, ops_)}
+    } arn_##id                                                                 \
+        cc_unused = {ARN_UNPAREN_ extra_init ARN_EACH_(ARN_INIT_, id, ops_)}
 
 #define ARN_PROVIDER_DECLARE(id, ops_)                                         \
     ARN_CAPS_DECLARE_(id, ops_);                                               \

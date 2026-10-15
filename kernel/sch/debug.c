@@ -99,7 +99,7 @@ static void sched_debug_dump(cpu_id_t cpu, uint64_t now_ms) {
 static atomic_bool sched_debug_tripped = false;
 
 static void sched_debug_strand_check(struct watchdog_callback *cb) {
-    cc_unused(cb);
+    cc_ignore(cb);
 
     if (atomic_load_rlx(&sched_debug_tripped))
         return;

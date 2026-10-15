@@ -250,7 +250,7 @@ static void vmm_free_user_subtree(struct page_table *pdpt) {
 
 void vmm_unmap_all_user_pages_full(struct page_table *pml4,
                                    struct vmm_request rq) {
-    cc_unused(rq);
+    cc_ignore(rq);
 
     for (int i4 = 0; i4 < KERNEL_PML4_START_INDEX; i4++) {
         pte_t e4 = pml4->entries[i4];
@@ -1009,7 +1009,7 @@ out:
 }
 
 paddr_t vmm_get_phys_full(vaddr_t virt, struct vmm_request rq) {
-    cc_unused(rq);
+    cc_ignore(rq);
 
     int level;
     uint64_t snap = vmm_walk_leaf(kernel_pml4, virt, &level);
@@ -1027,7 +1027,7 @@ paddr_t vmm_get_phys_full(vaddr_t virt, struct vmm_request rq) {
 }
 
 pte_t vmm_get_leaf_pte_full(vaddr_t virt, struct vmm_request rq) {
-    cc_unused(rq);
+    cc_ignore(rq);
     return vmm_walk_leaf(kernel_pml4, virt, NULL);
 }
 

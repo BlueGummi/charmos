@@ -10,7 +10,7 @@ static atomic_size_t vfree_irq_test_consumed = 0;
 
 static enum irq_result vfree_irq_test_irq(void *ctx, uint8_t vector,
                                           struct irq_context *ictx) {
-    cc_unused(ctx, vector, ictx);
+    cc_ignore(ctx, vector, ictx);
     size_t total = vfree_irq_total_allocs;
     int midrange = total / 10;
     int delta = (prng_next() % (midrange * 2)) - midrange;

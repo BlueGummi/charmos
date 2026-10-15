@@ -110,7 +110,7 @@ bool atapi_read_sector(struct block_device *disk, uint64_t lba, uint8_t *buffer,
 
 bool atapi_write_sector(struct block_device *disk, uint64_t lba,
                         const uint8_t *buffer, uint64_t sector_count) {
-    cc_unused(disk, lba, buffer, sector_count);
+    cc_ignore(disk, lba, buffer, sector_count);
     return false; // no can write to cd
     // TODO: newer CDs support write :boom:
 }

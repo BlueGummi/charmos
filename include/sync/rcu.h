@@ -62,14 +62,13 @@ void rcu_idle_exit(void);
 #define rcu_access_pointer(p) ((rcu_plain_t(p)) ca_read_once(p))
 #define RCU_INIT_POINTER(p, v) ((p) = (typeof(p)) (rcu_plain_t(p))(v))
 
-static inline cc_always_inline
-cc_maybe_unused void rcu_read_guard_exit(int *unused)
+static inline cc_always_inline cc_unused void rcu_read_guard_exit(int *unused)
     TSA_RELEASES(RCU_READ_LOCKED) TSA_NO_ANALYSIS {
-    cc_unused(unused);
+    cc_ignore(unused);
     rcu_read_unlock();
 }
 
-static inline cc_always_inline cc_maybe_unused int rcu_read_guard_enter(void)
+static inline cc_always_inline cc_unused int rcu_read_guard_enter(void)
     TSA_ACQUIRES(RCU_READ_LOCKED) TSA_NO_ANALYSIS {
     rcu_read_lock();
     return 0;

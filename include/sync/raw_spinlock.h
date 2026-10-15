@@ -62,30 +62,30 @@ struct raw_spinlock_high_guard {
     bool irqs_were_enabled;
 };
 
-static inline cc_always_inline cc_maybe_unused void
+static inline cc_always_inline cc_unused void
 raw_spin_guard_assume(struct raw_spinlock *lock) TSA_ASSERT_CAPABILITY(lock) {
-    cc_unused(lock);
+    cc_ignore(lock);
 }
 
-static inline cc_always_inline cc_maybe_unused void
+static inline cc_always_inline cc_unused void
 raw_spin_guard_exit(struct raw_spinlock **lock) TSA_NO_ANALYSIS {
     if (*lock)
         raw_spin_unlock(*lock);
 }
 
-static inline cc_always_inline cc_maybe_unused struct raw_spinlock *
+static inline cc_always_inline cc_unused struct raw_spinlock *
 raw_spin_guard_enter(struct raw_spinlock *lock) TSA_NO_ANALYSIS {
     raw_spin_lock(lock);
     return lock;
 }
 
-static inline cc_always_inline cc_maybe_unused void raw_spin_high_guard_exit(
+static inline cc_always_inline cc_unused void raw_spin_high_guard_exit(
     struct raw_spinlock_high_guard *g) TSA_RELEASES_IRQS TSA_NO_ANALYSIS {
     if (g->lock)
         raw_spin_unlock_irq_restore(g->lock, g->irqs_were_enabled);
 }
 
-static inline cc_always_inline cc_maybe_unused struct raw_spinlock_high_guard
+static inline cc_always_inline cc_unused struct raw_spinlock_high_guard
 raw_spin_high_guard_enter(struct raw_spinlock *lock)
     TSA_ACQUIRES_IRQS TSA_NO_ANALYSIS {
     return (struct raw_spinlock_high_guard) {

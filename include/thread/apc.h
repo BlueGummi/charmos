@@ -86,26 +86,24 @@ static inline void apc_queue_init(struct apc_queue *q) {
     q->head = q->tail = NULL;
 }
 
-static inline cc_always_inline cc_maybe_unused void
+static inline cc_always_inline cc_unused void
 apc_kernel_guard_exit(int *unused) {
-    cc_unused(unused);
+    cc_ignore(unused);
     apc_enable_kernel();
 }
 
-static inline cc_always_inline cc_maybe_unused int
-apc_kernel_guard_enter(void) {
+static inline cc_always_inline cc_unused int apc_kernel_guard_enter(void) {
     apc_disable_kernel();
     return 0;
 }
 
-static inline cc_always_inline cc_maybe_unused void
+static inline cc_always_inline cc_unused void
 apc_special_guard_exit(int *unused) {
-    cc_unused(unused);
+    cc_ignore(unused);
     apc_enable_special();
 }
 
-static inline cc_always_inline cc_maybe_unused int
-apc_special_guard_enter(void) {
+static inline cc_always_inline cc_unused int apc_special_guard_enter(void) {
     apc_disable_special();
     return 0;
 }

@@ -152,8 +152,8 @@ LINKER_SECTION_EXTERN(struct nightmare, nightmares);
                        .unit = (unit_)}
 
 #define NIGHTMARE_WORKER(id)                                                   \
-    static void id(struct nightmare_ctx *NM_CTX cc_fn_unused,                  \
-                   struct test_conc_worker *NM_SELF cc_fn_unused)
+    static void id(struct nightmare_ctx *NM_CTX cc_unused,                     \
+                   struct test_conc_worker *NM_SELF cc_unused)
 
 #define NIGHTMARE_OPTIONS_DEFINE(id, struct_type, instance, ...)               \
     static void *__nightmare_options_resolve_##id(const char *path,            \

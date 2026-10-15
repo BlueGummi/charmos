@@ -86,7 +86,7 @@ fail:
     return IOMMU_ERR_NO_MEM;
 }
 
-static cc_fn_unused bool vtd_sl_unmap_page(uint64_t *sl_pgd, iova_t iova) {
+static cc_unused bool vtd_sl_unmap_page(uint64_t *sl_pgd, iova_t iova) {
     pte_t pte;
 
     pte = sl_pgd[SL_PML4_INDEX(iova)];
@@ -111,7 +111,7 @@ static cc_fn_unused bool vtd_sl_unmap_page(uint64_t *sl_pgd, iova_t iova) {
     return true;
 }
 
-static cc_fn_unused paddr_t vtd_sl_translate(uint64_t *sl_pgd, iova_t iova) {
+static cc_unused paddr_t vtd_sl_translate(uint64_t *sl_pgd, iova_t iova) {
     pte_t pte;
 
     pte = sl_pgd[SL_PML4_INDEX(iova)];
@@ -136,9 +136,9 @@ static cc_fn_unused paddr_t vtd_sl_translate(uint64_t *sl_pgd, iova_t iova) {
     return SL_PTE_ADDR(pte) | SL_PAGE_OFFSET(iova);
 }
 
-static cc_fn_unused enum iommu_error vtd_map(struct iommu_domain *domain,
-                                             iova_t iova, paddr_t pa,
-                                             size_t size, uint32_t perm) {
+static cc_unused enum iommu_error vtd_map(struct iommu_domain *domain,
+                                          iova_t iova, paddr_t pa, size_t size,
+                                          uint32_t perm) {
     struct vtd_unit   *u  = domain->unit->private;
     struct vtd_domain *vd = domain->priv;
 
@@ -159,7 +159,7 @@ static cc_fn_unused enum iommu_error vtd_map(struct iommu_domain *domain,
     return IOMMU_ERR_OK;
 }
 
-static cc_fn_unused void vtd_flush_iotlb_domain(struct iommu_domain *domain) {
+static cc_unused void vtd_flush_iotlb_domain(struct iommu_domain *domain) {
     struct vtd_unit   *u  = domain->unit->private;
     struct vtd_domain *vd = domain->priv;
 
@@ -167,8 +167,8 @@ static cc_fn_unused void vtd_flush_iotlb_domain(struct iommu_domain *domain) {
     vtd_iq_flush(u);
 }
 
-static cc_fn_unused void vtd_flush_iotlb_range(struct iommu_domain *domain,
-                                               iova_t iova, size_t size) {
+static cc_unused void vtd_flush_iotlb_range(struct iommu_domain *domain,
+                                            iova_t iova, size_t size) {
     struct vtd_unit   *u  = domain->unit->private;
     struct vtd_domain *vd = domain->priv;
 
@@ -265,8 +265,8 @@ static void vtd_sl_reclaim_walk(struct vtd_walk_state *ws) {
     }
 }
 
-static cc_fn_unused void vtd_unmap(struct iommu_domain *domain, iova_t iova,
-                                   size_t size) {
+static cc_unused void vtd_unmap(struct iommu_domain *domain, iova_t iova,
+                                size_t size) {
     struct vtd_unit   *u  = domain->unit->private;
     struct vtd_domain *vd = domain->priv;
 

@@ -4,7 +4,7 @@
 #define MAKE_HANDLER(handler_name, message)                                    \
     enum irq_result handler_name##_handler(void *ctx, uint8_t vector,          \
                                            struct irq_context *rsp) {          \
-        cc_unused(ctx, vector);                                                \
+        cc_ignore(ctx, vector);                                                \
         struct crash_regs pregs;                                               \
         irq_context_to_crash_regs(rsp->regs, &pregs);                          \
         char msg[CRASH_MSG_MAX];                                               \
@@ -24,7 +24,7 @@
 
 enum irq_result gpf_handler(void *ctx, uint8_t vector,
                             struct irq_context *ictx) {
-    cc_unused(ctx, vector);
+    cc_ignore(ctx, vector);
 
     uint64_t core = smp_id_raw();
     struct irq_registers *rsp = ictx->regs;
@@ -88,7 +88,7 @@ MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 
 enum irq_result panic_nmi_isr(void *ctx, uint8_t vector,
                               struct irq_context *rsp) {
-    cc_unused(vector);
+    cc_ignore(vector);
     if (atomic_load(&global.panicked)) {
         if (crash_cpu_is_owner(smp_id_raw()))
             return IRQ_HANDLED;
@@ -101,7 +101,7 @@ enum irq_result panic_nmi_isr(void *ctx, uint8_t vector,
 
 enum irq_result hw_error_nmi_isr(void *ctx, uint8_t vector,
                                  struct irq_context *ictx) {
-    cc_unused(ctx, vector, ictx);
+    cc_ignore(ctx, vector, ictx);
     uint8_t port61 = inb(0x61);
     if (port61 & 0xC0) {
         char msg[CRASH_MSG_MAX];
@@ -123,13 +123,13 @@ enum irq_result hw_error_nmi_isr(void *ctx, uint8_t vector,
 
 enum irq_result nop_handler(void *ctx, uint8_t vector,
                             struct irq_context *rsp) {
-    cc_unused(ctx, vector, rsp);
+    cc_ignore(ctx, vector, rsp);
     return IRQ_HANDLED;
 }
 
 enum irq_result dpc_handler(void *ctx, uint8_t vector,
                             struct irq_context *rsp) {
     scheduler_mark_self_needs_run_dpcs(true);
-    cc_unused(ctx, vector, rsp);
+    cc_ignore(ctx, vector, rsp);
     return IRQ_HANDLED;
 }

@@ -195,7 +195,7 @@ irq_restore(bool was_enabled) TSA_RELEASES_IRQS TSA_NO_ANALYSIS {
         irq_enable();
 }
 
-static inline cc_always_inline cc_maybe_unused void
+static inline cc_always_inline cc_unused void
 irq_save_guard_exit(bool *was_enabled) TSA_RELEASES_IRQS TSA_NO_ANALYSIS {
     irq_restore(*was_enabled);
 }

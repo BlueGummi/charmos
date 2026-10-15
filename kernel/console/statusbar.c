@@ -285,7 +285,7 @@ void status_bar_progress_timed(size_t done, size_t total,
 }
 
 static void bar_timer_fn(struct timer *timer) {
-    cc_unused(timer);
+    cc_ignore(timer);
 
     if (!term_available() || term_in_panic())
         return;

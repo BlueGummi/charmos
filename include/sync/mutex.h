@@ -104,23 +104,23 @@ void mutex_assert_not_held_full(struct mutex *mtx,
     mutex_assert_not_held_full((m), LOCK_CHK_SITE_HERE())
 
 static inline cc_always_inline
-cc_maybe_unused void mutex_guard_exit(struct mutex **m) TSA_NO_ANALYSIS {
+cc_unused void mutex_guard_exit(struct mutex **m) TSA_NO_ANALYSIS {
     if (*m)
         mutex_unlock(*m);
 }
 
-static inline cc_always_inline cc_maybe_unused void
+static inline cc_always_inline cc_unused void
 mutex_guard_assume(struct mutex *m) TSA_ASSERT_CAPABILITY(m) {
-    cc_unused(m);
+    cc_ignore(m);
 }
 
-static inline cc_always_inline cc_maybe_unused struct mutex *
+static inline cc_always_inline cc_unused struct mutex *
 mutex_guard_enter(struct mutex *m) TSA_MAY_SLEEP TSA_NO_ANALYSIS {
     mutex_lock(m);
     return m;
 }
 
-static inline cc_always_inline cc_maybe_unused struct mutex *
+static inline cc_always_inline cc_unused struct mutex *
 mutex_guard_subclass_enter(struct mutex *m, enum lock_subclass subclass)
     TSA_MAY_SLEEP TSA_NO_ANALYSIS {
     mutex_lock_subclass(m, subclass);

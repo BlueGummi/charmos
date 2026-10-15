@@ -34,8 +34,8 @@ struct topo_gen_descriptor {
                    __topo_ctor_TOPOLOGY_LEVEL_PACKAGE_##name_);                \
     PERTOPO_DEFINE(type_, name_##_MACHINE, TOPOLOGY_LEVEL_MACHINE,             \
                    __topo_ctor_TOPOLOGY_LEVEL_MACHINE_##name_);                \
-    static typeof(type_) __topo_gen_##name_ cc_fn_unused;                      \
-    static struct topo_gen_descriptor __topo_gen_desc_##name_ cc_fn_unused = { \
+    static typeof(type_) __topo_gen_##name_ cc_unused;                         \
+    static struct topo_gen_descriptor __topo_gen_desc_##name_ cc_unused = {    \
         .descs = {                                                             \
             [TOPOLOGY_LEVEL_SMT] = &__pertopo_desc_##name_##_SMT,              \
             [TOPOLOGY_LEVEL_CORE] = &__pertopo_desc_##name_##_CORE,            \

@@ -25,7 +25,7 @@ int system_shutdown(void) {
 }
 
 static uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
-    cc_unused(ctx);
+    cc_ignore(ctx);
     system_shutdown();
     return UACPI_INTERRUPT_HANDLED;
 }

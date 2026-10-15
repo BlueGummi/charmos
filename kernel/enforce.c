@@ -7,7 +7,7 @@ static cc_noreturn void impl_default(struct crash_payload pluh,
                                      const char *file, int line,
                                      const char *func, const char *prefix,
                                      const char *fmt, va_list args) {
-    cc_unused(pluh);
+    cc_ignore(pluh);
     static char msg[CRASH_MSG_MAX];
 
     int n = 0;
@@ -38,7 +38,7 @@ static cc_noreturn void impl_enforce_expr(struct crash_payload pluh,
                                           const char *func, const char *prefix,
                                           const char *expr, const char *fmt,
                                           va_list args) {
-    cc_unused(pluh);
+    cc_ignore(pluh);
     static char msg[CRASH_MSG_MAX];
 
     int n = snprintf(msg, sizeof(msg), "%s%s", prefix ? prefix : "",

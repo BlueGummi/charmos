@@ -76,7 +76,7 @@ struct file_read_ctx {
 static void file_read_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
                               uint32_t depth, uint32_t *block_ptr,
                               void *user_data) {
-    cc_unused(depth);
+    cc_ignore(depth);
     struct file_read_ctx *ctx = (struct file_read_ctx *) user_data;
 
     if (ctx->bytes_read >= ctx->length)

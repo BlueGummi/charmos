@@ -20,7 +20,7 @@ bool slab_check_traces(struct slab *s) {
 }
 #else
 bool slab_check_traces(struct slab *s) {
-    cc_unused(s);
+    cc_ignore(s);
     return true;
 }
 #endif
@@ -44,7 +44,7 @@ bool slab_check_bitmap(struct slab *slab) {
         if (slab->bitmap[i / 8] & (uint8_t) (1U << (i % 8)))
             set_bits_accumulator++;
     }
-    cc_unused(bitmap_bytes);
+    cc_ignore(bitmap_bytes);
 
     slab_check_assert_return_false(expected_set_bits == set_bits_accumulator);
 

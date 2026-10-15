@@ -35,7 +35,7 @@ const char *detect_fstr(enum fs_type type) {
 }
 
 struct vfs_node *dummy_mount(struct partition *p) {
-    cc_unused(p);
+    cc_ignore(p);
     return NULL;
 }
 

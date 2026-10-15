@@ -11,7 +11,7 @@
 
 static uacpi_iteration_decision
 walk_callback(void *ctx, uacpi_namespace_node *node, uacpi_u32 depth) {
-    cc_unused(ctx, depth);
+    cc_ignore(ctx, depth);
     char name[5] = {0};
     memcpy(name, uacpi_namespace_node_name(node).text, 4);
     printf("searching %s\n", name);

@@ -4,12 +4,12 @@
 #include <smp/perdomain.h>
 
 static enum daemon_thread_command page_zeroer_ts_thread(void *a, void *b) {
-    cc_unused(a, b);
+    cc_ignore(a, b);
     return DAEMON_THREAD_COMMAND_DEFAULT;
 }
 
 static enum daemon_thread_command page_zeroer_bg_thread(void *a, void *b) {
-    cc_unused(a, b);
+    cc_ignore(a, b);
     return DAEMON_THREAD_COMMAND_DEFAULT;
 }
 

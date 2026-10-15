@@ -568,5 +568,5 @@ static inline bool arena_bin_getref_rcu(struct arena_bin *bin) {
 }
 
 static inline void arena_bin_putref(struct arena_bin *bin) {
-    cc_unused(bin);
+    cc_ignore(bin);
 }

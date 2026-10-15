@@ -184,7 +184,7 @@ err:
 }
 
 static void domains_move(void *a, void *b) {
-    cc_unused(a, b);
+    cc_ignore(a, b);
     for (size_t i = 0; i < global.domain_count; i++) {
         struct domain *domain = global.domains[i];
         movealloc(domain->id, domain);

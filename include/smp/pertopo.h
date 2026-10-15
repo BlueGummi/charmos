@@ -26,7 +26,7 @@ struct pertopo_descriptor {
 LINKER_SECTION_EXTERN(struct pertopo_descriptor, pertopo_desc);
 
 #define PERTOPO_DEFINE_4(type_, name_, level_, ctor_)                          \
-    static typeof(type_) __pertopo_##name_ cc_fn_unused;                       \
+    static typeof(type_) __pertopo_##name_ cc_unused;                          \
     static struct pertopo_descriptor __pertopo_desc_##name_;                   \
     static void __pertopo_ctor_##name_(void *inst, size_t node_id) {           \
         void (*const __typed_ctor)(typeof(type_) *, size_t) = (ctor_);         \
@@ -46,7 +46,7 @@ LINKER_SECTION_EXTERN(struct pertopo_descriptor, pertopo_desc);
             .ready = false,                                                    \
     };                                                                         \
     static struct pertopo_descriptor *const __pertopo_desc_ref_##name_         \
-        cc_fn_unused = &__pertopo_desc_##name_
+        cc_unused = &__pertopo_desc_##name_
 
 #define PERTOPO_DEFINE_3(type_, name_, level_)                                 \
     PERTOPO_DEFINE_4(type_, name_, level_, NULL)
@@ -60,9 +60,9 @@ LINKER_SECTION_EXTERN(struct pertopo_descriptor, pertopo_desc);
 
 #define PERTOPO_EXTERN_AS(type, name, sym_name)                                \
     extern struct pertopo_descriptor __pertopo_desc_sym_##sym_name;            \
-    static typeof(type) __pertopo_##name cc_fn_unused;                         \
+    static typeof(type) __pertopo_##name cc_unused;                            \
     static struct pertopo_descriptor *const __pertopo_desc_ref_##name          \
-        cc_fn_unused = &__pertopo_desc_sym_##sym_name
+        cc_unused = &__pertopo_desc_sym_##sym_name
 
 #define PERTOPO_EXTERN(type, name) PERTOPO_EXTERN_AS(type, name, name)
 

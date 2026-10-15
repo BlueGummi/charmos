@@ -73,9 +73,9 @@
 /* tsa_unpublished(&o->lock) states that o is not reachable by anyone else yet,
  * so we simply treat the lock as held for the rest of the function */
 #define TSA_DEFINE_ASSUME(type)                                                \
-    static inline cc_overloadable cc_always_inline cc_fn_unused void           \
+    static inline cc_overloadable cc_always_inline cc_unused void              \
     tsa_unpublished_internal(type *cap) TSA_ASSERT_CAPABILITY(cap) {           \
-        cc_unused(cap);                                                        \
+        cc_ignore(cap);                                                        \
     }
 #define tsa_unpublished(cap) tsa_unpublished_internal(cap)
 
@@ -184,7 +184,7 @@ struct TSA_CAPABILITY("owner") tsa_owner {};
 #define TSA_OWNER_TOKEN(name) struct tsa_owner name
 
 static inline cc_always_inline
-cc_fn_unused void tsa_owner_is_me(struct tsa_owner *tok)
+cc_unused void tsa_owner_is_me(struct tsa_owner *tok)
     TSA_ASSERT_CAPABILITY(tok) {
-    cc_unused(tok);
+    cc_ignore(tok);
 }

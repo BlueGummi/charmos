@@ -13,7 +13,7 @@ struct counting_fix {
 
 static bool counting_worker(struct test_fleet *f, struct test_conc_worker *w) {
     struct counting_fix *fix = w->arg;
-    cc_unused(f);
+    cc_ignore(f);
 
     atomic_inc(&fix->ran);
     return true;
@@ -50,7 +50,7 @@ struct gate_fix {
 
 static bool gate_worker(struct test_fleet *f, struct test_conc_worker *w) {
     struct gate_fix *fix = w->arg;
-    cc_unused(f);
+    cc_ignore(f);
 
     if (!atomic_load(&fix->released))
         atomic_inc(&fix->jumped_early);
@@ -87,7 +87,7 @@ TEST_DEFINE_INTEGRATION(fleet, start_gate_holds,
 }
 
 static bool failing_worker(struct test_fleet *f, struct test_conc_worker *w) {
-    cc_unused(w);
+    cc_ignore(w);
     TEST_WORKER_CHECK_EQ(f, 2 + 2, 5);
     return true;
 }

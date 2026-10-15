@@ -305,7 +305,7 @@ struct test_dup_item {
     uint32_t hash; /* hash_murmur3_32() */
 };
 
-static cc_fn_unused int test_dup_item_cmp(const void *a, const void *b) {
+static cc_unused int test_dup_item_cmp(const void *a, const void *b) {
     const struct test_dup_item *ta = a;
     const struct test_dup_item *tb = b;
 
@@ -518,7 +518,7 @@ static void test_progress_paint(const struct test_group *tg,
 static void test_handle_print(const struct log_site *site,
                               const struct log_record *rec,
                               void (*print)(const char *fmt, ...)) {
-    cc_unused(site);
+    cc_ignore(site);
     print("[%s%zu.%03zu" ANSI_RESET "] ", log_level_color(rec->level),
           MS_TO_SECONDS(rec->timestamp), rec->timestamp % 1000);
 }

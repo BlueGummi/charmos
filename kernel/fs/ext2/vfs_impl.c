@@ -51,12 +51,12 @@ enum err ext2_vfs_readdir(struct vfs_node *n, struct vfs_dirent *out,
                           uint64_t index);
 
 enum err vfs_dummy_open(struct vfs_node *a, uint32_t b) {
-    cc_unused(a, b);
+    cc_ignore(a, b);
     return ERR_OK;
 }
 
 enum err vfs_dummy_close(struct vfs_node *a) {
-    cc_unused(a);
+    cc_ignore(a);
     return ERR_OK;
 }
 
@@ -298,7 +298,7 @@ static bool dir_entry_rename_callback(struct ext2_fs *fs,
                                       struct ext2_dir_entry *entry,
                                       void *ctx_ptr, uint32_t b, uint32_t e_num,
                                       uint32_t c) {
-    cc_unused(c, fs, b, e_num);
+    cc_ignore(c, fs, b, e_num);
     struct rename_ctx *ctx = (struct rename_ctx *) ctx_ptr;
 
     if (!ext2_dirent_valid(entry))

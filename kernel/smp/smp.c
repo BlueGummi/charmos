@@ -270,7 +270,7 @@ static inline void set_core_awake(void) {
 
 /* returns with interrupts disabled; the scheduler takes it from here */
 void smp_ap_wakeup(struct limine_mp_info *info) TSA_ACQUIRES_IRQS {
-    cc_unused(info);
+    cc_ignore(info);
     irq_disable();
 
     cr3_write(atomic_load_acq(&cr3));
@@ -360,7 +360,7 @@ static uint8_t entry = 0;
 
 static enum irq_result tick_op_isr(void *ctx, uint8_t vector,
                                    struct irq_context *rsp) {
-    cc_unused(ctx, vector, rsp);
+    cc_ignore(ctx, vector, rsp);
     if (atomic_load_acq(&enable)) {
         scheduler_tick_enable();
     } else {

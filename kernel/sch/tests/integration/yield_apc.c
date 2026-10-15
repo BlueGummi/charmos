@@ -8,14 +8,14 @@ static atomic_uint yd_nesting_at_delivery = YIELD_APC_NO_READING;
 static atomic_bool yd_gave_up = false;
 
 static void yd_apc(void *arg) {
-    cc_unused(arg);
+    cc_ignore(arg);
     atomic_store(&yd_nesting_at_delivery,
                  scheduler_yield_nesting(thread_get_current()));
     atomic_store(&yd_apc_ran, true);
 }
 
 static void yd_subject_main(void *arg) {
-    cc_unused(arg);
+    cc_ignore(arg);
     for (size_t i = 0; i < YIELD_APC_SPIN_LIMIT; i++) {
         if (atomic_load(&yd_apc_ran))
             return;

@@ -14,7 +14,7 @@
  * 7: RIP
  */
 
-cc_naked int setjmp(jmp_buf cc_maybe_unused env) {
+cc_naked int setjmp(jmp_buf cc_unused env) {
     asm volatile("movq %rbx, (%rdi)\n\t"
                  "movq %rbp, 8(%rdi)\n\t"
                  "movq %r12, 16(%rdi)\n\t"
@@ -32,7 +32,7 @@ cc_naked int setjmp(jmp_buf cc_maybe_unused env) {
                  "retq");
 }
 
-cc_naked void longjmp(jmp_buf cc_maybe_unused env, int cc_maybe_unused val) {
+cc_naked void longjmp(jmp_buf cc_unused env, int cc_unused val) {
     asm volatile("movq (%rdi), %rbx\n\t"
                  "movq 8(%rdi), %rbp\n\t"
                  "movq 16(%rdi), %r12\n\t"

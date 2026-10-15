@@ -19,8 +19,8 @@ AttributeMacros:
   - cc_noinline
   - cc_always_inline
   - cc_noreturn
-  - cc_fn_unused
-  - cc_maybe_unused
+  - cc_unused
+  - cc_unused
   - cc_warn_unused_result
   - cc_nodiscard
   - cc_packed

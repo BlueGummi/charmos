@@ -16,7 +16,7 @@ struct many_waiter_fix {
 
 static bool many_worker(struct test_fleet *f, struct test_conc_worker *w) {
     struct many_waiter_fix *fix = w->arg;
-    cc_unused(f);
+    cc_ignore(f);
 
     for (int i = 0; i < MUTEX_MANY_WAITER_LOOP_COUNT; i++) {
         mutex_lock(&fix->lock);
@@ -64,7 +64,7 @@ struct chaos_fix {
 
 static bool chaos(struct test_fleet *f, struct test_conc_worker *w) {
     struct chaos_fix *fix = w->arg;
-    cc_unused(f);
+    cc_ignore(f);
 
     for (int i = 0; i < CHAOS_LOOPS; i++) {
         mutex_lock(&fix->lock);

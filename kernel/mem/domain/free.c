@@ -198,7 +198,7 @@ void domain_free(paddr_t address, size_t page_count) {
 }
 
 void domain_flush_thread(void *arg) {
-    cc_unused(arg);
+    cc_ignore(arg);
     struct domain_flush_worker *worker = &domain_buddy_on_this_core()->worker;
     while (!worker->stop) {
         semaphore_wait(&worker->sema);
