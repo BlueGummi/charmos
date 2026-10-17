@@ -9,6 +9,12 @@
 
 #include "internal.h"
 
+enum irq_result scheduler_reschedule_isr(void *ctx, uint8_t vec,
+                                         struct irq_context *rsp) {
+    cc_ignore(ctx, vec, rsp);
+    return IRQ_HANDLED;
+}
+
 static size_t scheduler_thread_get_data(struct rbt_node *n) {
     return thread_from_rq_rbt_node(n)->virtual_runtime_left;
 }
@@ -60,6 +66,7 @@ void scheduler_init(void) {
                                 * being mistakenly identified
                                 * as completed */
 
+        cpu_mask_clear_all(&s->deferred_resched_mask);
         s->core_id = i;
         s->tick.func = scheduler_tick;
         s->tick.flags =

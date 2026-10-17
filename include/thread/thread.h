@@ -23,6 +23,7 @@
 #include <sync/lock_chk_types.h>
 #include <sync/rcu.h>
 #include <sync/spinlock.h>
+#include <sync/wroost.h>
 #include <thread/apc_types.h>
 #include <thread/thread_diag.h>
 #include <thread/thread_types.h>
@@ -287,8 +288,8 @@ struct thread {
 
     enum thread_activity_class activity_class : 4;
 
-    enum thread_prio_class base_prio_class : 2; /* for class boosts */
-    enum thread_prio_class perceived_prio_class : 2;
+    enum thread_prio_class perceived_prio_class : THREAD_PRIO_CLASS_BIT_COUNT;
+    enum thread_prio_class base_prio_class; /* for class boosts */
 
     /*
      * Rules with this lock:
@@ -296,14 +297,14 @@ struct thread {
      * This lock is meant to synchronize updates to perceived_prio_class
      * and base_prio_class. It is only meant to be used when
      *
-     * (1) you are updating a thread on another CPU and ALSO have the
-     * runqueue lock held prior to taking this, and will update
+     * (1) you are updating a thread on another CPU OR a non-running thread on THIS CPU
+     * and ALSO have the runqueue lock held prior to taking this, and will update
      * the thread positions after doing this, OR
      *
-     * (2) you are updating a thread on THIS CPU, which it is OK to not
-     * have the runqueue lock held.
+     * (2) you are updating the currently running thread on the calling
+     * CPU, it  is OK to NOT have the runqueue lock held.
      *
-     * In either case, the scheduler will not see an invalid
+     * In any case, the scheduler will not see an invalid
      * perceived_prio_class, and should be able to make decisions
      * based on it, as it would be properly locked.
      */
@@ -376,6 +377,7 @@ struct thread {
     atomic(struct turnstile *) blocked_ts; /* what am I blocked on */
 
     struct climb_thread_state climb_state;
+    struct wroost_thread_state wroost_state;
 
 #ifdef DEBUG_LOCK_CHK
 
@@ -500,7 +502,7 @@ void thread_donate_class(struct thread *boosted, enum thread_prio_class class,
                          struct thread_class_donation *d);
 
 void thread_uninherit_priority(struct thread_class_donation *d);
-void thread_remove_boost();
+void thread_remove_boost(void);
 
 cc_noreturn void thread_exit_with_status(int status);
 

@@ -93,6 +93,7 @@ struct scheduler {
     enum irql locked_irql;
     enum irql other_locked_irql;
 
+    struct cpu_mask deferred_resched_mask;
     struct rt_scheduler_percpu *rt;
 
 #ifdef DEBUG_SCHED
@@ -143,8 +144,8 @@ size_t scheduler_try_push_to_idle_core(struct scheduler *sched);
 
 void scheduler_tick_enable();
 void scheduler_tick_disable();
-enum irq_result scheduler_timer_isr(void *ctx, uint8_t vector,
-                                    struct irq_context *rsp);
+enum irq_result scheduler_reschedule_isr(void *ctx, uint8_t vec,
+                                         struct irq_context *rsp);
 
 /* For a global structure containing central scheduler data */
 struct scheduler_data {
@@ -212,12 +213,34 @@ static inline bool scheduler_core_idle(struct core *c) {
     return atomic_load(&c->idle);
 }
 
+/* NOTE: this function is unsafe to call from context that holds a runqueue
+ * lock. The reason:
+ *
+ * Imagine the following:
+ *     CPU 0 is holding RQ 0's lock
+ *     CPU 0 IPI's CPU 1
+ *     CPU 1, before that IPI arrives, was spinning on
+ *            RQ 0's lock, since it was migrating a thread.
+ *
+ *            Thus, CPU 1 cannot respond to the IPI
+ *            because it has interrupts disabled,
+ *            and will never enter the ISR to ack.
+ *
+ *     CPU 0 spins on waiting for this (uncompletable) IPI to complete
+ *     CPU 1 is also stuck waiting for RQ 0's lock to be relinquished,
+ *           which is something that won't happen because of this
+ *           dependency
+ *
+ *     *boom* deadlock.
+ *
+ *     scheduler core code is supposed to call scheduler_defer_resched()
+ *     defined in the internal header there.
+ */
 static inline void scheduler_force_resched(struct scheduler *sched) {
     scheduler_mark_core_needs_resched(global.cores[sched->core_id], true);
     ipi_send(sched->core_id, IRQ_SCHEDULER);
 }
 
-/* caller has to handle failure */
 static inline bool cc_warn_unused_result
 scheduler_try_force_resched(struct scheduler *sched) {
     scheduler_mark_core_needs_resched(global.cores[sched->core_id], true);

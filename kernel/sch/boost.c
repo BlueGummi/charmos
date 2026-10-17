@@ -16,13 +16,13 @@ void thread_recompute_prio_class_locked(struct thread *t) {
     t->perceived_prio_class = c;
 }
 
-static void thread_class_inc(struct thread *t, enum thread_prio_class class) {
+void thread_class_inc_locked(struct thread *t, enum thread_prio_class class) {
     enforce(class < THREAD_PRIO_CLASS_COUNT);
     enforce(t->class_boosts[class] != UINT16_MAX);
     t->class_boosts[class]++;
 }
 
-static void thread_class_dec(struct thread *t, enum thread_prio_class class) {
+void thread_class_dec_locked(struct thread *t, enum thread_prio_class class) {
     enforce(class < THREAD_PRIO_CLASS_COUNT);
     enforce(t->class_boosts[class] > 0, "class ref underflow");
     t->class_boosts[class]--;
@@ -39,13 +39,13 @@ static bool thread_donation_raise_locked(struct thread *t,
         if (class <= d->class)
             return false;
 
-        thread_class_dec(t, d->class);
+        thread_class_dec_locked(t, d->class);
     }
 
     d->target = t;
     d->class = class;
     d->active = true;
-    thread_class_inc(t, class);
+    thread_class_inc_locked(t, class);
     thread_recompute_prio_class_locked(t);
 
     return t->perceived_prio_class > old;
@@ -53,7 +53,7 @@ static bool thread_donation_raise_locked(struct thread *t,
 
 static void thread_donation_drop_locked(struct thread_class_donation *d) {
     struct thread *t = d->target;
-    thread_class_dec(t, d->class);
+    thread_class_dec_locked(t, d->class);
     thread_recompute_prio_class_locked(t);
 
     d->target = NULL;
@@ -163,7 +163,7 @@ void thread_boost_self(enum thread_prio_class class) {
     struct thread *curr = thread_get_current();
     spin_guard_high(&curr->pi_lock);
 
-    thread_class_inc(curr, class);
+    thread_class_inc_locked(curr, class);
     thread_recompute_prio_class_locked(curr);
 }
 
@@ -171,7 +171,7 @@ void thread_unboost_self(enum thread_prio_class class) {
     struct thread *curr = thread_get_current();
     spin_guard_high(&curr->pi_lock);
 
-    thread_class_dec(curr, class);
+    thread_class_dec_locked(curr, class);
     thread_recompute_prio_class_locked(curr);
 }
 
@@ -180,7 +180,7 @@ void thread_io_boost_locked(struct thread *t) {
 
     if (!t->io_class_boost) {
         t->io_class_boost = true;
-        thread_class_inc(t, THREAD_PRIO_CLASS_URGENT);
+        thread_class_inc_locked(t, THREAD_PRIO_CLASS_URGENT);
     }
 
     thread_recompute_prio_class_locked(t);
@@ -192,11 +192,11 @@ void thread_io_unboost_self(void) {
 
     if (curr->io_class_boost) {
         curr->io_class_boost = false;
-        thread_class_dec(curr, THREAD_PRIO_CLASS_URGENT);
+        thread_class_dec_locked(curr, THREAD_PRIO_CLASS_URGENT);
         thread_recompute_prio_class_locked(curr);
     }
 }
 
-void thread_remove_boost() {
+void thread_remove_boost(void) {
     climb_handle_remove(&thread_get_current()->climb_state.handle);
 }

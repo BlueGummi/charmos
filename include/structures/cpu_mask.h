@@ -241,6 +241,10 @@ static inline size_t cpu_mask_next_clear(const struct cpu_mask *m,
     for (iter = 0; iter < cpu_mask_active_bits(); iter++)                      \
         if (bitmap_test((mask).bits, iter))
 
+#define cpu_mask_for_each_atomic(iter, mask)                                   \
+    for (iter = 0; iter < cpu_mask_active_bits(); iter++)                      \
+        if (bitmap_atomic_test((mask).bits, iter))
+
 #define cpu_mask_for_each_clear(iter, mask)                                    \
     for (iter = 0; iter < cpu_mask_active_bits(); iter++)                      \
         if (!bitmap_test((mask).bits, iter))

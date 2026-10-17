@@ -98,6 +98,8 @@ enum thread_prio_class : uint8_t {
     THREAD_PRIO_CLASS_URGENT = 3,     /* Urgent thread - ran before RT */
 };
 #define THREAD_PRIO_CLASS_COUNT (4)
+#define THREAD_PRIO_CLASS_BIT_COUNT 2
+#define THREAD_PRIO_CLASS_MASK 0x3
 
 /* Different enums are used for the little
  * bit of type safety since different ringbuffers

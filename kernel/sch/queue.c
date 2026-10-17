@@ -79,15 +79,16 @@ void thread_enqueue(struct thread *t) {
     enum irql irql = spin_lock_high(&s->lock);
 
     scheduler_add_thread_locked(s, t);
-    scheduler_force_resched(s);
 
     spin_unlock(&s->lock, irql);
+    scheduler_force_resched(s);
 }
 
 void thread_enqueue_on_core(struct thread *t, uint64_t core_id) {
     struct scheduler *s = global.schedulers[core_id];
     enum irql irql = spin_lock_high(&s->lock);
     scheduler_add_thread_locked(s, t);
-    scheduler_force_resched(s);
     spin_unlock(&s->lock, irql);
+
+    scheduler_force_resched(s);
 }

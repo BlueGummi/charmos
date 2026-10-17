@@ -331,6 +331,10 @@ void irq_init() {
     irq_register("page_fault", IRQ_PAGE_FAULT, page_fault_isr, NULL,
                  IRQ_FLAG_NONE);
 
+    irq_register("scheduler", IRQ_SCHEDULER, scheduler_reschedule_isr, NULL,
+                 IRQ_FLAG_NONE);
+    irq_set_chip(IRQ_SCHEDULER, lapic_get_chip(), NULL);
+
     irq_register("timer", IRQ_TIMER, timer_isr, NULL, IRQ_FLAG_NONE);
     irq_set_chip(IRQ_TIMER, lapic_get_chip(), NULL);
 

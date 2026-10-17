@@ -23,6 +23,7 @@ void thread_migrate(struct thread *t, size_t dest_core) TSA_NO_ANALYSIS {
 
     enum irql sirql, dirql, tirql;
 
+    struct scheduler *to_force_resched = NULL;
     struct scheduler *src;
     struct scheduler *dst = global.schedulers[dest_core];
 
@@ -48,11 +49,11 @@ void thread_migrate(struct thread *t, size_t dest_core) TSA_NO_ANALYSIS {
     if (thread_get_state(t) == THREAD_STATE_RUNNING ||
         !(thread_get_flags(t) & THREAD_FLAG_YIELDED)) {
         thread_set_migration_target(t, dest_core);
-        scheduler_force_resched(dst);
+        to_force_resched = dst;
     } else if (thread_get_state(t) == THREAD_STATE_READY) {
         scheduler_remove_thread_locked(src, t);
         scheduler_add_thread_locked(dst, t);
-        scheduler_force_resched(dst);
+        to_force_resched = dst;
     }
 
     thread_set_runqueue(t, dst);
@@ -63,4 +64,7 @@ out:
 
 end:
     thread_unlock_thread_and_rq(src, dst, sirql, dirql);
+
+    if (to_force_resched)
+        scheduler_force_resched(to_force_resched);
 }

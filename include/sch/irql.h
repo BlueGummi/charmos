@@ -162,6 +162,7 @@ STRINGIFY_DECLARE_ENUM(irql) {
     }
 }
 
+/* TODO: crash codes and irql_assert_gt/lt */
 enum irql irql_raise(enum irql new_level) TSA_ACQUIRES(IRQL_RAISED);
 void irql_lower(enum irql old_level) TSA_RELEASES(IRQL_RAISED);
 

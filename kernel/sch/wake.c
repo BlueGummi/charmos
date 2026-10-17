@@ -35,6 +35,9 @@ static void resume_thread(struct thread *t, enum thread_resume_reason reason,
                           bool completion) TSA_NO_ANALYSIS {
     enum irql birql, lirql;
 
+    /* Force reschedule OUTSIDE of any runqueue locks to avoid deadlocking */
+    struct scheduler *to_force_resched = NULL;
+
     struct scheduler *best = scheduler_select_best_for_thread(t);
     struct scheduler *last;
     thread_lock_thread_and_rq(t, best, &last, &lirql, &birql);
@@ -51,7 +54,7 @@ static void resume_thread(struct thread *t, enum thread_resume_reason reason,
                thread_get_wait_type(t) != THREAD_WAIT_INTERRUPTIBLE) {
 
         if (state == THREAD_STATE_RUNNING || state == THREAD_STATE_READY)
-            scheduler_force_resched(last);
+            to_force_resched = last;
 
         goto out;
     }
@@ -89,9 +92,9 @@ static void resume_thread(struct thread *t, enum thread_resume_reason reason,
         if (last != best)
             thread_post_migrate(t, last->core_id, best->core_id);
 
-        scheduler_force_resched(best);
+        to_force_resched = best;
     } else if (!completion) {
-        scheduler_force_resched(last);
+        to_force_resched = last;
     }
 
     spin_unlock(&t->pi_lock, pirql);
@@ -101,6 +104,9 @@ out:
 
 end:
     thread_unlock_thread_and_rq(last, best, lirql, birql);
+
+    if (to_force_resched)
+        scheduler_force_resched(to_force_resched);
 }
 
 void scheduler_complete_object_wait(struct thread *t,

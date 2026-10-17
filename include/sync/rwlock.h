@@ -27,6 +27,15 @@
  * a - waiter bit     -> threads are waiting on the lock
  * W - writer want    -> a writer wants the lock
  * R - reader count   -> used to store the number of readers
+ *                    |
+ *                    |  The way the reader count actually works,
+ *                    |  though, is that it uses the base priority
+ *                    |  of the reader to create multiple separate
+ *                    |  counters that are all the same few bits,
+ *                    |  so writers have an exact snapshot of
+ *                    |  who is reading the lock.
+ *                    |
+ *
  * m - max prio class -> panic if reader > this
  *
  * %%%% - pointer to owner thread

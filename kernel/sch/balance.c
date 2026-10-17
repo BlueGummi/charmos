@@ -250,7 +250,7 @@ out:
     spin_unlock_raw(&other->lock);
 
     if (migrated)
-        scheduler_force_resched(other);
+        scheduler_defer_resched(other);
 
     return migrated;
 }

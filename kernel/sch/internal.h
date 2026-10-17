@@ -253,8 +253,12 @@ scheduler_release_two_raw_locks(struct scheduler *a,
     }
 }
 
+static inline void scheduler_defer_resched(struct scheduler *target) {
+    cpu_mask_set(&smp_core_scheduler()->deferred_resched_mask, target->core_id);
+}
+
 /* Internal use only */
-void scheduler_switch_in();
+void scheduler_switch_in(void);
 
 /* NOTE: This is merely a place to hook things into.
  * The actual CPU that calls this is undefined */
@@ -265,3 +269,5 @@ void scheduler_complete_object_wait(struct thread *t,
                                     enum thread_resume_reason reason);
 
 void scheduler_resume_for_apc(struct thread *t);
+void thread_class_inc_locked(struct thread *t, enum thread_prio_class class);
+void thread_class_dec_locked(struct thread *t, enum thread_prio_class class);

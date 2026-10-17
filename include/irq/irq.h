@@ -18,8 +18,8 @@
 #define IRQ_GPF 0xD
 #define IRQ_PAGE_FAULT 0xE
 #define IRQ_TIMER 0x20
-#define IRQ_SCHEDULER IRQ_TIMER
 #define IRQ_TLB_SHOOTDOWN 0x22
+#define IRQ_SCHEDULER 0x23
 #define IRQ_NOP 0x24
 #define IRQ_DPC 0x25
 #define IRQ_EXCEPTION_COUNT 32

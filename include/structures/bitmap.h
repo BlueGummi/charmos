@@ -27,6 +27,9 @@ typedef uint64_t bitmap_word_t;
 #define BITMAP_DECLARE(name, nbits)                                            \
     bitmap_word_t name[BITMAP_WORDS_CONST(nbits)]
 
+#define BITMAP_DECLARE_ATOMIC(name, nbits)                                     \
+    atomic(bitmap_word_t) name[BITMAP_WORDS_CONST(nbits)]
+
 #define BITMAP_WORD_INDEX(bit) ((bit) / BITMAP_BITS_PER_WORD)
 #define BITMAP_BIT_OFFSET(bit) ((bit) % BITMAP_BITS_PER_WORD)
 #define BITMAP_BIT_MASK(bit) ((bitmap_word_t) BIT(BITMAP_BIT_OFFSET(bit)))
@@ -229,19 +232,17 @@ static inline size_t bitmap_weight(const bitmap_word_t *map, size_t nbits) {
     size_t words = BITMAP_WORDS(nbits);
     size_t count = 0;
 
-    if (words == 0) {
+    if (words == 0)
         return 0;
-    }
 
-    for (size_t i = 0; i < words - 1; i++) {
+    for (size_t i = 0; i < words - 1; i++)
         count += (size_t) ci_popcountll(map[i]);
-    }
 
     size_t rem = nbits % BITMAP_BITS_PER_WORD;
     bitmap_word_t last = map[words - 1];
-    if (rem) {
+    if (rem)
         last &= ((bitmap_word_t) 1 << rem) - 1;
-    }
+
     count += (size_t) ci_popcountll(last);
 
     return count;
@@ -274,9 +275,8 @@ static inline size_t bitmap_find_first_zero(const bitmap_word_t *map,
 
 static inline size_t bitmap_find_next_bit(const bitmap_word_t *map,
                                           size_t nbits, size_t start) {
-    if (start >= nbits) {
+    if (start >= nbits)
         return nbits;
-    }
 
     size_t word_index = BITMAP_WORD_INDEX(start);
     size_t bit_offset = BITMAP_BIT_OFFSET(start);
@@ -300,9 +300,8 @@ static inline size_t bitmap_find_next_bit(const bitmap_word_t *map,
 
 static inline size_t bitmap_find_next_zero_bit(const bitmap_word_t *map,
                                                size_t nbits, size_t start) {
-    if (start >= nbits) {
+    if (start >= nbits)
         return nbits;
-    }
 
     size_t word_index = BITMAP_WORD_INDEX(start);
     size_t bit_offset = BITMAP_BIT_OFFSET(start);

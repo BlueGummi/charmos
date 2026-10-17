@@ -167,8 +167,8 @@ static inline bool migrate_to_destination(struct thread *t, time_ms_t time) {
     thread_set_runqueue(t, other);
 
     /* An idle destination sits in a tickless hlt and won't look at its
-     * runqueue until its next interrupt, so tell it the thread is there */
-    scheduler_force_resched(other);
+     * runqueue until its next interrupt, gotta go bother it */
+    scheduler_defer_resched(other);
 
     thread_post_migrate(t, us->core_id, dst);
     return true;
@@ -394,7 +394,7 @@ void schedule(void) TSA_NO_ANALYSIS {
     context_switch(curr, next);
 }
 
-void scheduler_switch_in() TSA_NO_ANALYSIS {
+void scheduler_switch_in(void) TSA_NO_ANALYSIS {
     struct scheduler *us = smp_core_scheduler();
     struct scheduler *other = us->other_locked;
     us->other_locked = NULL;
@@ -409,6 +409,19 @@ void scheduler_switch_in() TSA_NO_ANALYSIS {
         scheduler_release_two_locks(us, other, us->locked_irql,
                                     us->other_locked_irql);
     }
+
+    /* Once the locks are dropped, we need to go bother
+     * all deferred reschedule requests since it's
+     * safe to do so (preemption would be disabled still)
+     *
+     * We actually can't enforce(irql_get() == IRQL_DISPATCH_LEVEL) because
+     * early reschedules before IRQL availability would report NONE, but it's
+     * pretty easy to see that any code calling this would be at DISPATCH */
+    cpu_id_t i;
+    cpu_mask_for_each(i, us->deferred_resched_mask)
+        scheduler_force_resched(global.schedulers[i]);
+
+    cpu_mask_clear_all(&us->deferred_resched_mask);
 
     struct thread *drop = us->drop_last_ref;
     us->drop_last_ref = NULL;

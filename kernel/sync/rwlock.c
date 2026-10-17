@@ -167,6 +167,29 @@ void rwlock_init_chk_full(struct rwlock *lock, enum thread_prio_class ceiling,
     rwlock_chk_state_init(lock, class, flags);
 }
 
+/* This prevents a lock that cannot possibly have a lower reader
+ * from going through the dance of hunting down CPUs to IPI */
+static bool rwlock_has_lower_readers_than(struct rwlock *lock,
+                                          enum thread_prio_class prio) {
+    /* This is called from the writer's context, once the
+     * RWLOCK_WRITER_WANT_BIT is set. No more readers
+     * can get the lock after this point, so it is
+     * safe to snapshot the lock word like this */
+    uintptr_t word = RWLOCK_READ_LOCK_WORD(lock);
+    uintptr_t lower_mask =
+        rwlock_make_one_reader_count(prio) - BIT(RWLOCK_READ_BIT_IDX);
+    return (word & lower_mask) != 0;
+}
+
+/* TODO:
+ *
+ * When a reader enters a rwlock, its base priority class CANNOT change.
+ *
+ * There's currently no code that changes base priorities after
+ * threads get enqueued, however, we do need to remember that there
+ * are only "safe states" that allow it to change, like lock_nesting == 0.
+ *
+ */
 void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
                   enum lock_subclass subclass,
                   const struct lock_chk_site *site) TSA_NO_ANALYSIS {
@@ -199,9 +222,10 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
             "rwlock prio ceiling cannot be 0 (background)");
 
     struct thread *curr = thread_get_current();
+    enum thread_prio_class base_class = curr->base_prio_class;
 
     /* fastpath */
-    if (rwlock_try_lock(lock, curr, acq_type)) {
+    if (rwlock_try_lock(lock, curr, acq_type, base_class)) {
         if (acq_type == RWLOCK_READ)
             thread_boost_self(RWLOCK_GET_PRIO_CEIL(lword));
 #ifdef DEBUG_LOCK_CHK
@@ -235,7 +259,7 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
      */
     while (true) {
         if (!RWLOCK_BUSY(old = RWLOCK_READ_LOCK_WORD(lock), busy_mask)) {
-            if (rwlock_try_lock(lock, curr, acq_type))
+            if (rwlock_try_lock(lock, curr, acq_type, base_class))
                 break;
 
             backoff = rwlock_get_backoff(backoff);
@@ -287,6 +311,7 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
             /* Same idea as mutex.c */
             thread_putref(owner);
         }
+
         turnstile_block(ts, queue, lock, irql_out, owner);
 
         /* when we wake up, we will have the lock handed off to us... */
@@ -314,7 +339,7 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
  * grant the lock to readers with the same or higher priority than the highest
  * priority writer...
  */
-size_t rwlock_get_readers_to_wake(struct turnstile *ts) {
+uintptr_t rwlock_get_readers_to_wake(struct turnstile *ts, size_t *raw_count) {
     struct rbt_node *wnode, *rnode, *iter;
     struct thread *writer = NULL;
 
@@ -331,6 +356,7 @@ size_t rwlock_get_readers_to_wake(struct turnstile *ts) {
      * increment the count of readers to wake */
     int32_t prio_to_beat = writer ? writer->wq_prio : -1;
     size_t to_wake = 0;
+    *raw_count = 0;
 
     rbt_for_each_reverse(iter, &ts->queues[TURNSTILE_READER_QUEUE]) {
         struct thread *check_reader = thread_from_wq_rbt_node(iter);
@@ -341,13 +367,16 @@ size_t rwlock_get_readers_to_wake(struct turnstile *ts) {
         if (prio < prio_to_beat)
             break;
 
-        to_wake++;
+        to_wake += rwlock_make_one_reader_count(check_reader->base_prio_class);
+        *raw_count = *raw_count + 1;
     }
 
     return to_wake;
 }
 
-static uintptr_t rwlock_unlock_get_val_to_sub(struct rwlock *lock) {
+static uintptr_t
+rwlock_unlock_get_val_to_sub(struct rwlock *lock,
+                             enum thread_prio_class base_class) {
     struct thread *current_thread = thread_get_current();
     uintptr_t lock_word = RWLOCK_READ_LOCK_WORD(lock);
     if (RWLOCK_WRITER_HELD(lock_word)) {
@@ -361,7 +390,7 @@ static uintptr_t rwlock_unlock_get_val_to_sub(struct rwlock *lock) {
         if ((lock_word & RWLOCK_READER_COUNT_MASK) == 0)
             rwlock_panic("reader unlocked with no readers left on lock", lock);
 
-        return RWLOCK_READER_COUNT_ONE;
+        return rwlock_make_one_reader_count(base_class);
     }
 }
 
@@ -392,9 +421,12 @@ void rw_unlock_full(struct rwlock *lock,
     size_t backoff = RWLOCK_BACKOFF_DEFAULT;
     size_t looped = 0;
 
+    struct thread *curr = thread_get_current();
+    enum thread_prio_class base_class = curr->base_prio_class;
+
     /* we can cheekily use this to figure out what to "subtract from the
      * lock" to determine what the lock word should be on unlock CAS */
-    uintptr_t val_to_subtract = rwlock_unlock_get_val_to_sub(lock);
+    uintptr_t val_to_subtract = rwlock_unlock_get_val_to_sub(lock, base_class);
 
     while (true) {
         uintptr_t old = RWLOCK_READ_LOCK_WORD(lock);
@@ -429,7 +461,8 @@ void rw_unlock_full(struct rwlock *lock,
         struct rbt_node *wnode = rbt_last(&ts->queues[TURNSTILE_WRITER_QUEUE]);
 
         struct thread *writer = wnode ? thread_from_wq_rbt_node(wnode) : NULL;
-        size_t to_wake = rwlock_get_readers_to_wake(ts);
+        size_t to_wake;
+        uintptr_t to_wake_ctr = rwlock_get_readers_to_wake(ts, &to_wake);
 
         if (writer && to_wake == 0) {
             /* directly transfer ownership to the very next writer */
@@ -445,7 +478,7 @@ void rw_unlock_full(struct rwlock *lock,
             turnstile_wake_handoff(ts, TURNSTILE_WRITER_QUEUE, irql_out);
         } else {
             /* give the lock to all waiters at once */
-            new = to_wake * RWLOCK_READER_COUNT_ONE;
+            new = to_wake_ctr;
 
             if (ts->waiters > to_wake)
                 new |= RWLOCK_WAITER_BIT;
