@@ -22,12 +22,10 @@ typedef void (*dpc_fanout_fn_t)(void);
 
 struct dpc_queue {
     atomic(struct dpc *) head;
-    atomic_size_t count;
 };
 
 /* Per-cpu DPC data */
 struct dpc_cpu {
-    atomic_bool ipi_queued;
     struct dpc_queue queue;
 };
 

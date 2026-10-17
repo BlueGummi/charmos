@@ -54,11 +54,18 @@ void dpc_drain_local(void) {
     size_t cpu = me->id;
     struct dpc_cpu *dc = &global.dpc_data[cpu];
 
+again:
     do {
         dpc_execute_all_in_queue(&dc->queue);
     } while (atomic_load_rlx(&dc->queue.head) != NULL);
 
     atomic_store(&me->executing_dpcs, false);
+
+    /* If an IPI lands here, we need to go do it again,
+     * so we don't lose a DPC */
+    if (atomic_load(&dc->queue.head) != NULL &&
+        !atomic_exchange(&me->executing_dpcs, true))
+        goto again;
 }
 
 void dpc_run_local(void) {
