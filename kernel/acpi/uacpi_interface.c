@@ -134,6 +134,21 @@ void uacpi_kernel_sleep(uacpi_u64 msec) {
         uacpi_kernel_stall(100);
 }
 
+struct uacpi_irq_shim {
+    uacpi_interrupt_handler handler;
+    uacpi_handle ctx;
+};
+
+static struct uacpi_irq_shim uacpi_irq_shims[256];
+
+static enum irq_result uacpi_irq_trampoline(struct irq_context *ictx,
+                                            void *data) {
+    cc_ignore(ictx);
+    struct uacpi_irq_shim *shim = data;
+    return shim->handler(shim->ctx) == UACPI_INTERRUPT_HANDLED ? IRQ_HANDLED
+                                                               : IRQ_NONE;
+}
+
 uacpi_status uacpi_kernel_install_interrupt_handler(
     uacpi_u32 irq, uacpi_interrupt_handler handler, uacpi_handle ctx,
     uacpi_handle *out_irq_handle) {
@@ -142,7 +157,10 @@ uacpi_status uacpi_kernel_install_interrupt_handler(
     if (irq >= 256)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    irq_register("uacpi", irq, (void *) handler, ctx, IRQ_FLAG_NONE);
+    uacpi_irq_shims[irq].handler = handler;
+    uacpi_irq_shims[irq].ctx = ctx;
+    irq_register("uacpi", irq, uacpi_irq_trampoline, &uacpi_irq_shims[irq],
+                 IRQ_FLAG_NONE);
 
     if (out_irq_handle)
         *out_irq_handle = (uacpi_handle) (uintptr_t) irq;

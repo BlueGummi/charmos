@@ -29,17 +29,17 @@ TEST_DEFINE_UNIT(climb, pressure_cubic_curve, TEST_INTENSITY(20, 100, 1000)) {
     return TEST_SUCCESS;
 }
 
-static struct climb_thread_state climb_keyed(int32_t periods,
-                                             climb_pressure_t direct) {
-    struct climb_thread_state cts = {0};
+static struct climb_thread_data climb_keyed(int32_t periods,
+                                            climb_pressure_t direct) {
+    struct climb_thread_data cts = {0};
     cts.pressure_periods = periods;
     cts.direct_pressure = direct;
     rbt_init_node(&cts.climb_node);
     return cts;
 }
 
-static int32_t climb_cmp(struct climb_thread_state *a,
-                         struct climb_thread_state *b) {
+static int32_t climb_cmp(struct climb_thread_data *a,
+                         struct climb_thread_data *b) {
     return climb_cmp_threads(&a->climb_node, &b->climb_node);
 }
 
@@ -48,10 +48,10 @@ TEST_DEFINE_UNIT(climb, tree_key_orders_by_pressure,
                  TEST_INTENSITY(8, 64, 4096)) {
     size_t steps = ctx->intensity_val ? ctx->intensity_val : 64;
 
-    struct climb_thread_state prev = climb_keyed(1, 0);
+    struct climb_thread_data prev = climb_keyed(1, 0);
     for (size_t i = 1; i <= steps; i++) {
         climb_pressure_t p = fx_div(fx_from_int(i), fx_from_int(steps));
-        struct climb_thread_state curr = climb_keyed(1, p);
+        struct climb_thread_data curr = climb_keyed(1, p);
 
         TEST_ASSERT_LT_S(climb_cmp(&prev, &curr), 0);
         TEST_ASSERT_GT_S(climb_cmp(&curr, &prev), 0);
@@ -59,8 +59,8 @@ TEST_DEFINE_UNIT(climb, tree_key_orders_by_pressure,
     }
 
     /* the two values that used to collide */
-    struct climb_thread_state zero = climb_keyed(1, 0);
-    struct climb_thread_state full = climb_keyed(1, CLIMB_PRESSURE_MAX);
+    struct climb_thread_data zero = climb_keyed(1, 0);
+    struct climb_thread_data full = climb_keyed(1, CLIMB_PRESSURE_MAX);
     TEST_ASSERT_LT_S(climb_cmp(&zero, &full), 0);
 
     return TEST_SUCCESS;
@@ -72,9 +72,9 @@ TEST_DEFINE_UNIT(climb, tree_key_comparator_is_consistent,
 
     for (size_t i = 0; i <= steps; i++) {
         for (size_t j = 0; j <= steps; j++) {
-            struct climb_thread_state a = climb_keyed(
+            struct climb_thread_data a = climb_keyed(
                 (int32_t) i - 2, fx_div(fx_from_int(i), fx_from_int(steps)));
-            struct climb_thread_state b = climb_keyed(
+            struct climb_thread_data b = climb_keyed(
                 (int32_t) j - 2, fx_div(fx_from_int(j), fx_from_int(steps)));
 
             int32_t ab = climb_cmp(&a, &b);
@@ -96,21 +96,21 @@ TEST_DEFINE_UNIT(climb, tree_key_comparator_is_consistent,
 }
 
 TEST_DEFINE_UNIT(climb, tree_key_trades_periods_against_pressure) {
-    struct climb_thread_state waited = climb_keyed(3, 0);
-    struct climb_thread_state pressured = climb_keyed(1, CLIMB_PRESSURE_MAX);
+    struct climb_thread_data waited = climb_keyed(3, 0);
+    struct climb_thread_data pressured = climb_keyed(1, CLIMB_PRESSURE_MAX);
 
     /* two extra periods == one full pressure point */
     TEST_ASSERT_EQ_S(climb_cmp(&waited, &pressured), 0);
 
     /* one more period breaks the tie towards the thread that waited */
-    struct climb_thread_state waited_longer = climb_keyed(4, 0);
+    struct climb_thread_data waited_longer = climb_keyed(4, 0);
     TEST_ASSERT_GT_S(climb_cmp(&waited_longer, &pressured), 0);
 
-    struct climb_thread_state decaying = climb_keyed(-1, CLIMB_PRESSURE_MAX);
-    struct climb_thread_state active = climb_keyed(1, CLIMB_PRESSURE_MAX);
+    struct climb_thread_data decaying = climb_keyed(-1, CLIMB_PRESSURE_MAX);
+    struct climb_thread_data active = climb_keyed(1, CLIMB_PRESSURE_MAX);
     TEST_ASSERT_LT_S(climb_cmp(&decaying, &active), 0);
 
-    struct climb_thread_state fresh = climb_keyed(1, 0);
+    struct climb_thread_data fresh = climb_keyed(1, 0);
     TEST_ASSERT_EQ_S(climb_cmp(&decaying, &fresh), 0);
 
     return TEST_SUCCESS;

@@ -102,7 +102,8 @@ struct apc_wait_case {
     uint64_t epoch;
 };
 
-static void satisfy_during_apc(void *arg) {
+static void satisfy_during_apc(struct apc_context *ac, void *arg) {
+    cc_ignore(ac);
     struct apc_wait_case *c = arg;
     struct thread *t = thread_get_current();
     enum irql irql = spin_lock_high(&t->wait_lock);

@@ -13,6 +13,7 @@
                       * we should consider moving it out of this */
 #include <sch/climb.h>
 #include <sch/rt_sched_types.h>
+#include <sch/wroost.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -23,7 +24,6 @@
 #include <sync/lock_chk_types.h>
 #include <sync/rcu.h>
 #include <sync/spinlock.h>
-#include <sync/wroost.h>
 #include <thread/apc_types.h>
 #include <thread/thread_diag.h>
 #include <thread/thread_types.h>
@@ -202,7 +202,12 @@ struct thread {
      * in mind that all nodes get need to get
      * reset if unions are to be used */
 
-    struct crash_perthread crash_data;
+#ifdef DEBUG_CRASH
+
+    struct crash_thread_data crash_data;
+
+#endif
+
     struct list_node reaper_list; /* reaper list */
     struct list_node thread_list; /* global list of threads */
 
@@ -219,13 +224,11 @@ struct thread {
     };
 
     /* Waitqueue nodes */
-    struct rbt_node wq_tree_node;        /* waitqueue tree node */
-    int32_t wq_prio;                     /* turnstile sort key
-                                          * TODO: there is probably a smarter way
-                                          */
-    struct list_node wq_list_node;       /* waitqueue list node */
-    struct pairing_node wq_pairing_node; /* waitqueue pairing node */
-
+    struct rbt_node wq_tree_node;   /* waitqueue tree node */
+    int32_t wq_prio;                /* turnstile sort key
+                                     * TODO: there is probably a smarter way
+                                     */
+    struct list_node wq_list_node;  /* waitqueue list node */
     struct list_node rcu_list_node; /* blocked reader node on RCU leaf */
 
     /* ========== State ========== */
@@ -236,9 +239,7 @@ struct thread {
     /* Who is running us? */
     cpu_id_t curr_core; /* -1 if not being ran */
 
-    cpu_id_t core_to_wake_on; /* When I run again, where should I be placed?
-                               * -1 if the scheduler should select the most
-                               * optimal core */
+    /* TODO: implement a core_to_wake_on */
 
     atomic(struct scheduler *) scheduler;
 
@@ -376,8 +377,8 @@ struct thread {
     struct turnstile *turnstile;           /* my turnstile */
     atomic(struct turnstile *) blocked_ts; /* what am I blocked on */
 
-    struct climb_thread_state climb_state;
-    struct wroost_thread_state wroost_state;
+    struct climb_thread_data climb_data;
+    struct wroost_thread_data wroost_data;
 
 #ifdef DEBUG_LOCK_CHK
 

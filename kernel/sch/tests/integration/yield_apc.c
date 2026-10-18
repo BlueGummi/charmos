@@ -7,7 +7,8 @@ static atomic_bool yd_apc_ran = false;
 static atomic_uint yd_nesting_at_delivery = YIELD_APC_NO_READING;
 static atomic_bool yd_gave_up = false;
 
-static void yd_apc(void *arg) {
+static void yd_apc(struct apc_context *ac, void *arg) {
+    cc_ignore(ac);
     cc_ignore(arg);
     atomic_store(&yd_nesting_at_delivery,
                  scheduler_yield_nesting(thread_get_current()));

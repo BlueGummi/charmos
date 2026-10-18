@@ -208,8 +208,7 @@ void ata_select_drive(struct ata_drive *ata_drive);
 void ata_soft_reset(struct ata_drive *ata_drive);
 bool atapi_identify(struct ata_drive *ide);
 void ata_init(struct pci_device *devices, uint64_t count);
-enum irq_result ide_irq_handler(void *ctx, irq_t irq_num,
-                                struct irq_context *ct);
+enum irq_result ide_irq_handler(struct irq_context *ct, void *ctx);
 void ide_reorder(struct block_device *disk);
 bool ide_submit_bio_async(struct block_device *d, struct bio_request *b);
 struct block_device *atapi_create_generic(struct ata_drive *d);

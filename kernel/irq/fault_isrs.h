@@ -2,9 +2,9 @@
 #include <console/panic.h>
 
 #define MAKE_HANDLER(handler_name, message)                                    \
-    enum irq_result handler_name##_handler(void *ctx, uint8_t vector,          \
-                                           struct irq_context *rsp) {          \
-        cc_ignore(ctx, vector);                                                \
+    enum irq_result handler_name##_handler(struct irq_context *rsp,            \
+                                           void *ctx) {                        \
+        cc_ignore(ctx);                                                        \
         struct crash_regs pregs;                                               \
         irq_context_to_crash_regs(rsp->regs, &pregs);                          \
         char msg[CRASH_MSG_MAX];                                               \
@@ -22,9 +22,8 @@
         return IRQ_HANDLED;                                                    \
     }
 
-enum irq_result gpf_handler(void *ctx, uint8_t vector,
-                            struct irq_context *ictx) {
-    cc_ignore(ctx, vector);
+enum irq_result gpf_handler(struct irq_context *ictx, void *ctx) {
+    cc_ignore(ctx);
 
     uint64_t core = smp_id_raw();
     struct irq_registers *rsp = ictx->regs;
@@ -86,9 +85,8 @@ MAKE_HANDLER(breakpoint, "Breakpoint");
 MAKE_HANDLER(ss, "STACK SEGMENT FAULT");
 MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 
-enum irq_result panic_nmi_isr(void *ctx, uint8_t vector,
-                              struct irq_context *rsp) {
-    cc_ignore(vector);
+enum irq_result panic_nmi_isr(struct irq_context *rsp, void *ctx) {
+    cc_ignore(rsp, ctx);
     if (atomic_load(&global.panicked)) {
         if (crash_cpu_is_owner(smp_id_raw()))
             return IRQ_HANDLED;
@@ -99,9 +97,8 @@ enum irq_result panic_nmi_isr(void *ctx, uint8_t vector,
     return IRQ_NONE;
 }
 
-enum irq_result hw_error_nmi_isr(void *ctx, uint8_t vector,
-                                 struct irq_context *ictx) {
-    cc_ignore(ctx, vector, ictx);
+enum irq_result hw_error_nmi_isr(struct irq_context *ictx, void *ctx) {
+    cc_ignore(ctx, ictx);
     uint8_t port61 = inb(0x61);
     if (port61 & 0xC0) {
         char msg[CRASH_MSG_MAX];
@@ -121,15 +118,13 @@ enum irq_result hw_error_nmi_isr(void *ctx, uint8_t vector,
     return IRQ_NONE;
 }
 
-enum irq_result nop_handler(void *ctx, uint8_t vector,
-                            struct irq_context *rsp) {
-    cc_ignore(ctx, vector, rsp);
+enum irq_result nop_handler(struct irq_context *ictx, void *ctx) {
+    cc_ignore(ctx, ictx);
     return IRQ_HANDLED;
 }
 
-enum irq_result dpc_handler(void *ctx, uint8_t vector,
-                            struct irq_context *rsp) {
+enum irq_result dpc_handler(struct irq_context *rsp, void *ctx) {
     scheduler_mark_self_needs_run_dpcs(true);
-    cc_ignore(ctx, vector, rsp);
+    cc_ignore(ctx, rsp);
     return IRQ_HANDLED;
 }

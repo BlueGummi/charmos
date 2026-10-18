@@ -331,9 +331,8 @@ static void rcu_irq_free_cb(struct rcu_cb *cb) {
     atomic_store_release(&rcu_irq_freed, true);
 }
 
-static enum irq_result rcu_irq_reader(void *ctx, uint8_t vector,
-                                      struct irq_context *ictx) {
-    cc_ignore(ctx, vector, ictx);
+static enum irq_result rcu_irq_reader(struct irq_context *ictx, void *ctx) {
+    cc_ignore(ctx, ictx);
 
     rcu_read_lock();
     struct rcu_irq_node *p = rcu_dereference(rcu_irq_shared);

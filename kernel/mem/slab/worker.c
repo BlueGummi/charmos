@@ -29,7 +29,9 @@ static enum daemon_thread_command slab_background_work(void *a, void *b) {
  * mean that this can be MPSC, which is what we're looking to be
  * able to pull off here.
  */
-static void slab_defer_free_dpc(void *unused_arg, void *unused_arg2) {
+static void slab_defer_free_dpc(struct dpc_context *dc, void *unused_arg,
+                                void *unused_arg2) {
+    cc_ignore(dc);
     cc_ignore(unused_arg2);
     cc_ignore(unused_arg);
     struct slab_percpu_cache *c = slab_percpu_cache_local();

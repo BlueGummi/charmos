@@ -1,6 +1,7 @@
 #include <atomic.h>
 #include <enforce.h>
 #include <mem/alloc.h>
+#include <mem/nofail.h>
 #include <sch/sched.h>
 #include <smp/core.h>
 #include <stdint.h>
@@ -34,7 +35,8 @@ static void dpc_execute_all_in_queue(struct dpc_queue *dq) {
         while (it) {
             struct dpc *next = atomic_load_rlx(&it->next);
             atomic_store_release(&it->enqueued, false);
-            it->func(it->a, it->b);
+            struct dpc_context dc = {.dpc = it};
+            it->func(&dc, it->a, it->b);
             it = next;
         }
     }
@@ -112,15 +114,13 @@ bool dpc_enqueue_on_cpu(size_t cpu, struct dpc *d) {
     return true;
 }
 
-/* Convenience: enqueue on current cpu */
 bool dpc_enqueue_local(struct dpc *d) {
-    /* Snapshot it */
-    bool ret = dpc_enqueue_on_cpu(smp_id_raw(), d);
-    return ret;
+    return dpc_enqueue_on_cpu(smp_id_raw(), d);
 }
 
 void dpc_init_percpu(void) {
-    global.dpc_data = vnews(global.dpc_data, global.core_count, ALLOC_ZERO);
+    global.dpc_data =
+        nofail_vnews(global.dpc_data, global.core_count, ALLOC_ZERO);
     size_t i;
     for_each_cpu_id(i) {
         atomic_store_rlx(&global.dpc_data[i].queue.head, NULL);
@@ -145,7 +145,8 @@ struct dpc *dpc_create(dpc_func_t fn, void *a, void *b) {
     return dpc_init(d, fn, a, b);
 }
 
-static void dpc_fanout_wrapper(void *fn, void *latch) {
+static void dpc_fanout_wrapper(struct dpc_context *dc, void *fn, void *latch) {
+    cc_ignore(dc);
     any_fn_to(any_fn_from_data(fn), dpc_fanout_fn_t)();
     once_latch_count_down((struct once_latch *) latch);
 }

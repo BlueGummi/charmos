@@ -60,7 +60,7 @@ struct climb_handle {
     struct thread *given_to;
 };
 
-struct climb_thread_state {
+struct climb_thread_data {
     /* pressure */
     climb_pressure_t direct_pressure;   /* Contributed direct pressure */
     climb_pressure_t indirect_pressure; /* Indirect pressure from others */
@@ -90,8 +90,8 @@ struct climb_thread_state {
      * what would it "apply"? */
     struct climb_handle handle;
 };
-#define climb_thread_state_from_tree_node(tn)                                  \
-    (container_of(tn, struct climb_thread_state, climb_node))
+#define climb_thread_data_from_tree_node(tn)                                   \
+    (container_of(tn, struct climb_thread_data, climb_node))
 
 struct climb_source {
     char *name;

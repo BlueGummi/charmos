@@ -8,7 +8,8 @@ TEST_GROUP_DEFINE(apc, .intensity_desc = {
 static atomic_bool apc_ran = false;
 static atomic_uint apc_destroyed = 0;
 
-static void the_apc(void *arg) {
+static void the_apc(struct apc_context *ac, void *arg) {
+    cc_ignore(ac);
     cc_ignore(arg);
     atomic_store(&apc_ran, true);
 }
@@ -86,7 +87,8 @@ static atomic_bool apc_cancel_release = false;
 static atomic_bool apc_cancel_ran = false;
 static atomic_uint apc_cancel_destroyed = 0;
 
-static void cancelled_apc(void *arg) {
+static void cancelled_apc(struct apc_context *ac, void *arg) {
+    cc_ignore(ac);
     cc_ignore(arg);
     atomic_store(&apc_cancel_ran, true);
 }
@@ -140,7 +142,8 @@ static atomic_bool apc_rundown_release = false;
 static atomic_bool apc_rundown_ran = false;
 static atomic_uint apc_rundown_destroyed = 0;
 
-static void rundown_apc(void *arg) {
+static void rundown_apc(struct apc_context *ac, void *arg) {
+    cc_ignore(ac);
     cc_ignore(arg);
     atomic_store(&apc_rundown_ran, true);
 }
@@ -190,7 +193,8 @@ TEST_DEFINE_INTEGRATION(apc, thread_rundown_releases_queue_ref) {
 static atomic_uint apc_reuse_ran = 0;
 static atomic_uint apc_reuse_destroyed = 0;
 
-static void reused_apc(void *arg) {
+static void reused_apc(struct apc_context *ac, void *arg) {
+    cc_ignore(ac);
     cc_ignore(arg);
     atomic_inc(&apc_reuse_ran);
 }
@@ -240,7 +244,8 @@ static atomic_bool apc_race_settled = false;
 static atomic_uint apc_race_ran = 0;
 static atomic_uint apc_race_destroyed = 0;
 
-static void raced_apc(void *arg) {
+static void raced_apc(struct apc_context *ac, void *arg) {
+    cc_ignore(ac);
     cc_ignore(arg);
     atomic_inc(&apc_race_ran);
 }
@@ -294,7 +299,8 @@ TEST_DEFINE_INTEGRATION(apc, cancel_races_delivery) {
 
 static atomic_uint the_event_apc_ran_times = 0;
 static atomic_bool event_apc_test_ok = false;
-static void the_event_apc(void *pc) {
+static void the_event_apc(struct apc_context *ac, void *pc) {
+    cc_ignore(ac);
     cc_ignore(pc);
     atomic_inc(&the_event_apc_ran_times);
 }

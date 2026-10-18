@@ -13,7 +13,7 @@
 #include <tsa.h>
 
 static void ide_start_next_locked(struct ide_channel *chan)
-    TSA_MUST_HOLD(&chan->lock);
+    TSA_CALLER_HOLDS(&chan->lock);
 typedef bool (*sync_fn)(struct ata_drive *, uint64_t, uint8_t *, uint8_t,
                         struct io_wait_token *);
 
@@ -36,9 +36,8 @@ static enum bio_request_status translate_status(uint8_t status, uint8_t error) {
     return BIO_STATUS_UNKNOWN_ERR;
 }
 
-enum irq_result ide_irq_handler(void *ctx, irq_t irq_num,
-                                struct irq_context *rsp) {
-    cc_ignore(irq_num, rsp);
+enum irq_result ide_irq_handler(struct irq_context *ictx, void *ctx) {
+    cc_ignore(ictx);
 
     struct ide_channel *chan = ctx;
     enum irql           irql = spin_lock_high(&chan->lock);
@@ -147,7 +146,7 @@ static void ide_start_next_locked(struct ide_channel *chan) {
 
 static void enqueue_request_locked(struct ide_channel *chan,
                                    struct ide_request *req)
-    TSA_MUST_HOLD(&chan->lock) {
+    TSA_CALLER_HOLDS(&chan->lock) {
     sll_add(chan, req);
 }
 

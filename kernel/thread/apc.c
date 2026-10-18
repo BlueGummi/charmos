@@ -2,6 +2,7 @@
 #include <compiler/intrinsic.h>
 #include <enforce.h>
 #include <math/bit.h>
+#include <mem/alloc.h>
 #include <sch/sched.h>
 #include <smp/core.h>
 #include <thread/apc.h>
@@ -9,7 +10,6 @@
 #include <thread/thread_diag.h>
 
 #include "sch/internal.h"
-#include <mem/alloc.h>
 
 static inline bool safe_to_exec_apcs(void) {
     if (irql_get() != IRQL_PASSIVE_LEVEL || !irq_not_in_interrupt())
@@ -113,7 +113,8 @@ static void apc_execute(struct apc *a) {
 
     thread_or_flags(curr, THREAD_FLAG_EXECUTING_APC);
 
-    a->func(a->ctx);
+    struct apc_context ac = {.apc = a};
+    a->func(&ac, a->ctx);
 
     thread_and_flags(curr, ~THREAD_FLAG_EXECUTING_APC);
     curr->total_apcs_ran++;

@@ -189,10 +189,10 @@ void bio_sched_dequeue(struct block_device *disk, struct bio_request *req);
 
 void bio_sched_enqueue_internal(struct bio_scheduler *sched,
                                 struct bio_request *req)
-    TSA_MUST_HOLD(&sched->lock);
+    TSA_CALLER_HOLDS(&sched->lock);
 void bio_sched_dequeue_internal(struct bio_scheduler *sched,
                                 struct bio_request *req)
-    TSA_MUST_HOLD(&sched->lock);
+    TSA_CALLER_HOLDS(&sched->lock);
 
 void bio_sched_dispatch_partial(struct block_device *disk,
                                 enum bio_request_priority prio);
@@ -200,12 +200,12 @@ void bio_sched_dispatch_partial(struct block_device *disk,
 void bio_sched_dispatch_all(struct block_device *disk);
 
 void bio_sched_try_early_dispatch(struct bio_scheduler *sched)
-    TSA_MUST_HOLD(&sched->lock);
+    TSA_CALLER_HOLDS(&sched->lock);
 
 bool bio_sched_try_coalesce(struct bio_scheduler *sched)
-    TSA_MUST_HOLD(&sched->lock);
+    TSA_CALLER_HOLDS(&sched->lock);
 bool bio_sched_boost_starved(struct bio_scheduler *sched)
-    TSA_MUST_HOLD(&sched->lock);
+    TSA_CALLER_HOLDS(&sched->lock);
 
 struct bio_scheduler *bio_sched_create(struct block_device *disk,
                                        struct bio_scheduler_ops *ops);

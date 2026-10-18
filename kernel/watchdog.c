@@ -664,9 +664,9 @@ static void watchdog_master_process_stall(void) {
     }
 }
 
-static enum irq_result watchdog_master_nmi_handler(void *ctx, irq_t irq,
-                                                   struct irq_context *regs) {
-    cc_ignore(ctx, irq, regs);
+static enum irq_result watchdog_master_nmi_handler(struct irq_context *regs,
+                                                   void *ctx) {
+    cc_ignore(ctx, regs);
 
     /* Since the other NMI ISRs run well before this one does, we can
      * guarantee that this IS us, since we register last, but we do
@@ -697,9 +697,9 @@ static enum irq_result watchdog_master_nmi_handler(void *ctx, irq_t irq,
     return IRQ_HANDLED;
 }
 
-static enum irq_result watchdog_pet_nmi_handler(void *ctx, irq_t irq,
-                                                struct irq_context *regs) {
-    cc_ignore(ctx, irq, regs);
+static enum irq_result watchdog_pet_nmi_handler(struct irq_context *regs,
+                                                void *ctx) {
+    cc_ignore(ctx, regs);
     struct watchdog_percpu *pcpu = PERCPU_PTR(TOPC_IRQ, watchdog_percpu);
 
     /* Must be set, if it doesn't, something happened */
@@ -712,9 +712,9 @@ static enum irq_result watchdog_pet_nmi_handler(void *ctx, irq_t irq,
     return IRQ_NONE;
 }
 
-static enum irq_result watchdog_test_handler(void *ctx, irq_t irq,
-                                             struct irq_context *regs) {
-    cc_ignore(ctx, irq, regs);
+static enum irq_result watchdog_test_handler(struct irq_context *regs,
+                                             void *ctx) {
+    cc_ignore(ctx, regs);
     struct watchdog_percpu *pcpu = PERCPU_PTR(TOPC_IRQ, watchdog_percpu);
 
     if (seqcount_read_raw(&pcpu->response.seqcount) & 1) {

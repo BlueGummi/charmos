@@ -76,7 +76,8 @@ static void chaos_diag_release(struct thread *t, size_t slot) {
     chaos_diag[slot] = NULL;
 }
 
-static void chaos_apc_fn(void *arg) {
+static void chaos_apc_fn(struct apc_context *ac, void *arg) {
+    cc_ignore(ac);
     cc_ignore(arg);
     CHAOS_LOG("apc executed on %p", thread_get_current());
 

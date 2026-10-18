@@ -358,9 +358,8 @@ static atomic_uint32_t tick_change_state = 0;
 static atomic_bool enable = false;
 static uint8_t entry = 0;
 
-static enum irq_result tick_op_isr(void *ctx, uint8_t vector,
-                                   struct irq_context *rsp) {
-    cc_ignore(ctx, vector, rsp);
+static enum irq_result tick_op_isr(struct irq_context *rsp, void *ctx) {
+    cc_ignore(ctx, rsp);
     if (atomic_load_acq(&enable)) {
         scheduler_tick_enable();
     } else {

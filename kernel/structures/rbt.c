@@ -23,8 +23,8 @@ static void rbt_debug_check_linked(const struct rbt *tree,
     const struct rbt_node *n = node;
     size_t steps = 0;
 
-    while (n->parent) {
-        const struct rbt_node *p = n->parent;
+    while (rbt_parent(n)) {
+        const struct rbt_node *p = rbt_parent(n);
         if (cc_unlikely(p->left != n && p->right != n))
             panic("%s: node %p (from %p) claims parent %p, whose children are "
                   "%p/%p, tree %p",
@@ -70,17 +70,17 @@ static size_t rbt_debug_validate_subtree(const struct rbt *tree,
         panic("%s: node %p has %p as both children, tree %p", caller, node,
               node->left, tree);
 
-    if (cc_unlikely(node->left && node->left->parent != node))
+    if (cc_unlikely(node->left && rbt_parent(node->left) != node))
         panic("%s: node %p left child %p has parent %p, tree %p", caller, node,
-              node->left, node->left->parent, tree);
+              node->left, rbt_parent(node->left), tree);
 
-    if (cc_unlikely(node->right && node->right->parent != node))
+    if (cc_unlikely(node->right && rbt_parent(node->right) != node))
         panic("%s: node %p right child %p has parent %p, tree %p", caller, node,
-              node->right, node->right->parent, tree);
+              node->right, rbt_parent(node->right), tree);
 
-    if (cc_unlikely(node->color == TREE_NODE_RED &&
-                    ((node->left && node->left->color == TREE_NODE_RED) ||
-                     (node->right && node->right->color == TREE_NODE_RED))))
+    if (cc_unlikely(rbt_color(node) == TREE_NODE_RED &&
+                    ((node->left && rbt_color(node->left) == TREE_NODE_RED) ||
+                     (node->right && rbt_color(node->right) == TREE_NODE_RED))))
         panic("%s: red-red violation at node %p, tree %p", caller, node, tree);
 
     size_t lh = rbt_debug_validate_subtree(tree, node->left, depth + 1, caller);
@@ -92,7 +92,7 @@ static size_t rbt_debug_validate_subtree(const struct rbt *tree,
               "tree %p",
               caller, node, lh, rh, tree);
 
-    return lh + (node->color == TREE_NODE_BLACK ? 1 : 0);
+    return lh + (rbt_color(node) == TREE_NODE_BLACK ? 1 : 0);
 }
 
 static void rbt_debug_validate(const struct rbt *tree, const char *caller) {
@@ -100,11 +100,11 @@ static void rbt_debug_validate(const struct rbt *tree, const char *caller) {
     if (!root)
         return;
 
-    if (cc_unlikely(root->parent))
+    if (cc_unlikely(rbt_parent(root)))
         panic("%s: root %p of tree %p has parent %p", caller, root, tree,
-              root->parent);
+              rbt_parent(root));
 
-    if (cc_unlikely(root->color != TREE_NODE_BLACK))
+    if (cc_unlikely(rbt_color(root) != TREE_NODE_BLACK))
         panic("%s: root %p of tree %p is red", caller, root, tree);
 
     rbt_debug_validate_subtree(tree, root, 0, caller);
@@ -166,10 +166,10 @@ struct rbt_node *rbt_next(struct rbt_node *node) {
         return rbt_find_min(node->right);
 
     size_t steps = 0;
-    struct rbt_node *parent = node->parent;
+    struct rbt_node *parent = rbt_parent(node);
     while (parent && node == parent->right) {
         node = parent;
-        parent = parent->parent;
+        parent = rbt_parent(parent);
         rbt_debug_step(&steps, node, __func__);
     }
     return parent;
@@ -209,15 +209,15 @@ struct rbt_node *rbt_find_successor(struct rbt *tree, uint64_t data) {
 
 static void rb_transplant(struct rbt *tree, struct rbt_node *u,
                           struct rbt_node *v) {
-    if (u->parent == NULL)
+    if (rbt_parent(u) == NULL)
         tree->root = v;
-    else if (u == u->parent->left)
-        u->parent->left = v;
+    else if (u == rbt_parent(u)->left)
+        rbt_parent(u)->left = v;
     else
-        u->parent->right = v;
+        rbt_parent(u)->right = v;
 
     if (v)
-        v->parent = u->parent;
+        rbt_set_parent(v, rbt_parent(u));
 }
 
 static void left_rotate(struct rbt *tree, struct rbt_node *x) {
@@ -225,46 +225,46 @@ static void left_rotate(struct rbt *tree, struct rbt_node *x) {
     x->right = y->left;
 
     if (y->left)
-        y->left->parent = x;
+        rbt_set_parent(y->left, x);
 
-    y->parent = x->parent;
-    if (!x->parent)
+    rbt_set_parent(y, rbt_parent(x));
+    if (!rbt_parent(x))
         tree->root = y;
-    else if (x == x->parent->left)
-        x->parent->left = y;
+    else if (x == rbt_parent(x)->left)
+        rbt_parent(x)->left = y;
     else
-        x->parent->right = y;
+        rbt_parent(x)->right = y;
 
     y->left = x;
-    x->parent = y;
+    rbt_set_parent(x, y);
 }
 
 static void right_rotate(struct rbt *tree, struct rbt_node *y) {
     struct rbt_node *x = y->left;
     y->left = x->right;
     if (x->right)
-        x->right->parent = y;
+        rbt_set_parent(x->right, y);
 
-    x->parent = y->parent;
-    if (!y->parent)
+    rbt_set_parent(x, rbt_parent(y));
+    if (!rbt_parent(y))
         tree->root = x;
-    else if (y == y->parent->right)
-        y->parent->right = x;
+    else if (y == rbt_parent(y)->right)
+        rbt_parent(y)->right = x;
     else
-        y->parent->left = x;
+        rbt_parent(y)->left = x;
 
     x->right = y;
-    y->parent = x;
+    rbt_set_parent(y, x);
 }
 
 static bool rbt_is_black(const struct rbt_node *node) {
-    return !node || node->color == TREE_NODE_BLACK;
+    return !node || rbt_color(node) == TREE_NODE_BLACK;
 }
 
 static void fix_deletion(struct rbt *tree, struct rbt_node *x,
                          struct rbt_node *x_parent) {
     size_t steps = 0;
-    while (x != tree->root && (!x || x->color == TREE_NODE_BLACK)) {
+    while (x != tree->root && (!x || rbt_color(x) == TREE_NODE_BLACK)) {
         if (!x_parent)
             break;
 
@@ -275,9 +275,9 @@ static void fix_deletion(struct rbt *tree, struct rbt_node *x,
         if (x == x_parent->left) {
             sibling = x_parent->right;
 
-            if (sibling && sibling->color == TREE_NODE_RED) {
-                sibling->color = TREE_NODE_BLACK;
-                x_parent->color = TREE_NODE_RED;
+            if (sibling && rbt_color(sibling) == TREE_NODE_RED) {
+                rbt_set_color(sibling, TREE_NODE_BLACK);
+                rbt_set_color(x_parent, TREE_NODE_RED);
                 left_rotate(tree, x_parent);
                 sibling = x_parent->right;
             }
@@ -285,22 +285,22 @@ static void fix_deletion(struct rbt *tree, struct rbt_node *x,
             if (!sibling ||
                 (rbt_is_black(sibling->left) && rbt_is_black(sibling->right))) {
                 if (sibling)
-                    sibling->color = TREE_NODE_RED;
+                    rbt_set_color(sibling, TREE_NODE_RED);
                 x = x_parent;
-                x_parent = x->parent;
+                x_parent = rbt_parent(x);
             } else {
                 if (rbt_is_black(sibling->right)) {
                     if (sibling->left)
-                        sibling->left->color = TREE_NODE_BLACK;
-                    sibling->color = TREE_NODE_RED;
+                        rbt_set_color(sibling->left, TREE_NODE_BLACK);
+                    rbt_set_color(sibling, TREE_NODE_RED);
                     right_rotate(tree, sibling);
                     sibling = x_parent->right;
                 }
 
-                sibling->color = x_parent->color;
-                x_parent->color = TREE_NODE_BLACK;
+                rbt_set_color(sibling, rbt_color(x_parent));
+                rbt_set_color(x_parent, TREE_NODE_BLACK);
                 if (sibling->right)
-                    sibling->right->color = TREE_NODE_BLACK;
+                    rbt_set_color(sibling->right, TREE_NODE_BLACK);
                 left_rotate(tree, x_parent);
                 x = tree->root;
                 x_parent = NULL;
@@ -308,9 +308,9 @@ static void fix_deletion(struct rbt *tree, struct rbt_node *x,
         } else {
             sibling = x_parent->left;
 
-            if (sibling && sibling->color == TREE_NODE_RED) {
-                sibling->color = TREE_NODE_BLACK;
-                x_parent->color = TREE_NODE_RED;
+            if (sibling && rbt_color(sibling) == TREE_NODE_RED) {
+                rbt_set_color(sibling, TREE_NODE_BLACK);
+                rbt_set_color(x_parent, TREE_NODE_RED);
                 right_rotate(tree, x_parent);
                 sibling = x_parent->left;
             }
@@ -318,22 +318,22 @@ static void fix_deletion(struct rbt *tree, struct rbt_node *x,
             if (!sibling ||
                 (rbt_is_black(sibling->left) && rbt_is_black(sibling->right))) {
                 if (sibling)
-                    sibling->color = TREE_NODE_RED;
+                    rbt_set_color(sibling, TREE_NODE_RED);
                 x = x_parent;
-                x_parent = x->parent;
+                x_parent = rbt_parent(x);
             } else {
                 if (rbt_is_black(sibling->left)) {
                     if (sibling->right)
-                        sibling->right->color = TREE_NODE_BLACK;
-                    sibling->color = TREE_NODE_RED;
+                        rbt_set_color(sibling->right, TREE_NODE_BLACK);
+                    rbt_set_color(sibling, TREE_NODE_RED);
                     left_rotate(tree, sibling);
                     sibling = x_parent->left;
                 }
 
-                sibling->color = x_parent->color;
-                x_parent->color = TREE_NODE_BLACK;
+                rbt_set_color(sibling, rbt_color(x_parent));
+                rbt_set_color(x_parent, TREE_NODE_BLACK);
                 if (sibling->left)
-                    sibling->left->color = TREE_NODE_BLACK;
+                    rbt_set_color(sibling->left, TREE_NODE_BLACK);
                 right_rotate(tree, x_parent);
                 x = tree->root;
                 x_parent = NULL;
@@ -342,11 +342,11 @@ static void fix_deletion(struct rbt *tree, struct rbt_node *x,
     }
 
     if (x)
-        x->color = TREE_NODE_BLACK;
+        rbt_set_color(x, TREE_NODE_BLACK);
 }
 
 void rbt_delete(struct rbt *tree, struct rbt_node *z) {
-    enforce(z->parent != NULL || z == tree->root,
+    enforce(rbt_parent(z) != NULL || z == tree->root,
             "rbt_delete: node %p is not linked into tree %p (root %p)", z, tree,
             tree->root);
     rbt_debug_check_linked(tree, z, __func__);
@@ -355,27 +355,27 @@ void rbt_delete(struct rbt *tree, struct rbt_node *z) {
     struct rbt_node *y = z;
     struct rbt_node *x = NULL;
     struct rbt_node *x_parent = NULL;
-    enum rbt_node_color y_original_color = y->color;
+    enum rbt_node_color y_original_color = rbt_color(y);
 
     if (z->left == NULL) {
         x = z->right;
-        x_parent = z->parent;
+        x_parent = rbt_parent(z);
         rb_transplant(tree, z, z->right);
     } else if (z->right == NULL) {
         x = z->left;
-        x_parent = z->parent;
+        x_parent = rbt_parent(z);
         rb_transplant(tree, z, z->left);
     } else {
         y = rbt_find_min(z->right);
-        y_original_color = y->color;
+        y_original_color = rbt_color(y);
         x = y->right;
 
-        if (y->parent != z) {
-            x_parent = y->parent;
+        if (rbt_parent(y) != z) {
+            x_parent = rbt_parent(y);
             rb_transplant(tree, y, y->right);
             y->right = z->right;
             if (y->right)
-                y->right->parent = y;
+                rbt_set_parent(y->right, y);
         } else {
             x_parent = y;
         }
@@ -383,8 +383,8 @@ void rbt_delete(struct rbt *tree, struct rbt_node *z) {
         rb_transplant(tree, z, y);
         y->left = z->left;
         if (y->left)
-            y->left->parent = y;
-        y->color = z->color;
+            rbt_set_parent(y->left, y);
+        rbt_set_color(y, rbt_color(z));
     }
 
     if (y_original_color == TREE_NODE_BLACK) {
@@ -393,7 +393,7 @@ void rbt_delete(struct rbt *tree, struct rbt_node *z) {
 
     z->left = NULL;
     z->right = NULL;
-    z->parent = NULL;
+    rbt_set_parent(z, NULL);
 
     rbt_debug_validate(tree, __func__);
 }
@@ -465,48 +465,48 @@ void rbt_remove(struct rbt *tree, uint64_t data) {
 
 static void fix_insertion(struct rbt *tree, struct rbt_node *node) {
     size_t steps = 0;
-    while (node != tree->root && node->parent->color == TREE_NODE_RED) {
+    while (node != tree->root && rbt_color(rbt_parent(node)) == TREE_NODE_RED) {
         rbt_debug_step(&steps, node, __func__);
-        struct rbt_node *parent = node->parent;
-        struct rbt_node *grandparent = parent->parent;
+        struct rbt_node *parent = rbt_parent(node);
+        struct rbt_node *grandparent = rbt_parent(parent);
 
         if (parent == grandparent->left) {
             struct rbt_node *uncle = grandparent->right;
-            if (uncle && uncle->color == TREE_NODE_RED) {
-                parent->color = TREE_NODE_BLACK;
-                uncle->color = TREE_NODE_BLACK;
-                grandparent->color = TREE_NODE_RED;
+            if (uncle && rbt_color(uncle) == TREE_NODE_RED) {
+                rbt_set_color(parent, TREE_NODE_BLACK);
+                rbt_set_color(uncle, TREE_NODE_BLACK);
+                rbt_set_color(grandparent, TREE_NODE_RED);
                 node = grandparent;
             } else {
                 if (node == parent->right) {
                     node = parent;
                     left_rotate(tree, node);
-                    parent = node->parent;
+                    parent = rbt_parent(node);
                 }
-                parent->color = TREE_NODE_BLACK;
-                grandparent->color = TREE_NODE_RED;
+                rbt_set_color(parent, TREE_NODE_BLACK);
+                rbt_set_color(grandparent, TREE_NODE_RED);
                 right_rotate(tree, grandparent);
             }
         } else {
             struct rbt_node *uncle = grandparent->left;
-            if (uncle && uncle->color == TREE_NODE_RED) {
-                parent->color = TREE_NODE_BLACK;
-                uncle->color = TREE_NODE_BLACK;
-                grandparent->color = TREE_NODE_RED;
+            if (uncle && rbt_color(uncle) == TREE_NODE_RED) {
+                rbt_set_color(parent, TREE_NODE_BLACK);
+                rbt_set_color(uncle, TREE_NODE_BLACK);
+                rbt_set_color(grandparent, TREE_NODE_RED);
                 node = grandparent;
             } else {
                 if (node == parent->left) {
                     node = parent;
                     right_rotate(tree, node);
-                    parent = node->parent;
+                    parent = rbt_parent(node);
                 }
-                parent->color = TREE_NODE_BLACK;
-                grandparent->color = TREE_NODE_RED;
+                rbt_set_color(parent, TREE_NODE_BLACK);
+                rbt_set_color(grandparent, TREE_NODE_RED);
                 left_rotate(tree, grandparent);
             }
         }
     }
-    tree->root->color = TREE_NODE_BLACK;
+    rbt_set_color(tree->root, TREE_NODE_BLACK);
 }
 
 void rbt_insert(struct rbt *tree, struct rbt_node *new_node) {
@@ -514,11 +514,11 @@ void rbt_insert(struct rbt *tree, struct rbt_node *new_node) {
 
     new_node->left = NULL;
     new_node->right = NULL;
-    new_node->color = TREE_NODE_RED;
+    rbt_set_color(new_node, TREE_NODE_RED);
 
     if (tree->root == NULL) {
-        new_node->color = TREE_NODE_BLACK;
-        new_node->parent = NULL;
+        rbt_set_color(new_node, TREE_NODE_BLACK);
+        rbt_set_parent(new_node, NULL);
         tree->root = new_node;
         return;
     }
@@ -543,7 +543,7 @@ void rbt_insert(struct rbt *tree, struct rbt_node *new_node) {
             current = current->right;
     }
 
-    new_node->parent = parent;
+    rbt_set_parent(new_node, parent);
 
 #ifdef DEBUG_LOCK_CHK
     if ((cmp < 0 && parent->left) || (cmp >= 0 && parent->right))
@@ -560,18 +560,18 @@ void rbt_insert(struct rbt *tree, struct rbt_node *new_node) {
     fix_insertion(tree, new_node);
 
     if (parent)
-        enforce(!(parent->color == TREE_NODE_RED &&
-                  new_node->color == TREE_NODE_RED));
+        enforce(!(rbt_color(parent) == TREE_NODE_RED &&
+                  rbt_color(new_node) == TREE_NODE_RED));
 
     rbt_debug_validate(tree, __func__);
 }
 
 void rbt_link_node(struct rbt_node *node, struct rbt_node *parent,
                    struct rbt_node **link) {
-    node->parent = parent;
+    rbt_set_parent(node, parent);
     node->left = NULL;
     node->right = NULL;
-    node->color = TREE_NODE_RED;
+    rbt_set_color(node, TREE_NODE_RED);
     *link = node;
 }
 

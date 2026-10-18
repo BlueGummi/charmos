@@ -71,8 +71,7 @@ struct tlb_request {
 };
 
 void tlb_init(void);
-enum irq_result tlb_shootdown_isr(void *ctx, irq_t irq,
-                                  struct irq_context *rsp);
+enum irq_result tlb_shootdown_isr(struct irq_context *rsp, void *ctx);
 void tlb_shootdown_full(struct tlb_request rq);
 void tlb_invalidate_lazy(void);
 

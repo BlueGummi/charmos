@@ -53,9 +53,8 @@ void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
     mmio_write_32(&p->is, p->is);
 }
 
-enum irq_result ahci_isr_handler(void *ctx, uint8_t vector,
-                                 struct irq_context *rsp) {
-    cc_ignore(vector, rsp);
+enum irq_result ahci_isr_handler(struct irq_context *ictx, void *ctx) {
+    cc_ignore(ictx);
 
     struct ahci_device *dev = ctx;
     for (uint32_t port = 0; port < AHCI_MAX_PORTS; port++) {

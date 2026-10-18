@@ -48,6 +48,8 @@ struct scheduler {
     struct thread *drop_last_ref;
     struct timer tick;
 
+    struct wroost_percpu_data *wroost_data;
+
     /* Thread count at each prio */
     size_t thread_count[THREAD_PRIO_CLASS_COUNT];
     size_t total_thread_count;
@@ -112,12 +114,12 @@ static inline void scheduler_debug_start(void) {}
 
 struct scheduler *scheduler_select_best_for_thread(struct thread *t);
 void scheduler_add_thread_locked(struct scheduler *sched, struct thread *thread)
-    TSA_MUST_HOLD(&sched->lock);
+    TSA_CALLER_HOLDS(&sched->lock);
 
 void scheduler_add_thread(struct scheduler *sched, struct thread *thread);
 
 void scheduler_remove_thread_locked(struct scheduler *sched, struct thread *t)
-    TSA_MUST_HOLD(&sched->lock);
+    TSA_CALLER_HOLDS(&sched->lock);
 
 void scheduler_remove_thread(struct scheduler *sched, struct thread *t);
 void schedule(void);
@@ -144,8 +146,7 @@ size_t scheduler_try_push_to_idle_core(struct scheduler *sched);
 
 void scheduler_tick_enable();
 void scheduler_tick_disable();
-enum irq_result scheduler_reschedule_isr(void *ctx, uint8_t vec,
-                                         struct irq_context *rsp);
+enum irq_result scheduler_reschedule_isr(struct irq_context *rsp, void *ctx);
 
 /* For a global structure containing central scheduler data */
 struct scheduler_data {

@@ -22,9 +22,9 @@ static int rbt_black_height(const struct rbt_node *node) {
     if (!node)
         return 1;
 
-    if (node->color == TREE_NODE_RED &&
-        ((node->left && node->left->color == TREE_NODE_RED) ||
-         (node->right && node->right->color == TREE_NODE_RED)))
+    if (rbt_color(node) == TREE_NODE_RED &&
+        ((node->left && rbt_color(node->left) == TREE_NODE_RED) ||
+         (node->right && rbt_color(node->right) == TREE_NODE_RED)))
         return -1;
 
     int left_height = rbt_black_height(node->left);
@@ -32,7 +32,7 @@ static int rbt_black_height(const struct rbt_node *node) {
     if (left_height < 0 || left_height != right_height)
         return -1;
 
-    return left_height + (node->color == TREE_NODE_BLACK);
+    return left_height + (rbt_color(node) == TREE_NODE_BLACK);
 }
 
 static bool verify_rbt_invariants(const struct rbt_node *node, const int *min,
@@ -43,8 +43,8 @@ static bool verify_rbt_invariants(const struct rbt_node *node, const int *min,
     int key = rbt_entry(node, struct test_rbt_node, node)->key;
     if ((min && key <= *min) || (max && key >= *max))
         return false;
-    if ((node->left && node->left->parent != node) ||
-        (node->right && node->right->parent != node))
+    if ((node->left && rbt_parent(node->left) != node) ||
+        (node->right && rbt_parent(node->right) != node))
         return false;
 
     return verify_rbt_invariants(node->left, min, &key) &&
@@ -66,7 +66,7 @@ TEST_DEFINE_UNIT(rbt, delete_black_leaf_rebalances) {
     rbt_delete(&tree, &nodes[2].node);
 
     TEST_ASSERT_NONNULL(tree.root);
-    TEST_ASSERT_EQ(tree.root->color, TREE_NODE_BLACK);
+    TEST_ASSERT_EQ(rbt_color(tree.root), TREE_NODE_BLACK);
     TEST_ASSERT_GE(rbt_black_height(tree.root), 0);
     TEST_ASSERT(verify_rbt_invariants(tree.root, NULL, NULL));
 

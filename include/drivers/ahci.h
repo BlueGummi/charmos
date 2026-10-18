@@ -339,8 +339,7 @@ bool ahci_should_coalesce(struct block_device *disk,
 void ahci_reorder(struct block_device *disk);
 
 struct block_device *ahci_create_generic(struct ahci_disk *disk);
-enum irq_result ahci_isr_handler(void *ctx, uint8_t vector,
-                                 struct irq_context *);
+enum irq_result ahci_isr_handler(struct irq_context *ictx, void *ctx);
 
 #define AHCI_PORT_OFFSET(n) (0x100 + (n) * 0x80)
 

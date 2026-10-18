@@ -103,7 +103,7 @@ bool timer_shutdown(struct timer *timer);
 bool timer_shutdown_sync(struct timer *timer);
 
 struct irq_context;
-enum irq_result timer_isr(void *ctx, irq_t vec, struct irq_context *);
+enum irq_result timer_isr(struct irq_context *ctx, void *c);
 void timers_init_bsp(void);
 void timers_init_ap(cpu_id_t cpu);
 

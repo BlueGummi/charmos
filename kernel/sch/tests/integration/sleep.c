@@ -77,7 +77,8 @@ static struct thread *si_t;
 static atomic_bool si_ok = false;
 static atomic_bool si_started = false;
 
-static void apc_si(void *apc) {
+static void apc_si(struct apc_context *ac, void *apc) {
+    cc_ignore(ac);
     cc_ignore(apc);
     atomic_store(&si_apc_ran, true);
 }
@@ -149,7 +150,8 @@ static struct thread *sub_t;
 static atomic_bool sub_interrupted = false;
 static atomic_bool sub_started = false;
 
-static void apc_sub(void *apc) {
+static void apc_sub(struct apc_context *ac, void *apc) {
+    cc_ignore(ac);
     cc_ignore(apc);
     atomic_store(&sub_apc_ran, true);
 }

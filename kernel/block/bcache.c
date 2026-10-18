@@ -16,7 +16,7 @@ static bool remove(struct bcache *cache, uint64_t key, uint64_t spb);
 
 static bool insert_locked(struct bcache *cache, uint64_t key,
                           struct bcache_entry *value)
-    TSA_MUST_HOLD(&cache->lock);
+    TSA_CALLER_HOLDS(&cache->lock);
 
 static bool insert(struct bcache *cache, uint64_t key,
                    struct bcache_entry *value);

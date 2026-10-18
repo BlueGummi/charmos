@@ -43,5 +43,4 @@ struct page_fault_scratch_buffer {
     uint64_t error_code;
 };
 
-enum irq_result page_fault_isr(void *context, uint8_t vector,
-                               struct irq_context *rsp);
+enum irq_result page_fault_isr(struct irq_context *rsp, void *ctx);

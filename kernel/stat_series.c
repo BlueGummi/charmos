@@ -55,7 +55,7 @@ void stat_series_reset(struct stat_series *s) {
 }
 
 static void stat_series_advance_locked(struct stat_series *s, time_us_t now_us)
-    TSA_MUST_HOLD(&s->lock) {
+    TSA_CALLER_HOLDS(&s->lock) {
     /* re-evaluate based on locked state (canonical update) */
     size_t delta = now_us - atomic_load_rlx(&s->last_update_us);
     uint32_t steps = delta / s->bucket_us;

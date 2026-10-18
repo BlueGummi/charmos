@@ -24,8 +24,8 @@
 #define TSA_PTR_GUARDED_BY(...) __attribute__((pt_guarded_by(__VA_ARGS__)))
 
 /* Function verification */
-#define TSA_MUST_HOLD(...) __attribute__((requires_capability(__VA_ARGS__)))
-#define TSA_MUST_HOLD_SHARED(...)                                              \
+#define TSA_CALLER_HOLDS(...) __attribute__((requires_capability(__VA_ARGS__)))
+#define TSA_CALLER_HOLDS_SHARED(...)                                           \
     __attribute__((requires_shared_capability(__VA_ARGS__)))
 #define TSA_EXCLUDED(...) __attribute__((locks_excluded(__VA_ARGS__)))
 
@@ -138,8 +138,8 @@
 #define TSA_CAPABILITY(kind)
 #define TSA_GUARDED_BY(...)
 #define TSA_PT_GUARDED_BY(...)
-#define TSA_MUST_HOLD(...)
-#define TSA_MUST_HOLD_SHARED(...)
+#define TSA_CALLER_HOLDS(...)
+#define TSA_CALLER_HOLDS_SHARED(...)
 #define TSA_EXCLUDED(...)
 #define TSA_ACQUIRES(...)
 #define TSA_ACQUIRES_SHARED(...)

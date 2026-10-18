@@ -95,7 +95,7 @@ static bool scheduler_boost_thread_internal(struct thread *boosted,
      * handle has either not been used or was used on `boosted`, and then
      * we perform our boost. We initialize `from`'s CLIMB handle, and then
      * attach it to `boosted` and apply relevant boosts */
-    struct climb_handle *h = &from->climb_state.handle;
+    struct climb_handle *h = &from->climb_data.handle;
     if (h->given_to == boosted)
         goto ok;
 
@@ -198,5 +198,5 @@ void thread_io_unboost_self(void) {
 }
 
 void thread_remove_boost(void) {
-    climb_handle_remove(&thread_get_current()->climb_state.handle);
+    climb_handle_remove(&thread_get_current()->climb_data.handle);
 }

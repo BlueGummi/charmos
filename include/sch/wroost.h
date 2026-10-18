@@ -1,6 +1,7 @@
 /* @title: Writer to Reader Boosting */
 #pragma once
 #include <math/hash.h>
+#include <structures/hlist.h>
 #include <thread/thread_types.h>
 
 /*
@@ -43,10 +44,15 @@
  */
 
 struct rwlock;
+/* Thread data */
 #define WROOST_BITS_PER_COUNTER 2
-#define WROOST_THREAD_MAP_DEPTH 2
+#define WROOST_THREAD_MAP_DEPTH 32
 #define WROOST_COUNTER_MAX 0x3
 #define WROOST_COUNTER_MASK 0x3
+
+#define WROOST_FINE_INDEX_SHIFT 3
+#define WROOST_FINE_OFFSET_MASK 0x7
+
 #define WROOST_BUCKET_COUNT 256
 #define WROOST_THREAD_COUNTERS 32
 #define WROOST_COARSE_FACTOR (WROOST_BUCKET_COUNT / WROOST_THREAD_COUNTERS)
@@ -54,6 +60,10 @@ struct rwlock;
 #define WROOST_FINE_VALID_MASK ((1U << WROOST_FINE_ENTRY_COUNT) - 1U)
 #define WROOST_THREAD_COUNTER_BITS (WROOST_THREAD_COUNTERS * 2)
 #define WROOST_THREAD_COUNTER_BYTES (WROOST_THREAD_COUNTER_BITS / BITS_PER_BYTE)
+
+/* Percpu data */
+#define WROOST_PENDING_BITMAP_WORD_SHIFT 6
+#define WROOST_THREAD_MAP_OVERFLOW ((struct thread *) (UINTPTR_MAX))
 
 typedef uint8_t wroost_id_t;
 typedef uint8_t wroost_counter_t;
@@ -67,8 +77,15 @@ static_assert(BITS_NEEDED(WROOST_THREAD_COUNTERS - 1) == 5);
 static_assert(BIT_SIZEOF(wroost_id_t) >= BITS_NEEDED(WROOST_THREAD_COUNTERS),
               "wroost_id_t needs to be wider");
 
+enum wroost_state {
+    WROOST_DPC_IDLE = 0,
+    WROOST_DPC_PENDING = 1,
+    WROOST_DPC_ACTIVE = 1 << 1,
+};
+
 /* Protected by scheduler->lock */
-struct wroost_percpu {
+struct wroost_percpu_data {
+    atomic(enum wroost_state) state;
     cpu_id_t id;
 
     /* This keeps track of the number of READY threads on this CPU's
@@ -86,12 +103,20 @@ struct wroost_percpu {
      * that lock ID held as a reader.
      */
     uint16_t rq_bucket_counts[WROOST_BUCKET_COUNT];
-    struct thread *thread_map[WROOST_BUCKET_COUNT][WROOST_THREAD_MAP_DEPTH];
+
+    /* Not actually a hashmap, it's just the number of counters,
+     * where precise entries get their coarse entry counter */
+    struct hlist_head thread_map[WROOST_THREAD_COUNTERS];
+
+    /* Since thread_map is guaranteed to only have single lock readers */
+    struct hlist_head multi_lock_readers;
+    BITMAP_DECLARE_ATOMIC(pending_bitmap, WROOST_BUCKET_COUNT);
+    struct dpc boost_dpc;
 };
 
 struct wroost_fine_entry {
-    uint8_t offset : 3;
-    uint8_t index : 5;
+    wroost_id_t lock_id; /* Shift this right by WROOST_FINE_INDEX_SHIFT
+                          * to get the coarse index of the fine entry */
 };
 ct_assert_struct_size_eq(wroost_fine_entry, 1);
 
@@ -116,7 +141,9 @@ ct_assert_struct_size_eq(wroost_fine_entry, 1);
  * Thus, that extra fine_entry is wasted on a lock ID that doesn't
  * use it. So, this invariant keeps all fine entries useful.
  */
-struct wroost_thread_state {
+struct wroost_thread_data {
+    struct hlist_node map_node;
+
     /* Reader */
     wroost_counter_t counters[WROOST_THREAD_COUNTER_BYTES];
     struct wroost_fine_entry fine_entries[WROOST_FINE_ENTRY_COUNT];
@@ -159,7 +186,7 @@ struct wroost_thread_state {
 
     enum thread_prio_class boost_class_ceil : THREAD_PRIO_CLASS_BIT_COUNT;
 };
-ct_assert_struct_size_eq(wroost_thread_state, 16);
+ct_assert_struct_size_eq(wroost_thread_data, 32);
 
 struct wroost_bucket {
     /* "tally", so as to not conflict with "counter":
@@ -186,7 +213,7 @@ static inline wroost_id_t wroost_hash(struct rwlock *lock) {
 }
 
 /* Counters are two bits. Index 0 is bit 0, index 1 is bit 2, index 2 is bit 4, etc. */
-static inline uint8_t wroost_get_counter(struct wroost_thread_state *wts,
+static inline uint8_t wroost_get_counter(struct wroost_thread_data *wts,
                                          uint8_t index, uint8_t *byte_idx_out,
                                          uint8_t *byte_offset_out) {
     enforce(index < WROOST_THREAD_COUNTERS);
@@ -203,13 +230,13 @@ static inline uint8_t wroost_get_counter(struct wroost_thread_state *wts,
 }
 
 static inline wroost_counter_t
-wroost_read_counter(struct wroost_thread_state *wts, uint8_t ctr_idx) {
+wroost_read_counter(struct wroost_thread_data *wts, uint8_t ctr_idx) {
     uint8_t idx, offset;
     wroost_counter_t ctr = wroost_get_counter(wts, ctr_idx, &idx, &offset);
     return (ctr >> offset) & WROOST_COUNTER_MASK;
 }
 
-static inline void wroost_write_counter(struct wroost_thread_state *wts,
+static inline void wroost_write_counter(struct wroost_thread_data *wts,
                                         uint8_t ctr_idx, uint8_t new_ctr_val) {
     enforce((new_ctr_val & WROOST_COUNTER_MASK) == new_ctr_val);
 
@@ -220,7 +247,7 @@ static inline void wroost_write_counter(struct wroost_thread_state *wts,
     wts->counters[idx] = new;
 }
 
-static inline uint8_t wroost_inc_counter(struct wroost_thread_state *wts,
+static inline uint8_t wroost_inc_counter(struct wroost_thread_data *wts,
                                          uint8_t ctr_idx,
                                          wroost_counter_t *ctr_val) {
     if ((*ctr_val = wroost_read_counter(wts, ctr_idx)) == WROOST_COUNTER_MAX)
@@ -230,7 +257,7 @@ static inline uint8_t wroost_inc_counter(struct wroost_thread_state *wts,
     return *ctr_val + 1;
 }
 
-static inline uint8_t wroost_dec_counter(struct wroost_thread_state *wts,
+static inline uint8_t wroost_dec_counter(struct wroost_thread_data *wts,
                                          uint8_t ctr_idx) {
     wroost_counter_t ctr_val;
     if ((ctr_val = wroost_read_counter(wts, ctr_idx)) == WROOST_COUNTER_MAX)
@@ -241,35 +268,40 @@ static inline uint8_t wroost_dec_counter(struct wroost_thread_state *wts,
     return ctr_val - 1;
 }
 
+static inline uint8_t wroost_fine_entry_index(struct wroost_fine_entry *ent) {
+    return ent->lock_id >> WROOST_FINE_INDEX_SHIFT;
+}
+
 static inline struct wroost_fine_entry *
-wroost_get_fine_entry(struct wroost_thread_state *wts, uint8_t index) {
+wroost_get_fine_entry(struct wroost_thread_data *wts, uint8_t index) {
     enforce(index < WROOST_THREAD_COUNTERS);
     for (int i = 0; i < WROOST_FINE_ENTRY_COUNT; i++) {
-        if ((wts->fine_valid & BIT(i)) && wts->fine_entries[i].index == index)
+        if ((wts->fine_valid & BIT(i)) &&
+            wroost_fine_entry_index(&wts->fine_entries[i]) == index)
             return &wts->fine_entries[i];
     }
 
     return NULL;
 }
 
-static inline void wroost_clear_fine_entry(struct wroost_thread_state *wts,
+static inline void wroost_clear_fine_entry(struct wroost_thread_data *wts,
                                            int slot) {
     enforce(slot >= 0 && slot < WROOST_FINE_ENTRY_COUNT);
-    wts->fine_entries[slot].index = 0;
-    wts->fine_entries[slot].offset = 0;
+    wts->fine_entries[slot].lock_id = 0;
     wts->fine_valid &= ~BIT(slot);
 }
 
-static inline void wroost_evict_fine_entries(struct wroost_thread_state *wts,
+static inline void wroost_evict_fine_entries(struct wroost_thread_data *wts,
                                              uint8_t index) {
     for (int i = 0; i < WROOST_FINE_ENTRY_COUNT; i++) {
-        if ((wts->fine_valid & BIT(i)) && wts->fine_entries[i].index == index)
+        if ((wts->fine_valid & BIT(i)) &&
+            wroost_fine_entry_index(&wts->fine_entries[i]) == index)
             wroost_clear_fine_entry(wts, i);
     }
 }
 
 static inline struct wroost_fine_entry *
-wroost_alloc_fine_entry(struct wroost_thread_state *wts) {
+wroost_alloc_fine_entry(struct wroost_thread_data *wts) {
     /* Notable edge case here:
      *
      * the index can be 0, so we track slot liveness explicitly via fine_valid
@@ -307,8 +339,9 @@ static inline void wroost_move_tally(struct wroost_bucket *bkt,
     atomic_fetch_add_release(&bkt->raw_tally, delta);
 }
 
-enum thread_prio_class wroost_compute_ceil(struct wroost_thread_state *wts,
+enum thread_prio_class wroost_compute_ceil(struct wroost_thread_data *wts,
                                            enum thread_prio_class min);
 void wroost_post_read_release(struct rwlock *lock);
 void wroost_post_read_acquire(struct rwlock *lock,
                               enum thread_prio_class lock_max_ceil);
+void wroost_scheduler_init(struct scheduler *sched);

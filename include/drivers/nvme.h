@@ -302,8 +302,7 @@ bool nvme_send_nvme_req(struct block_device *d, struct nvme_request *r);
 bool nvme_write_sector_wrapper(struct block_device *disk, uint64_t lba,
                                const uint8_t *buf, uint64_t cnt);
 
-enum irq_result nvme_isr_handler(void *ctx, uint8_t vector,
-                                 struct irq_context *rsp);
+enum irq_result nvme_isr_handler(struct irq_context *rsp, void *ctx);
 
 bool nvme_submit_bio_request(struct block_device *disk,
                              struct bio_request *bio);

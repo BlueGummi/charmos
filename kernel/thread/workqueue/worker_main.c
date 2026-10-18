@@ -7,7 +7,7 @@
 
 static enum wake_reason worker_wait(struct workqueue *wq, struct worker *w,
                                     enum irql irql, enum irql *out)
-    TSA_MUST_HOLD(&wq->lock) {
+    TSA_CALLER_HOLDS(&wq->lock) {
     enum wake_reason sig;
 
     atomic_inc(&wq->idle_workers);

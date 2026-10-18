@@ -37,6 +37,7 @@ static struct idt_ptr idtps = {0};
 
 static void irq_execute_vector_handlers(irq_t vector,
                                         struct irq_context *irq_ctx) {
+    irq_ctx->vector = vector;
     struct irq_desc *desc = &irq_table[vector];
     if (!desc->present || list_head_empty(&irq_table[vector].actions))
         panic("Unhandled ISR vector: %u", vector);
@@ -57,7 +58,7 @@ static void irq_execute_vector_handlers(irq_t vector,
     struct list_node *lh;
     list_for_each(lh, &desc->actions) {
         struct irq_action *act = container_of(lh, struct irq_action, list);
-        if (act->handler(act->data, vector, irq_ctx) == IRQ_HANDLED) {
+        if (act->handler(irq_ctx, act->data) == IRQ_HANDLED) {
             if (vector != IRQ_NMI)
                 watchdog_pet();
             handled = true;

@@ -64,7 +64,7 @@ void condvar_broadcast(struct condvar *cv) {
 
 static void condvar_timeout_wakeup(struct timer *timer) {
     struct condvar_with_cb *ck = timer->data;
-    struct thread *t = ck->thread;
+    struct thread *t = container_of(ck, struct thread, cv_cb_object);
 
     /* Signals and timeouts use the same block */
     thread_wait_satisfy_epoch(&t->wait_blocks[THREAD_WAIT_BLOCK_SYNC],
@@ -79,7 +79,6 @@ enum wake_reason condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
 
     struct condvar_with_cb *cwcb = &curr->cv_cb_object;
     cwcb->cv = cv;
-    cwcb->thread = curr;
 
     condvar_prepare_wait(cv);
     cwcb->cookie = curr->wait_epoch;

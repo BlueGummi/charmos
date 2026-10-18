@@ -32,8 +32,7 @@ enum irq_result {
     IRQ_HANDLED = 1,
 };
 
-typedef enum irq_result (*irq_handler_t)(void *ctx, uint8_t vector,
-                                         struct irq_context *ictx);
+typedef enum irq_result (*irq_handler_t)(struct irq_context *ictx, void *ctx);
 
 enum irq_flags {
     IRQ_FLAG_SHARED = 1, /* IRQ is shared between things */
@@ -103,6 +102,7 @@ struct irq_registers {
 };
 
 struct irq_context {
+    irq_t vector;
     struct irq_registers *regs;
 
     /* This scratch buffer is stack allocated, and is set upon

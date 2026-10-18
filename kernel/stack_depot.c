@@ -30,7 +30,7 @@ void stack_depot_init() {
 static struct stack_depot_record *
 record_chain_getref_locked(struct stack_depot_record_chain *this_chain,
                            uintptr_t *entries, size_t num_entries,
-                           uint32_t hash) TSA_MUST_HOLD(&this_chain->lock) {
+                           uint32_t hash) TSA_CALLER_HOLDS(&this_chain->lock) {
     struct stack_depot_record *pos;
     list_for_each_entry(pos, &this_chain->list, hash_list) {
         if (pos->num_entries == num_entries && pos->hash == hash) {

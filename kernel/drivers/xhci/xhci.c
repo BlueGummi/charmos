@@ -734,8 +734,8 @@ void xhci_process_event_ring(struct xhci_device *xhci) {
     spin_unlock(&xhci->lock, irql);
 }
 
-enum irq_result xhci_isr(void *ctx, uint8_t vector, struct irq_context *rsp) {
-    cc_ignore(vector, rsp);
+enum irq_result xhci_isr(struct irq_context *rsp, void *ctx) {
+    cc_ignore(rsp);
     xhci_trace("Interrupt caught");
     struct xhci_device *dev = ctx;
 

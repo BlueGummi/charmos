@@ -160,9 +160,8 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
     semaphore_post(&dev->sem);
 }
 
-enum irq_result nvme_isr_handler(void *ctx, uint8_t vector,
-                                 struct irq_context *rsp) {
-    cc_ignore(vector, rsp);
+enum irq_result nvme_isr_handler(struct irq_context *rsp, void *ctx) {
+    cc_ignore(rsp);
     struct nvme_device *dev = ctx;
     nvme_process_completions(dev, THIS_QID(dev));
     return IRQ_HANDLED;

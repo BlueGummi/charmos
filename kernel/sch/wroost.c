@@ -1,7 +1,11 @@
+#include <mem/alloc.h>
+#include <mem/nofail.h>
 #include <sch/sched.h>
+#include <sch/wroost.h>
 #include <sync/rwlock.h>
-#include <sync/wroost.h>
 #include <thread/thread.h>
+
+#include "internal.h"
 
 struct wroost_globals {
     struct wroost_hash_table hash_table;
@@ -60,15 +64,15 @@ static size_t next_ctr(const wroost_counter_t *ctrs, size_t total,
  *
  */
 #define wroost_check_enforce(wts) enforce(wroost_state_check(wts))
-static bool wroost_state_check(struct wroost_thread_state *wts) {
+static bool wroost_state_check(struct wroost_thread_data *wts) {
     cc_ignore(wts);
 #ifdef DEBUG_WROOST
     for (int i = 0; i < WROOST_THREAD_COUNTERS; i++) {
         wroost_counter_t ctr = wroost_read_counter(wts, i);
         int found = 0;
         for (int j = 0; j < WROOST_FINE_ENTRY_COUNT; j++) {
-            if ((wts->fine_valid & (1U << j)) &&
-                wts->fine_entries[j].index == i)
+            if ((wts->fine_valid & BIT(j)) &&
+                wroost_fine_entry_index(&wts->fine_entries[j]) == i)
                 found++;
         }
 
@@ -117,7 +121,7 @@ static enum thread_prio_class update_bucket_prio(struct wroost_bucket *bkt,
     return old;
 }
 
-static void percpu_inc_id(struct wroost_percpu *pcpu, wroost_id_t lock_id,
+static void percpu_inc_id(struct wroost_percpu_data *pcpu, wroost_id_t lock_id,
                           enum thread_prio_class prio) {
     pcpu->rq_bucket_counts[lock_id]++;
 
@@ -133,20 +137,21 @@ static void percpu_inc_id(struct wroost_percpu *pcpu, wroost_id_t lock_id,
  * This functionality is identical to what we want when a CPU has no threads
  * of a given lock ID, so we stash an URGENT when clearing.
  */
-static void percpu_dec_id(struct wroost_percpu *pcpu, wroost_id_t lock_id) {
+static void percpu_dec_id(struct wroost_percpu_data *pcpu,
+                          wroost_id_t lock_id) {
     enforce(pcpu->rq_bucket_counts[lock_id] > 0);
     if (--pcpu->rq_bucket_counts[lock_id] == 0) {
         struct wroost_bucket *bkt = &wroost_global.hash_table.buckets[lock_id];
         size_t idx, offset;
         bucket_idx_and_offset(pcpu->id, &idx, &offset);
-        enum thread_prio_class new = (THREAD_PRIO_CLASS_URGENT) << offset;
+        enum thread_prio_class new = THREAD_PRIO_CLASS_URGENT << offset;
         atomic_fetch_or(&bkt->rq_min_prio[idx], new);
     }
 }
 
-static void percpu_move_id(struct wroost_percpu *src_pcpu,
-                           struct wroost_percpu *dst_pcpu, wroost_id_t lock_id,
-                           enum thread_prio_class prio) {
+static void percpu_move_id(struct wroost_percpu_data *src_pcpu,
+                           struct wroost_percpu_data *dst_pcpu,
+                           wroost_id_t lock_id, enum thread_prio_class prio) {
     /* Both runqueues are locked at this time,
      * as we're in the migration hook */
     enforce(src_pcpu->rq_bucket_counts[lock_id]);
@@ -187,14 +192,15 @@ static enum thread_prio_class bucket_ceil_for(size_t bkt_idx,
     return ceil;
 }
 
-static enum thread_prio_class fine_entry_ceil(struct wroost_thread_state *wts,
+static enum thread_prio_class fine_entry_ceil(struct wroost_thread_data *wts,
                                               struct wroost_fine_entry *fe,
                                               enum thread_prio_class min) {
-    size_t idx = (size_t) fe->index * WROOST_COARSE_FACTOR + fe->offset;
+    size_t idx = wroost_fine_entry_index(fe) * WROOST_COARSE_FACTOR +
+                 (fe->lock_id & WROOST_FINE_OFFSET_MASK);
     return bucket_ceil_for(idx, wts->max_boost, min);
 }
 
-enum thread_prio_class wroost_compute_ceil(struct wroost_thread_state *wts,
+enum thread_prio_class wroost_compute_ceil(struct wroost_thread_data *wts,
                                            enum thread_prio_class min) {
     wroost_check_enforce(wts);
 
@@ -214,7 +220,7 @@ enum thread_prio_class wroost_compute_ceil(struct wroost_thread_state *wts,
                     continue;
 
                 struct wroost_fine_entry *fe = &wts->fine_entries[j];
-                if (fe->index == i) {
+                if (wroost_fine_entry_index(fe) == i) {
                     ceil = MAX(fine_entry_ceil(wts, fe, ceil), ceil);
                     was_fine = true;
                     checked_fine_entries++;
@@ -239,7 +245,8 @@ void wroost_post_read_acquire(struct rwlock *lock,
     wroost_id_t id = wroost_hash(lock);
     uint8_t c_idx = id / WROOST_COARSE_FACTOR;
     uint8_t offset = id % WROOST_COARSE_FACTOR;
-    struct wroost_thread_state *wts = &curr->wroost_state;
+    enforce((offset & WROOST_FINE_OFFSET_MASK) == offset);
+    struct wroost_thread_data *wts = &curr->wroost_data;
 
     /* We're touching per-thread that the scheduler cares about,
      * so let's prevent preemption so it always sees a valid state */
@@ -257,10 +264,9 @@ void wroost_post_read_acquire(struct rwlock *lock,
     if (prev_val == 0) {
         /* First lock in this index, try to get an entry */
         struct wroost_fine_entry *fe = wroost_alloc_fine_entry(wts);
-        if (fe) {
-            fe->index = c_idx;
-            fe->offset = offset;
-        }
+        if (fe)
+            fe->lock_id = (c_idx << WROOST_FINE_INDEX_SHIFT) | offset;
+
     } else if (new_val == WROOST_COUNTER_MAX) {
         /* Evict entries */
         wroost_evict_fine_entries(wts, c_idx);
@@ -270,8 +276,7 @@ void wroost_post_read_acquire(struct rwlock *lock,
         if (wroost_get_fine_entry(wts, c_idx) != NULL) {
             struct wroost_fine_entry *fe = wroost_alloc_fine_entry(wts);
             if (fe) {
-                fe->index = c_idx;
-                fe->offset = offset;
+                fe->lock_id = (c_idx << WROOST_FINE_INDEX_SHIFT) | offset;
             } else {
                 wroost_evict_fine_entries(wts, c_idx);
             }
@@ -284,7 +289,7 @@ void wroost_post_read_acquire(struct rwlock *lock,
 
 void wroost_post_read_release(struct rwlock *lock) {
     struct thread *curr = thread_get_current();
-    struct wroost_thread_state *wts = &curr->wroost_state;
+    struct wroost_thread_data *wts = &curr->wroost_data;
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     wroost_check_enforce(wts);
@@ -306,9 +311,11 @@ void wroost_post_read_release(struct rwlock *lock) {
 
         if (prev_val < WROOST_COUNTER_MAX) {
             for (int i = 0; i < WROOST_FINE_ENTRY_COUNT; i++) {
-                if ((wts->fine_valid & BIT(i)) &&
-                    wts->fine_entries[i].index == c_idx &&
-                    wts->fine_entries[i].offset == offset) {
+                struct wroost_fine_entry *wfe = &wts->fine_entries[i];
+                uint8_t wfe_idx = wroost_fine_entry_index(wfe);
+                uint8_t wfe_offset = wfe->lock_id & WROOST_FINE_OFFSET_MASK;
+                if ((wts->fine_valid & BIT(i)) && wfe_idx == c_idx &&
+                    wfe_offset == offset) {
                     wroost_clear_fine_entry(wts, i);
                     break;
                 }
@@ -320,8 +327,13 @@ void wroost_post_read_release(struct rwlock *lock) {
     irql_lower(irql);
 }
 
-void wroost_writer_bump(struct rwlock *lock,
-                        enum thread_prio_class writer_class) {
+static bool percpu_boost_kick(cpu_id_t target) {
+    dpc_enqueue_on_cpu(target,
+                       &global.schedulers[target]->wroost_data->boost_dpc);
+}
+
+void wroost_writer_block(struct rwlock *lock,
+                         enum thread_prio_class writer_class) {
     wroost_id_t bkt_idx = wroost_hash(lock);
     struct wroost_bucket *bkt = &wroost_global.hash_table.buckets[bkt_idx];
     size_t offset = (size_t) writer_class * BIT_SIZEOF(uint16_t);
@@ -345,9 +357,8 @@ void wroost_writer_bump(struct rwlock *lock,
                 enum thread_prio_class prio =
                     (word >> shift) & THREAD_PRIO_CLASS_MASK;
 
-                if (prio < writer_class) {
-                    /* TODO: Kick */
-                }
+                if (prio < writer_class)
+                    percpu_boost_kick(checked);
 
                 checked++;
             }
@@ -355,9 +366,63 @@ void wroost_writer_bump(struct rwlock *lock,
     }
 }
 
-void wroost_switch_out(struct wroost_percpu *pcpu, struct thread *out) {}
+/* There's a balance to strike with the scheduler runqueue lock granularity.
+ *
+ * If we lock around the WHOLE DPC, then writers can stall waiting
+ * for us to complete it if we are in the middle of it.
+ *
+ * This is because the IPI would wait for us to exit our IRQ disabled
+ * critical section, which would be bounded by the time we hold
+ * the lock for. In contrast, holding it for too little is also
+ * not great since the lock paths get noisy.
+ *
+ * We break it to the per-bitmap-pass granularity.
+ */
+static void process_pending_bitmap(struct scheduler *self) {
+    struct wroost_percpu_data *pcd = self->wroost_data;
 
-void wroost_switch_in(struct wroost_percpu *pcpu, struct thread *in) {}
+    enum irql irql = spin_lock_high(&self->lock);
 
-void wroost_migrate_hook(struct wroost_percpu *from, struct wroost_percpu *to,
-                         struct thread *thread) {}
+    for (size_t w = 0; w < BITMAP_WORDS(WROOST_BUCKET_COUNT); w++) {
+        uint64_t pending = atomic_xchg_acq_rel(&pcd->pending_bitmap[w], 0);
+
+        while (pending) {
+            uint8_t bit = cw_ctz(pending);
+            pending &= pending - 1;
+            wroost_id_t id = (w << WROOST_PENDING_BITMAP_WORD_SHIFT) | bit;
+        }
+    }
+
+    spin_unlock(&self->lock, irql);
+}
+
+/* This DPC runs on the reader-side CPU and is
+ * responsible for doing all of the boosting. */
+static void wroost_dpc(struct dpc_context *dc, void *a, void *b) {
+    cc_ignore(dc, a, b);
+    struct scheduler *self = smp_core_scheduler();
+    while (true) {
+        process_pending_bitmap(self);
+
+        /* If a writer came about, this CAS fails and we go again */
+        enum wroost_state want = WROOST_DPC_ACTIVE;
+
+        if (cc_likely(atomic_cas_strong(&self->wroost_data->state, &want,
+                                        WROOST_DPC_IDLE)))
+            break;
+    }
+}
+
+void wroost_switch_out(struct wroost_percpu_data *pcpu, struct thread *out) {}
+
+void wroost_migrate_hook(struct wroost_percpu_data *from,
+                         struct wroost_percpu_data *to, struct thread *thread) {
+}
+
+void wroost_scheduler_init(struct scheduler *sched) {
+    sched->wroost_data = nofail_vnew(sched->wroost_data, ALLOC_ZERO);
+
+    struct wroost_percpu_data *pcd = sched->wroost_data;
+    dpc_init(&pcd->boost_dpc, wroost_dpc, NULL, NULL);
+    pcd->id = sched->core_id;
+}

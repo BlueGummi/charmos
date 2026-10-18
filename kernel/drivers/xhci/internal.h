@@ -21,7 +21,7 @@ void xhci_request_move(struct xhci_device *dev, struct xhci_request *req,
                        enum xhci_request_list new_list);
 void xhci_reset_slot(struct usb_device *dev);
 enum usb_error xhci_port_init(struct xhci_port *p);
-enum irq_result xhci_isr(void *ctx, uint8_t vector, struct irq_context *rsp);
+enum irq_result xhci_isr(struct irq_context *ic, void *ctx);
 struct xhci_return xhci_wait_for_port_status_change(struct xhci_device *dev,
                                                     uint32_t port_id);
 void xhci_device_start_interrupts(uint8_t bus, uint8_t slot, uint8_t func,

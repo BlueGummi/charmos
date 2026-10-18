@@ -46,7 +46,7 @@ static bool should_boost(struct bio_request *req) {
 }
 
 static bool do_boost_prio(struct bio_scheduler *sched, struct bio_request *req)
-    TSA_MUST_HOLD(&sched->lock) {
+    TSA_CALLER_HOLDS(&sched->lock) {
     enum bio_request_priority new_prio = get_boosted_prio(req);
 
     struct bio_scheduler_ops *ops = sched->disk->ops;
@@ -75,7 +75,7 @@ static bool do_boost_prio(struct bio_scheduler *sched, struct bio_request *req)
 
 static inline bool try_boost(struct bio_scheduler *sched,
                              struct bio_request *req)
-    TSA_MUST_HOLD(&sched->lock) {
+    TSA_CALLER_HOLDS(&sched->lock) {
     if (should_boost(req))
         return do_boost_prio(sched, req);
 

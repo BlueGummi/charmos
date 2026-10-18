@@ -21,7 +21,7 @@ CMDLINE_CHILDREN_DEFINE(
                                                     CLOCK_NAME_HPET,
                                                     CLOCK_NAME_TSC)));
 
-static void timer_dpc(void *ctx, void *unused);
+static void timer_dpc(struct dpc_context *dc, void *ctx, void *unused);
 void timer_base_reprogram_hardware(cpu_id_t cpu);
 static void timer_percpu_ctor(struct timer_percpu *p, cpu_id_t cpu) {
     for (int i = 0; i < TIMER_BASE_MAX; i++) {
@@ -142,7 +142,8 @@ static inline void timer_sync_wait_spin() {
         cpu_pause();
 }
 
-static void timer_dpc(void *ctx, void *unused) {
+static void timer_dpc(struct dpc_context *dc, void *ctx, void *unused) {
+    cc_ignore(dc);
     cc_ignore(unused);
     struct timer_percpu *pcpu = ctx;
 
@@ -588,8 +589,8 @@ void timer_base_reprogram_hardware(cpu_id_t cpu) {
     irql_lower(outer);
 }
 
-enum irq_result timer_isr(void *ctx, uint8_t vec, struct irq_context *rsp) {
-    cc_ignore(ctx, vec, rsp);
+enum irq_result timer_isr(struct irq_context *rsp, void *ctx) {
+    cc_ignore(ctx, rsp);
     cpu_id_t cpu = smp_id(TOPC_IRQ);
     if (!PERCPU_READY(timer_percpu))
         return IRQ_HANDLED;

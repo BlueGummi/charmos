@@ -83,9 +83,8 @@ static void tlb_shootdown_internal(void) {
     ring_invalidate(&PERCPU_PTR(TOPC_IRQ, tlb_cpus)->eager_ring);
 }
 
-enum irq_result tlb_shootdown_isr(void *ctx, irq_t irq,
-                                  struct irq_context *rsp) {
-    cc_ignore(ctx, irq, rsp);
+enum irq_result tlb_shootdown_isr(struct irq_context *rsp, void *ctx) {
+    cc_ignore(ctx, rsp);
 
     tlb_shootdown_internal();
     return IRQ_HANDLED;

@@ -93,7 +93,8 @@ void test_perturb_waker(const struct test_perturb_env *env,
     }
 }
 
-static void perturb_apc_probe(void *arg) {
+static void perturb_apc_probe(struct apc_context *ac, void *arg) {
+    cc_ignore(ac);
     cc_ignore(arg);
 }
 
@@ -260,7 +261,8 @@ static void dpc_storm_spin(void) {
         cpu_pause();
 }
 
-static void dpc_storm_fn(void *a, void *b) {
+static void dpc_storm_fn(struct dpc_context *dc, void *a, void *b) {
+    cc_ignore(dc);
     cc_ignore(a, b);
     dpc_storm_spin();
 }

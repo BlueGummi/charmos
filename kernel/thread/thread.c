@@ -236,7 +236,6 @@ static struct thread *thread_init(struct thread *thread,
      * thread_join_timeout() has to allocate a timer while holding the
      * lock, which it could not do at IRQL_HIGH_LEVEL */
     condvar_init(&thread->join_cv);
-    pairing_node_init(&thread->wq_pairing_node);
 
     turnstile_init(thread->turnstile);
 
@@ -258,7 +257,7 @@ static struct thread *thread_init(struct thread *thread,
     list_node_init(&thread->reaper_list);
     rbt_init_node(&thread->rq_tree_node);
     rbt_init_node(&thread->wq_tree_node);
-    crash_perthread_init(thread);
+    crash_thread_init(thread);
     locked_list_add(&global.thread_list, &thread->thread_list);
 
     return thread;

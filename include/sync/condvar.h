@@ -10,14 +10,15 @@ struct condvar {
     struct thread_wait_header waiters;
 };
 
-/* wait object */
+/* wait object, embedded in a thread.
+ *
+ * get the thread pointer with container_of() */
 struct condvar_with_cb {
     struct condvar *cv;
     condvar_callback cb;
     void *cb_arg;
     size_t cookie;
     struct timer timer;
-    struct thread *thread;
 };
 
 enum wake_reason condvar_wait(struct condvar *cv, struct spinlock *lock,

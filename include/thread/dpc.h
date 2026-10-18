@@ -7,8 +7,9 @@
 #include <structures/cpu_mask.h>
 
 struct dpc;
+struct dpc_context;
 
-typedef void (*dpc_func_t)(void *a, void *b);
+typedef void (*dpc_func_t)(struct dpc_context *d, void *a, void *b);
 
 struct dpc {
     dpc_func_t func;
@@ -16,6 +17,10 @@ struct dpc {
     void *b;
     atomic(struct dpc *) next; /* for MPSC push */
     atomic_bool enqueued;      /* prevents double-enqueue */
+};
+
+struct dpc_context {
+    struct dpc *dpc;
 };
 
 typedef void (*dpc_fanout_fn_t)(void);

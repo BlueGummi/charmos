@@ -15,7 +15,7 @@ static inline bool should_early_dispatch(struct bio_scheduler *sched) {
 
 static bool try_dispatch_queue_head(struct bio_scheduler *sched,
                                     struct bio_rqueue *q)
-    TSA_MUST_HOLD(&sched->lock) {
+    TSA_CALLER_HOLDS(&sched->lock) {
     if (list_head_empty(&q->list))
         return false;
 
@@ -55,7 +55,7 @@ static void dispatch_queue(struct block_device *disk, struct bio_rqueue *q) {
 }
 
 static void do_early_dispatch(struct bio_scheduler *sched)
-    TSA_MUST_HOLD(&sched->lock) {
+    TSA_CALLER_HOLDS(&sched->lock) {
     for (int prio = 0; prio < BIO_SCHED_LEVELS; prio++)
         if (try_dispatch_queue_head(sched, &sched->queues[prio]))
             return;

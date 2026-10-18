@@ -930,8 +930,12 @@ void crash_facilities_init(void) {
         f->prefix = (f - __skernel_crash_facilities) + 1;
 }
 
-void crash_perthread_init(struct thread *t) {
-    struct crash_perthread *pt = &t->crash_data;
+#ifdef DEBUG_CRASH
+
+void crash_thread_init(struct thread *t) {
+    cc_ignore(t);
+
+    struct crash_thread_data *pt = &t->crash_data;
     list_head_init(&pt->crash_hooks);
     pt->in_hook = false;
     list_head_init(&pt->unwind.free_list);
@@ -1064,29 +1068,6 @@ STRINGIFY_DECLARE_ENUM(crash_unwind_type) {
     }
 }
 
-/* The idea here: we first traverse backwards and unwind
- * one by one, detaching as we go */
-void crash_unwind(void) TSA_NO_ANALYSIS {
-    struct thread *t = thread_get_current();
-    struct crash_perthread *pt = &t->crash_data;
-    pt->unwinding = true;
-
-    struct crash_unwind_perthread *upt = &pt->unwind;
-    struct crash_unwind_node *cun, *tmp;
-    list_for_each_entry_safe_rev(cun, tmp, &upt->in_use, list) {
-        enforce(cun->type != CRASH_UNWIND_NONE);
-        thread_warn("unwinding %s (%p)", crash_unwind_type_to_str(cun->type),
-                    cun->data.ptr);
-        unwind_cbs[cun->type](&cun->data);
-        list_node_delete(&cun->list);
-        unwind_node_free(t, cun);
-    }
-
-    irql_lower(IRQL_PASSIVE_LEVEL);
-
-    pt->unwinding = false;
-}
-
 static void crash_unwind_enter(uintptr_t data, enum crash_unwind_type type,
                                uintptr_t arg) {
     if (global.current_bootstage >= BOOTSTAGE_LATE &&
@@ -1109,6 +1090,29 @@ static void crash_unwind_exit(uintptr_t data, enum crash_unwind_type type) {
 
         crash_unwind_node_remove(&nd, type);
     }
+}
+
+/* The idea here: we first traverse backwards and unwind
+ * one by one, detaching as we go */
+void crash_unwind(void) TSA_NO_ANALYSIS {
+    struct thread *t = thread_get_current();
+    struct crash_thread_data *pt = &t->crash_data;
+    pt->unwinding = true;
+
+    struct crash_unwind_thread_data *upt = &pt->unwind;
+    struct crash_unwind_node *cun, *tmp;
+    list_for_each_entry_safe_rev(cun, tmp, &upt->in_use, list) {
+        enforce(cun->type != CRASH_UNWIND_NONE);
+        thread_warn("unwinding %s (%p)", crash_unwind_type_to_str(cun->type),
+                    cun->data.ptr);
+        unwind_cbs[cun->type](&cun->data);
+        list_node_delete(&cun->list);
+        unwind_node_free(t, cun);
+    }
+
+    irql_lower(IRQL_PASSIVE_LEVEL);
+
+    pt->unwinding = false;
 }
 
 void crash_unwind_enter_rcu(void) {
@@ -1150,3 +1154,5 @@ void crash_unwind_enter_qspinlock(struct qspinlock *q, enum irql old) {
 void crash_unwind_exit_qspinlock(struct qspinlock *q) {
     crash_unwind_exit((uintptr_t) q, CRASH_UNWIND_QSPINLOCK);
 }
+
+#endif

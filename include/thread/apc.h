@@ -22,6 +22,10 @@ enum apc_state : uint8_t {
 struct apc;
 typedef void (*apc_destroy_t)(struct apc *apc);
 
+struct apc_context {
+    struct apc *apc;
+};
+
 struct apc {
     apc_func_t func;
     void *ctx;

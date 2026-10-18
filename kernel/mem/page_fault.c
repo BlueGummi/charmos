@@ -29,9 +29,8 @@ EXCEPTION_SYNC_CB_REGISTER(page_fault, IRQ_PAGE_FAULT, page_fault_sync_cb,
 
 static struct spinlock pf_lock = SPINLOCK_INIT;
 
-enum irq_result page_fault_isr(void *context, uint8_t vector,
-                               struct irq_context *rsp) {
-    cc_ignore(context, vector);
+enum irq_result page_fault_isr(struct irq_context *rsp, void *ctx) {
+    cc_ignore(ctx);
     /* Synchronization here is actually OK: we can only receive one
      * IRQ per CPU at any moment, and the caller passes the thread-local buffer
      * to the exception_sync_cb below, this is just how the ISR

@@ -190,14 +190,14 @@ struct crash_unwind_node {
 };
 
 #define CRASH_UNWIND_NODES 128
-struct crash_unwind_perthread {
+struct crash_unwind_thread_data {
     struct list_head free_list;
     struct list_head in_use; /* LIFO */
     struct crash_unwind_node nodes[CRASH_UNWIND_NODES];
 };
 
-struct crash_perthread {
-    struct crash_unwind_perthread unwind;
+struct crash_thread_data {
+    struct crash_unwind_thread_data unwind;
     struct list_head crash_hooks; /* struct crash_hook */
     bool unwinding;
     bool in_hook;
@@ -289,7 +289,10 @@ const char *crash_code_from_facility_to_str(enum crash_code code);
 void crash_nmi_handoff(void *p, struct irq_registers *irqc);
 void debug_print_stack(void);
 void crash_facility_printf(const char *fmt, ...) cc_printf_like(1, 2);
-void crash_perthread_init(struct thread *t);
+
+#ifdef DEBUG_CRASH
+
+void crash_thread_init(struct thread *t);
 void crash_unwind(void);
 
 /* Enter/exit pairs */
@@ -303,6 +306,54 @@ void crash_unwind_enter_spinlock(struct spinlock *s, enum irql old);
 void crash_unwind_exit_spinlock(struct spinlock *s);
 void crash_unwind_enter_qspinlock(struct qspinlock *q, enum irql old);
 void crash_unwind_exit_qspinlock(struct qspinlock *q);
+
+#else
+/* Empty static inline versions that cc_ignore the parameters */
+
+static inline void crash_thread_init(struct thread *t) {
+    cc_ignore(t);
+}
+
+static inline void crash_unwind(void) {}
+
+static inline void crash_unwind_enter_rcu(void) {}
+static inline void crash_unwind_exit_rcu(void) {}
+
+static inline void crash_unwind_enter_mutex(struct mutex *m) {
+    cc_ignore(m);
+}
+
+static inline void crash_unwind_exit_mutex(struct mutex *m) {
+    cc_ignore(m);
+}
+
+static inline void crash_unwind_enter_rwlock(struct rwlock *r) {
+    cc_ignore(r);
+}
+
+static inline void crash_unwind_exit_rwlock(struct rwlock *r) {
+    cc_ignore(r);
+}
+
+static inline void crash_unwind_enter_spinlock(struct spinlock *s,
+                                               enum irql old) {
+    cc_ignore(s, old);
+}
+
+static inline void crash_unwind_exit_spinlock(struct spinlock *s) {
+    cc_ignore(s);
+}
+
+static inline void crash_unwind_enter_qspinlock(struct qspinlock *q,
+                                                enum irql old) {
+    cc_ignore(q, old);
+}
+
+static inline void crash_unwind_exit_qspinlock(struct qspinlock *q) {
+    cc_ignore(q);
+}
+
+#endif
 
 static inline void qemu_exit(int code) {
     outb(0xf4, (uint8_t) code);

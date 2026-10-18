@@ -1,5 +1,6 @@
 #include <console/printf.h>
 #include <mem/alloc.h>
+#include <mem/nofail.h>
 #include <sch/sched.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -9,9 +10,9 @@
 
 #include "internal.h"
 
-enum irq_result scheduler_reschedule_isr(void *ctx, uint8_t vec,
-                                         struct irq_context *rsp) {
-    cc_ignore(ctx, vec, rsp);
+enum irq_result scheduler_reschedule_isr(struct irq_context *rsp, void *ctx) {
+    scheduler_mark_self_needs_resched(true);
+    cc_ignore(ctx, rsp);
     return IRQ_HANDLED;
 }
 
@@ -49,9 +50,7 @@ void scheduler_init(void) {
 
     size_t i;
     for_each_cpu_id(i) {
-        struct scheduler *s = vnew(s, ALLOC_ZERO);
-        if (!s)
-            panic("Could not allocate scheduler %lu", i);
+        struct scheduler *s = nofail_vnew(s, ALLOC_ZERO);
 
         spinlock_init(&s->lock, LOCK_UNCHKD);
         rbt_init(&s->thread_rbt, scheduler_thread_get_data,
