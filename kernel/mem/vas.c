@@ -48,6 +48,7 @@ static bool magazines_enabled(struct vas *vas) {
 #else
     cc_ignore(vas);
 #endif
+
     /* IRQL is a no-op during bootstrap */
     return global.current_bootstage >= BOOTSTAGE_LATE;
 }
@@ -110,9 +111,11 @@ static bool magazine_free(struct vas_arena *arena, uint32_t cls, vaddr_t addr) {
 
         magazine_publish(slot, VAS_MAG_CACHED);
         mag->recent = i;
+
 #ifdef TEST_ENABLED
         arena->mag_free_hits++;
 #endif
+
         return true;
     }
     return false;
@@ -153,6 +156,7 @@ static struct vas_segment *segment_alloc(struct vas_arena *arena) {
     if (arena->tag_alloc_budget > 0)
         arena->tag_alloc_budget--;
 #endif
+
     struct vas_segment *seg = fixed_size_alloc(&arena->fsr);
     if (seg) {
         memset(seg, 0, sizeof(*seg));
@@ -216,6 +220,7 @@ static void arena_init(struct vas_arena *arena, bool is_global) {
         .bootstrap_mode = true,
     };
     fixed_size_range_init(&arena->fsr, &attrs);
+
 #ifdef TEST_ENABLED
     arena->tag_alloc_budget = -1;
 #endif
@@ -493,6 +498,7 @@ vaddr_t vas_alloc(struct vas *vas, size_t size, size_t align) {
     vas->local[cpu].requests[cls]++;
     vas->local[cpu].alignments[size_to_bin(align)]++;
 #endif
+
     if (cls < VAS_MAG_CLASSES && magazines_enabled(vas)) {
         result = magazine_alloc(&vas->local[cpu], cls, align);
         if (result)

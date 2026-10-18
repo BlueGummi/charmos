@@ -276,6 +276,7 @@ void mutex_simple_assert_held_full(struct mutex_simple *m,
 #else
     cc_ignore(site);
 #endif
+
     enforce(mutex_simple_get_owner(m) == thread_get_current(),
             "mutex_simple not held by current thread");
 }
@@ -291,6 +292,7 @@ void mutex_simple_assert_not_held_full(struct mutex_simple *m,
 #else
     cc_ignore(site);
 #endif
+
     enforce(mutex_simple_get_owner(m) != thread_get_current(),
             "mutex_simple unexpectedly held by current thread");
 }

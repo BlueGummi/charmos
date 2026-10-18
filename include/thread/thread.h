@@ -73,17 +73,11 @@ struct cpu_context {
 
 #define THREAD_EVENT_REASON_NONE 0xFF
 
-struct thread_event_association {
-    thread_act_reason_t reason;
-    uint64_t cycle; /* Cycle for the associated reason */
-};
-
-#define THREAD_ASSOCIATED_REASON_NONE 0xFF
 struct thread_event_reason {
-    thread_act_reason_t reason;
-    struct thread_event_association associated_reason;
-    time_ms_t timestamp;
-    uint64_t cycle;
+    uint16_t duration_ms; /* wait duration (clamped to UINT16_MAX ms) */
+    thread_act_reason_t
+        wait_reason; /* BLOCK_IO, BLOCK_MANUAL, SLEEP_MANUAL... */
+    thread_act_reason_t wake_reason; /* WAKE_IO, WAKE_MANUAL, WAKE_TIMEOUT... */
 };
 
 /* Background threads share timeslices */
@@ -92,51 +86,36 @@ struct thread_event_reason {
      prio == THREAD_PRIO_CLASS_BACKGROUND)
 
 #define THREAD_ACTIVITY_BUCKET_COUNT 4
-#define THREAD_ACTIVITY_BUCKET_DURATION 1000 /* 1 second per bucket */
-
-static_assert(THREAD_ACTIVITY_BUCKET_COUNT < UINT16_MAX,
-              "Thread activity bucket granularity too large for a u16");
+#define THREAD_ACTIVITY_BUCKET_SHIFT 10
+#define THREAD_ACTIVITY_BUCKET_DURATION                                        \
+    (1U << THREAD_ACTIVITY_BUCKET_SHIFT) /* 1024 ms (~1s) */
+#define THREAD_ACTIVITY_BUCKET_MASK (THREAD_ACTIVITY_BUCKET_DURATION - 1U)
+#define THREAD_ACTIVITY_INDEX_MASK (THREAD_ACTIVITY_BUCKET_COUNT - 1U)
 
 #define THREAD_EVENT_RINGBUFFER_CAPACITY THREAD_ACTIVITY_BUCKET_COUNT
+#define THREAD_EVENT_RINGBUFFER_MASK (THREAD_EVENT_RINGBUFFER_CAPACITY - 1U)
 #define TOTAL_BUCKET_DURATION                                                  \
     (THREAD_ACTIVITY_BUCKET_COUNT * THREAD_ACTIVITY_BUCKET_DURATION)
 
-/* Buckets */
-struct thread_runtime_bucket {
-    uint16_t run_time_ms; /* can safely do a u16 since 2^16 > 1000 */
-    uint64_t wall_clock_sec;
-};
-
+/* We're using 1024 for power of 2 division strength reduction optimizations */
 struct thread_activity_bucket {
-    uint64_t cycle;
-
-    /* please do not block/sleep/wake more than 2^32 times a second */
-    uint32_t block_count;
-    uint32_t sleep_count;
-    uint32_t wake_count;
-
-    uint16_t block_duration;
-    uint16_t sleep_duration;
+    uint32_t epoch;      /* time_ms >> THREAD_ACTIVITY_BUCKET_SHIFT */
+    uint16_t run_ms;     /* run duration in window (0..1024) */
+    uint16_t block_ms;   /* blocked duration in window (0..1024) */
+    uint16_t sleep_ms;   /* sleeping duration in window (0..1024) */
+    uint16_t wake_count; /* saturating wake count in window */
 };
 
-/* Fine grained, exact activity stats */
 struct thread_activity_stats {
-    struct thread_runtime_bucket rt_buckets[THREAD_ACTIVITY_BUCKET_COUNT];
     struct thread_activity_bucket buckets[THREAD_ACTIVITY_BUCKET_COUNT];
-    time_ms_t last_update_ms;
-    uint64_t current_cycle;
-    uint8_t current_bucket; /* idx of bucket representing 'now' */
-    uint8_t last_wake_index;
 };
-
-#define MAKE_THREAD_RINGBUFFER(name)                                           \
-    struct thread_event_reason name[THREAD_EVENT_RINGBUFFER_CAPACITY];         \
-    uint8_t name##_head;
 
 struct thread_activity_data {
-    MAKE_THREAD_RINGBUFFER(wake_reasons);
-    MAKE_THREAD_RINGBUFFER(block_reasons);
-    MAKE_THREAD_RINGBUFFER(sleep_reasons);
+    uint32_t wait_start_ms; /*low 32 bits of wait start time */
+    struct thread_event_reason events[THREAD_EVENT_RINGBUFFER_CAPACITY];
+    uint8_t head; /* next slot index */
+
+    thread_act_reason_t active_wait_reason; /* NONE if not waiting */
 };
 
 /* Activity aggregations */
@@ -203,13 +182,13 @@ struct thread {
      * reset if unions are to be used */
 
 #ifdef DEBUG_CRASH
-
     struct crash_thread_data crash_data;
-
 #endif
 
-    struct list_node reaper_list; /* reaper list */
-    struct list_node thread_list; /* global list of threads */
+    union {
+        struct list_node reaper_list; /* reaper list */
+        struct list_node thread_list; /* global list of threads */
+    };
 
     /* Runqueue nodes */
 
@@ -223,7 +202,7 @@ struct thread {
         struct list_node rt_list_node; /* alias for rt scheduling */
     };
 
-    /* Waitqueue nodes */
+    /* Waitqueue nodes. TODO: union */
     struct rbt_node wq_tree_node;   /* waitqueue tree node */
     int32_t wq_prio;                /* turnstile sort key
                                      * TODO: there is probably a smarter way
@@ -273,8 +252,6 @@ struct thread {
     /* Class changes */
     time_ms_t last_class_change_ms;
 
-    size_t effective_priority;
-
     /* Timeslice info and periods */
     uint64_t completed_period;
     time_ms_t period_runtime_raw_ms; /* Raw MS time of runtime this period */
@@ -318,8 +295,8 @@ struct thread {
     bool io_class_boost; /* has an URGENT boost*/
 
     /* Activity data */
-    struct thread_activity_data *activity_data;
-    struct thread_activity_stats *activity_stats;
+    struct thread_activity_data activity_data;
+    struct thread_activity_stats activity_stats;
 
     /* "Overview" derived from data and stats */
     struct thread_activity_metrics activity_metrics;
@@ -381,9 +358,7 @@ struct thread {
     struct wroost_thread_data wroost_data;
 
 #ifdef DEBUG_LOCK_CHK
-
     struct lock_chk_thread_data lock_chk;
-
 #endif
 
     /* ========== Memory management data ========== */
@@ -400,12 +375,11 @@ struct thread {
     uint32_t special_apc_disable;
     uint32_t kernel_apc_disable;
 
-    struct apc_queue event_apcs;         /* yet to execute */
-    struct apc_queue to_exec_event_apcs; /* to be executed */
-
-    /* ========== Profiling data ========== */
+    /* ========== Debug data ========== */
+#ifdef DEBUG_THREAD
     struct log_site *log_site;
     struct log_handle log_handle;
+
     size_t context_switches; /* Total context switches */
 
     size_t preemptions;
@@ -417,6 +391,7 @@ struct thread {
     uint32_t total_block_count; /* Aggregate count of all block events */
     uint32_t total_sleep_count; /* Aggregate count of all sleep events */
     uint32_t total_apcs_ran;    /* Total APCs executed on a given thread */
+#endif
 
     /* Misc. private field for whatever needs it */
     void *private;
@@ -468,7 +443,6 @@ void thread_sleep_for_us(uint64_t us) TSA_MAY_SLEEP;
 cc_noreturn void thread_exit(void);
 void thread_print(const struct thread *t);
 
-void thread_update_activity_stats(struct thread *t, time_ms_t time);
 void thread_classify_activity(struct thread *t, uint64_t now_ms);
 void thread_update_runtime_buckets(struct thread *thread, time_ms_t time);
 void thread_apply_wake_boost(struct thread *t);
@@ -559,6 +533,7 @@ static inline void scheduler_yield_nesting_enter(struct thread *t) {
     t->yield_nesting++;
     if (t->yield_nesting > t->yield_nesting_max)
         t->yield_nesting_max = t->yield_nesting;
+
 #ifdef DEBUG_SCHED_NESTING
     enforce(t->yield_nesting <= SCHED_MAX_YIELD_NESTING,
             "scheduler_yield nested %u deep on thread '%s'", t->yield_nesting,

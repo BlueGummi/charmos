@@ -225,10 +225,12 @@ enum slab_crash_code {
  * will have to be mapped regardless */
 struct slab {
     uint8_t *bitmap;
+
 #ifdef DEBUG_SLAB_DEEP
     stack_handle_t *traces; /* This is used to keep stack traces of the
                              * individual allocations when in DEBUG_DEEP */
 #endif
+
     vaddr_t mem; /* Where does the slab data start */
     size_t used;
     struct slab_chunk *parent_chunk;

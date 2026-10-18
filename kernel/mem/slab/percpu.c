@@ -10,6 +10,7 @@ static cc_no_asan void slab_magazine_zero_check(struct slab_magazine *mag) {
 #ifndef DEBUG_SLAB_DEEP
     cc_ignore(mag);
 #endif
+
 #ifdef DEBUG_SLAB_DEEP
     if (mag->type != SLAB_MAGAZINE_ZERO)
         return;

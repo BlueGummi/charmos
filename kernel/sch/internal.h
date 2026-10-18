@@ -63,7 +63,7 @@ static inline void scheduler_decrement_thread_count(struct scheduler *sched,
     if (sched->thread_count[t->perceived_prio_class] == 0)
         scheduler_clear_queue_bitmap(sched, t->perceived_prio_class);
 
-    if (t->effective_priority == THREAD_PRIO_CLASS_TIMESHARE)
+    if (t->perceived_prio_class == THREAD_PRIO_CLASS_TIMESHARE)
         sched->total_weight -= t->weight;
 
     atomic_dec(&scheduler_data.total_threads);
@@ -77,7 +77,7 @@ static inline void scheduler_increment_thread_count(struct scheduler *sched,
     sched->thread_count[t->perceived_prio_class]++;
     scheduler_set_queue_bitmap(sched, t->perceived_prio_class);
 
-    if (t->effective_priority == THREAD_PRIO_CLASS_TIMESHARE)
+    if (t->perceived_prio_class == THREAD_PRIO_CLASS_TIMESHARE)
         sched->total_weight += t->weight;
 
     atomic_inc(&scheduler_data.total_threads);

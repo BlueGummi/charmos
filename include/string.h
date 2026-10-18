@@ -139,6 +139,7 @@ int tolower(int c) cc_constfn;
 #define strdup vstrdup
 #define strndup vstrndup
 #endif
+
 char *cc_nullable strdup(const char *str) cw_alloc() cc_warn_unused_result;
 char *cc_nullable strndup(const char *str, size_t n) cw_alloc()
     cc_warn_unused_result;

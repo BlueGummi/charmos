@@ -228,10 +228,12 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
     if (rwlock_try_lock(lock, curr, acq_type, base_class)) {
         if (acq_type == RWLOCK_READ)
             thread_boost_self(RWLOCK_GET_PRIO_CEIL(lword));
+
 #ifdef DEBUG_LOCK_CHK
         if (checked_deep)
             lock_chk_acqd(&token);
 #endif
+
         crash_unwind_enter_rwlock(lock);
         return;
     }
@@ -328,6 +330,7 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
     if (checked_deep)
         lock_chk_acqd(&token);
 #endif
+
     crash_unwind_enter_rwlock(lock);
 }
 
@@ -500,6 +503,7 @@ void rw_unlock_full(struct rwlock *lock,
     if (checked_deep)
         lock_chk_reld(&token);
 #endif /* DEBUG_LOCK_CHK */
+
     crash_unwind_exit_rwlock(lock);
 
     if (!is_writer)
@@ -523,6 +527,7 @@ void rwlock_assert_held_full(struct rwlock *lock, enum rwlock_acquire_type type,
 #else
     cc_ignore(site);
 #endif
+
     enforce(rwlock_locked(lock, type), "rwlock not held");
 }
 
@@ -537,6 +542,7 @@ void rwlock_assert_not_held_full(struct rwlock *lock,
 #else
     cc_ignore(site);
 #endif
+
     /* Raw fallback can only check write mode ownership, which is
      * a small caveat of the system here, as reads can be
      * any reader, not necessarily "this reader" */

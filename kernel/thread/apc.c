@@ -117,7 +117,10 @@ static void apc_execute(struct apc *a) {
     a->func(&ac, a->ctx);
 
     thread_and_flags(curr, ~THREAD_FLAG_EXECUTING_APC);
+
+#ifdef DEBUG_THREAD
     curr->total_apcs_ran++;
+#endif
 }
 
 /* TODO: Work on this budget thing */
@@ -210,37 +213,6 @@ bool apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
     return true;
 }
 
-/* We can only enqueue and run from ourselves, no sync needed */
-bool apc_enqueue_event_apc(struct event_apc *a, struct apc_event_desc *desc) {
-    enforce(desc);
-    if (!a || !apc_getref(&a->apc))
-        return false;
-
-    enum apc_state expected = APC_STATE_IDLE;
-    if (!atomic_cas_strong(&a->apc.state, &expected, APC_STATE_QUEUED,
-                           mo_acq_rel, mo_acquire)) {
-        apc_putref(&a->apc);
-        return false;
-    }
-
-    enforce(!a->apc.owner);
-
-    a->desc = desc;
-
-    struct thread *t = thread_get_current();
-    if (!thread_apc_sanity_check(t)) {
-        atomic_store_release(&a->apc.state, APC_STATE_IDLE);
-        apc_putref(&a->apc);
-        return false;
-    }
-
-    apc_enqueue_tail(&t->event_apcs, &a->apc);
-
-    a->apc.owner = t;
-    apc_set_bitmask(t, APC_TYPE_KERNEL);
-    return true;
-}
-
 static bool try_cancel_from_queue(struct thread *t, struct apc *a,
                                   enum apc_type type) {
     struct apc_queue *q = &t->apc_head[type];
@@ -313,11 +285,6 @@ struct apc *apc_create(void) {
     return a;
 }
 
-struct event_apc *apc_event_apc_create(void) {
-    struct event_apc *a = vnew(a);
-    return a;
-}
-
 void apc_init(struct apc *a, apc_func_t fn, void *arg1, apc_destroy_t destroy) {
     enforce(a);
     enforce(fn);
@@ -328,12 +295,6 @@ void apc_init(struct apc *a, apc_func_t fn, void *arg1, apc_destroy_t destroy) {
     refcount_init(&a->refcount, 1);
     atomic_store_rlx(&a->state, APC_STATE_IDLE);
     a->destroy = destroy;
-}
-
-void apc_event_apc_init(struct event_apc *a, apc_func_t fn, void *arg1,
-                        apc_destroy_t destroy) {
-    apc_init(&a->apc, fn, arg1, destroy);
-    a->execute_times = 0;
 }
 
 bool apc_getref(struct apc *a) {
@@ -373,8 +334,6 @@ void apc_rundown_thread(struct thread *t) {
     for (size_t type = 0; type < APC_TYPE_COUNT; type++)
         apc_queue_splice(&t->apc_head[type], &drained);
 
-    apc_queue_splice(&t->event_apcs, &drained);
-    apc_queue_splice(&t->to_exec_event_apcs, &drained);
     atomic_store_release(&t->apc_pending_mask, 0);
 
     spin_unlock(&t->lock, irql);
@@ -388,109 +347,11 @@ void apc_rundown_thread(struct thread *t) {
     }
 }
 
-static void bump_counters_on_queue(struct apc_queue *from,
-                                   struct apc_event_desc *desc,
-                                   struct apc_queue *to) {
-    struct apc *prev = NULL;
-    struct apc *curr = from->head;
-
-    while (curr) {
-        struct apc *next = curr->next;
-        struct event_apc *eapc = container_of(curr, struct event_apc, apc);
-
-        if (eapc->desc == desc) {
-            eapc->execute_times++;
-
-            if (to) {
-                /* unlink */
-                if (prev)
-                    prev->next = next;
-                else
-                    from->head = next;
-
-                if (from->tail == curr)
-                    from->tail = prev;
-
-                /* enqueue into target */
-                curr->next = NULL;
-                apc_enqueue_tail(to, curr);
-
-                curr = next;
-                continue;
-            }
-        }
-
-        prev = curr;
-        curr = next;
-    }
-}
-
 static void apc_execute_event(struct apc *a) {
     enforce(apc_state_load(a) == APC_STATE_QUEUED);
     atomic_store_release(&a->state, APC_STATE_EXECUTING);
     apc_execute(a);
     atomic_store_release(&a->state, APC_STATE_QUEUED);
-}
-
-void apc_event_signal(struct apc_event_desc *desc) {
-    /* here we want to do two things: first, we identify if it is safe to
-     * execute APCs. if it is, it must be guaranteed that the to_execute
-     * tree of event APCs is empty, because the irql_lower that should've
-     * happened would have executed anything on that tree. in this case,
-     * we check our event_apcs tree, and execute anything of relevance
-     * in there. if it is not safe to execute APCs, we will check
-     * the to_execute tree, increment counters for all relevant APCs, and then
-     * check the event_apcs tree, and move anything necessary over */
-    struct thread *curr = thread_get_current();
-
-    if (safe_to_exec_apcs() && curr->kernel_apc_disable == 0) {
-        enforce(apc_queue_empty(&curr->to_exec_event_apcs));
-
-        enum irql irql = irql_raise(IRQL_APC_LEVEL);
-
-        struct apc *a = curr->event_apcs.head;
-
-        /* This will give us the "first node in a list" that matches our `desc`
-         * value. We can keep going this->right->right to find everyone else to
-         * execute */
-        while (a) {
-            if (container_of(a, struct event_apc, apc)->desc == desc)
-                apc_execute_event(a);
-
-            a = a->next;
-        }
-
-        irql_lower(irql);
-    } else {
-        /* Cannot execute APCs right now. Search both trees, bump counters. */
-        bump_counters_on_queue(&curr->to_exec_event_apcs, desc, NULL);
-        bump_counters_on_queue(&curr->event_apcs, desc,
-                               &curr->to_exec_event_apcs);
-
-        apc_set_bitmask(curr, APC_TYPE_KERNEL);
-    }
-}
-
-void thread_exec_event_apcs(struct thread *t) {
-    struct apc *a;
-
-    while ((a = apc_dequeue_head(&t->to_exec_event_apcs))) {
-        struct event_apc *eapc = container_of(a, struct event_apc, apc);
-        enforce(eapc->execute_times);
-
-        for (size_t i = 0; i < eapc->execute_times; i++)
-            apc_execute_event(a);
-
-        eapc->execute_times = 0;
-
-        apc_enqueue_tail(&t->event_apcs, a);
-    }
-
-    enum irql irql = spin_lock_high(&t->lock);
-    if (apc_list_empty(t, APC_TYPE_KERNEL) &&
-        apc_queue_empty(&t->to_exec_event_apcs))
-        apc_unset_bitmask(t, APC_TYPE_KERNEL);
-    spin_unlock(&t->lock, irql);
 }
 
 void apc_disable_special() {
@@ -525,10 +386,8 @@ void thread_exec_apcs(struct thread *t) {
     if (thread_can_exec_special_apcs(t))
         deliver_apc_type(t, APC_TYPE_SPECIAL_KERNEL);
 
-    if (thread_can_exec_kernel_apcs(t)) {
+    if (thread_can_exec_kernel_apcs(t))
         deliver_apc_type(t, APC_TYPE_KERNEL);
-        thread_exec_event_apcs(t);
-    }
 }
 
 void apc_check_and_deliver(struct thread *t) {

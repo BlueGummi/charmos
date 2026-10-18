@@ -65,6 +65,7 @@ struct vas_arena {
     struct fixed_size_range fsr;
     size_t total_free;
     struct vas_magazine magazines[VAS_MAG_CLASSES];
+
 #ifdef TEST_ENABLED
     /* TODO: Use injection sites and bring this out of TEST_ENABLED */
     ssize_t tag_alloc_budget;
@@ -86,6 +87,7 @@ struct vas {
     /* Charged whilst enrolled, including LIVE slots,
      * this is a bound on retained VA */
     atomic_size_t mag_reserved_bytes;
+
 #ifdef TEST_ENABLED
     bool magazines_disabled;
 #endif

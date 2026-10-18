@@ -559,6 +559,7 @@ typedef _Atomic ptrdiff_t atomic_ptrdiff_t;
             uint8_t ca_post_##name[CA_CACHELINE_SIZE];                         \
         };                                                                     \
     }
+
 #ifndef TSA_LOCKLESS
 #define TSA_LOCKLESS
 #endif

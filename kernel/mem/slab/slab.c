@@ -481,6 +481,7 @@ static void *slab_alloc_from(struct slab_cache *cache, stack_handle_t handle,
 #ifndef DEBUG_SLAB_DEEP
     cc_ignore(handle);
 #endif
+
     slab_check_assert(slab);
 
     SPINLOCK_ASSERT_HELD(&cache->lock);
@@ -928,6 +929,7 @@ void *valloc_try_from_magazine(struct slab_domain *domain,
 #ifndef DEBUG_SLAB_DEEP
     cc_ignore(handle);
 #endif
+
     enum slab_magazine_type mtype = (flags & ALLOC_FLAG_ZERO_ON_ALLOC)
                                         ? SLAB_MAGAZINE_ZERO
                                         : SLAB_MAGAZINE_NORMAL;
@@ -962,6 +964,7 @@ void *valloc_try_from_magazine(struct slab_domain *domain,
 #ifdef DEBUG_SLAB_DEEP
             slab_dump_corruption(ret, mag, 0);
 #endif
+
             panic("buffer size %zu idx %zu not uniform", size, class_idx);
         }
 #endif
@@ -1131,6 +1134,7 @@ out:
 #ifdef DEBUG_SLAB_DEEP
             slab_dump_corruption(ret, NULL, cache->obj_size);
 #endif
+
             const uint8_t *bb = (const uint8_t *) ret;
             size_t bad = 0;
             for (size_t i = 0; i < cache->obj_size; i++)
@@ -1611,6 +1615,7 @@ void *vrealloc_full(void *ptr, size_t size, struct alloc_params params) {
 #ifdef DEBUG_ASAN
         asan_alloc(ptr, size, old);
 #endif
+
         return ptr;
     }
 

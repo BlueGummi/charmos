@@ -108,7 +108,11 @@ static bool scheduler_boost_thread_internal(struct thread *boosted,
     return false;
 
 ok:
+
+#ifdef DEBUG_THREAD
     boosted->boost_count++;
+#endif
+
     return true;
 }
 
@@ -146,8 +150,11 @@ bool thread_inherit_priority(struct thread *boosted, struct thread *from,
 void thread_donate_class(struct thread *boosted, enum thread_prio_class class,
                          struct thread_class_donation *d) TSA_NO_ANALYSIS {
     THREAD_CLASS_UPDATE(boosted, {
-        if (thread_donation_raise_locked(boosted, d, class))
+        if (thread_donation_raise_locked(boosted, d, class)) {
+#ifdef DEBUG_THREAD
             boosted->boost_count++;
+#endif
+        }
     });
 }
 

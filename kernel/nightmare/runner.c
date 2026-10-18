@@ -63,13 +63,16 @@ static void nightmare_build_caps(void) {
     nightmare_runtime.caps[0] = '\0';
     append_cap(nightmare_runtime.caps, sizeof(nightmare_runtime.caps),
                "preempt");
+
 #ifdef DEBUG_ASAN
     append_cap(nightmare_runtime.caps, sizeof(nightmare_runtime.caps), "asan");
 #endif
+
 #ifdef DEBUG_LOCK_CHK
     append_cap(nightmare_runtime.caps, sizeof(nightmare_runtime.caps),
                "lock_chk");
 #endif
+
 #ifdef INJECT_ENABLED
     append_cap(nightmare_runtime.caps, sizeof(nightmare_runtime.caps),
                "inject");
@@ -202,14 +205,17 @@ nightmare_preflight(const struct nightmare *nm,
     if ((nm->requires & NIGHTMARE_REQ_PREEMPT) == 0) {
         /* No-op */
     }
+
 #ifndef DEBUG_ASAN
     if (nm->requires & NIGHTMARE_REQ_ASAN)
         return NIGHTMARE_SKIP_NEEDS_ASAN;
 #endif
+
 #ifndef INJECT_ENABLED
     if (nm->requires & NIGHTMARE_REQ_INJECT)
         return NIGHTMARE_SKIP_NEEDS_INJECT;
 #endif
+
     if (pmm_get_usable_ram() / NIGHTMARE_MIB < nm->min_mem_mib)
         return NIGHTMARE_SKIP_RAM_LOW;
 

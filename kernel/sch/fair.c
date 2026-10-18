@@ -99,18 +99,19 @@ static struct thread_activity_metrics calc_activity_metrics(struct thread *t) {
     uint64_t total_sleep = 0;
     uint64_t total_run = 0;
     uint64_t total_wake_count = 0;
+    uint32_t current_epoch =
+        (uint32_t) ((uint64_t) time_get_ms() >> THREAD_ACTIVITY_BUCKET_SHIFT);
 
     for (size_t i = 0; i < THREAD_ACTIVITY_BUCKET_COUNT; i++) {
-        struct thread_activity_bucket *b = &t->activity_stats->buckets[i];
-        struct thread_runtime_bucket *rtb = &t->activity_stats->rt_buckets[i];
+        struct thread_activity_bucket *b = &t->activity_stats.buckets[i];
 
-        uint64_t run_time = rtb->run_time_ms;
-        uint64_t block_time = b->block_duration;
-        uint64_t sleep_time = b->sleep_duration;
+        if ((uint32_t) (current_epoch - b->epoch) >=
+            THREAD_ACTIVITY_BUCKET_COUNT)
+            continue;
 
-        total_run += run_time;
-        total_block += block_time;
-        total_sleep += sleep_time;
+        total_run += b->run_ms;
+        total_block += b->block_ms;
+        total_sleep += b->sleep_ms;
         total_wake_count += b->wake_count;
     }
 
@@ -122,7 +123,8 @@ static struct thread_activity_metrics calc_activity_metrics(struct thread *t) {
     m.block_ratio = (total_block * 100) / total_duration;
     m.sleep_ratio = (total_sleep * 100) / total_duration;
 
-    m.wake_freq = total_wake_count / THREAD_ACTIVITY_BUCKET_COUNT;
+    uint64_t avg_wake = total_wake_count / THREAD_ACTIVITY_BUCKET_COUNT;
+    m.wake_freq = (avg_wake > UINT8_MAX) ? UINT8_MAX : (uint8_t) avg_wake;
 
     return m;
 }

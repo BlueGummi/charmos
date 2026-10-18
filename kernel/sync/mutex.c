@@ -335,6 +335,7 @@ void mutex_assert_held_full(struct mutex *mtx,
 #else
     cc_ignore(site);
 #endif
+
     enforce(mutex_read_owner(mtx) == thread_get_current(),
             "mutex not held by current thread");
 }
@@ -350,6 +351,7 @@ void mutex_assert_not_held_full(struct mutex *mtx,
 #else
     cc_ignore(site);
 #endif
+
     enforce(mutex_read_owner(mtx) != thread_get_current(),
             "mutex unexpectedly held by current thread");
 }

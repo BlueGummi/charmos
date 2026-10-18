@@ -215,9 +215,11 @@ static void apply_handle(struct thread *t, struct climb_handle *ch) {
 
     climb_info("Apply handle on %p, %zu", cts, climb_count_handles(cts));
 
+#ifdef DEBUG_CLIMB
     /* If there was already a giver, like with indirect boosts, we don't
      * change it. Otherwise, we do, and say we are the giver */
     ch->given_by = ch->given_by ? ch->given_by : thread_get_current();
+#endif
 
     /* Was previously not on tree */
     if (cts->pressure_periods == 0) {
@@ -247,7 +249,10 @@ static void apply_handle(struct thread *t, struct climb_handle *ch) {
 
 static void remove_handle(struct thread *t, struct climb_handle *ch) {
     struct climb_thread_data *cts = &t->climb_data;
+
+#ifdef DEBUG_CLIMB
     enforce(ch->given_by == thread_get_current());
+#endif
 
     if (ch->applied_pressure_internal == 0) {
         climb_warn("No-op handle removed from %p", cts);
@@ -561,12 +566,14 @@ void climb_thread_init(struct thread *t) {
     cts->indirect_pressure = 0;
     rbt_init_node(&cts->climb_node);
     struct climb_handle *ch = &cts->handle;
-    ch->name = t->name;
     ch->applied_pressure_internal = 0;
     ch->kind = CLIMB_PRESSURE_INDIRECT;
+
+#ifdef DEBUG_CLIMB
     ch->given_by = t;
+#endif
+
     ch->given_to = NULL;
-    ch->pressure_source = NULL;
     list_node_init(&ch->list);
 }
 

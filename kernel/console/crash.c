@@ -823,10 +823,12 @@ cc_noreturn void crash_full(const struct crash_context *ctx) TSA_NO_ANALYSIS {
 
     if (depth >= CRASH_MAX_DEPTH) {
         printf_unlocked("\n[crash depth %u, aborting report]\n", depth);
+
 #if defined(TEST_ENABLED) || defined(TEST_NIGHTMARE_ENABLED)
         ndjson_bye(QEMU_EXIT_PANIC, "nested_crash");
         qemu_exit(QEMU_EXIT_PANIC);
 #endif
+
         while (true)
             cpu_halt();
     }

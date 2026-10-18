@@ -66,6 +66,7 @@ static size_t next_ctr(const wroost_counter_t *ctrs, size_t total,
 #define wroost_check_enforce(wts) enforce(wroost_state_check(wts))
 static bool wroost_state_check(struct wroost_thread_data *wts) {
     cc_ignore(wts);
+
 #ifdef DEBUG_WROOST
     for (int i = 0; i < WROOST_THREAD_COUNTERS; i++) {
         wroost_counter_t ctr = wroost_read_counter(wts, i);
@@ -86,6 +87,7 @@ static bool wroost_state_check(struct wroost_thread_data *wts) {
     }
 
 #endif
+
     return true;
 }
 

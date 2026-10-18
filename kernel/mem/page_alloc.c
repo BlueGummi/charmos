@@ -104,6 +104,7 @@ void *page_alloc_full(size_t page_count, struct alloc_params params) {
     if (ret)
         asan_unpoison(ret, page_count * PAGE_SIZE);
 #endif
+
     return ret;
 }
 
@@ -116,11 +117,13 @@ void *page_alloc_demand_full(size_t page_count, struct alloc_params params) {
     if (ret)
         asan_unpoison(ret, page_count * PAGE_SIZE);
 #endif
+
     return ret;
 }
 
 void page_free_full(void *ptr, size_t page_count, enum alloc_behavior b) {
     cc_ignore(b);
+
 #ifdef DEBUG_ASAN
     if (ptr)
         asan_poison(ptr, page_count * PAGE_SIZE);

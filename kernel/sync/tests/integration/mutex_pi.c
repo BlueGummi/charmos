@@ -300,9 +300,16 @@ TEST_DEFINE_INTEGRATION(mutex, pi_revert, .min_cores = 2) {
     thread_join(ts);
     thread_join(rt);
 
+#ifdef DEBUG_THREAD
     uint32_t boosts = ts->boost_count;
+#endif
+
     thread_putref(ts);
+
+#ifdef DEBUG_THREAD
     TEST_ASSERT_EQ(boosts, 1);
+#endif
+
     TEST_ASSERT(atomic_load(&pi_reverted));
 
     return TEST_SUCCESS;

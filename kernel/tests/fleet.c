@@ -267,10 +267,12 @@ static void test_fleet_dump_worker(const struct test_conc_worker *w) {
     if (thread_get_state(t) == THREAD_STATE_ZOMBIE)
         return;
 
+#ifdef DEBUG_THREAD
     test_err("  %s[%zu]   apcs_pending=0x%x apcs_ran=%u ctxsw=%zu",
              w->role ? w->role : "worker", w->index,
              (unsigned) atomic_load(&t->apc_pending_mask), t->total_apcs_ran,
              t->context_switches);
+#endif
 
     thread_dump_wait_trace(t, w->role ? w->role : "worker", w->index,
                            TEST_FLEET_DUMP_ARMS);

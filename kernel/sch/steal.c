@@ -9,7 +9,6 @@
 #include <thread/apc.h>
 
 #include "internal.h"
-#include "sched_profiling.h"
 
 bool scheduler_can_take_thread(size_t core, struct thread *target) {
     if (thread_get_flags(target) & THREAD_FLAG_PINNED)
@@ -208,11 +207,8 @@ struct thread *scheduler_try_do_steal(struct scheduler *sched) {
     struct thread *stolen = scheduler_steal_work(sched, victim);
     stop_steal(sched, victim);
 
-    if (stolen) {
-        sched_profiling_record_steal();
-    } else {
+    if (!stolen)
         scheduler_try_push_to_idle_core(sched);
-    }
 
     return stolen;
 }

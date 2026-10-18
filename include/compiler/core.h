@@ -29,6 +29,7 @@
 #define cc_likely(x) __builtin_expect(!!(x), 1)
 #define cc_unlikely(x) __builtin_expect(!!(x), 0)
 #define cc_unreachable() __builtin_unreachable()
+
 #if defined(cn_id_clang)
 #define cc_assume(expr) __builtin_assume(expr)
 #elif cn_has_attribute(assume)
@@ -44,6 +45,7 @@
 #define cc_cold __attribute__((cold))
 #define cc_hot __attribute__((hot))
 #define cc_flatten __attribute__((flatten))
+
 #if cn_has_attribute(nodebug)
 #define cc_nodebug __attribute__((nodebug))
 #else
@@ -53,6 +55,7 @@
 #define cc_no_asan __attribute__((no_sanitize("address")))
 #define cc_no_ubsan __attribute__((no_sanitize("undefined")))
 #define cc_no_tsan __attribute__((no_sanitize("thread")))
+
 #if defined(cn_id_clang)
 #define cc_no_msan __attribute__((no_sanitize("memory")))
 #define cc_no_csan __attribute__((no_sanitize("coverage")))
@@ -63,6 +66,7 @@
 #define cc_no_msan
 #define cc_no_csan
 #endif
+
 #define cc_no_sanitize(...) __attribute__((no_sanitize(__VA_ARGS__)))
 #define cc_no_stack_protector __attribute__((no_stack_protector))
 #define cc_no_instrument __attribute__((no_instrument_function))

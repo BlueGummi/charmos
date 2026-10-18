@@ -23,6 +23,7 @@ struct slab_elcm_candidate slab_elcm(size_t obj_size, size_t obj_alignment) {
 #else
         .metadata_bits_per_obj = 1,
 #endif
+
         .obj_size = obj_size,
         .obj_alignment = obj_alignment,
         .bias_towards_pow2 = true,

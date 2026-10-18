@@ -258,11 +258,13 @@ static void chaos_dump_thread(const char *role, size_t idx, struct thread *t,
             idx, t->name, (int) thread_get_state(t),
             (unsigned) thread_get_flags(t), (int) thread_get_wait_type(t));
 
+#ifdef DEBUG_THREAD
     log_msg(LOG_ERROR,
             "  %s[%zu]   mask=0x%x apcs_ran=%u "
             "ctxsw=%zu",
             role, idx, (unsigned) atomic_load(&t->apc_pending_mask),
             t->total_apcs_ran, t->context_switches);
+#endif
 
     if (max_arms)
         thread_dump_wait_trace(t, role, idx, max_arms);

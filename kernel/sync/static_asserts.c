@@ -9,6 +9,7 @@
 
 /* verification of lock word sizes and bitfield not overlapping */
 static_assert_size(struct raw_spinlock, 1);
+
 #ifndef DEBUG_LOCK_CHK
 static_assert_size(struct qspinlock, 4);
 static_assert_size(struct spinlock, 1);

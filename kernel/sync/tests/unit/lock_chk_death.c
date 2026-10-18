@@ -157,6 +157,7 @@ TEST_DEFINE_UNIT(lock_chk, death_checked_in_nmi,
     };
     lock_chk_before_acq(&tok, &req);
 #endif
+
     return TEST_SUCCESS;
 }
 

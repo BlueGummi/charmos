@@ -310,8 +310,10 @@ static inline void context_switch(struct thread *curr, struct thread *next) {
     if (curr)
         thread_or_flags(curr, THREAD_FLAG_YIELDED);
 
+#ifdef DEBUG_THREAD
     if (curr != next)
         next->context_switches++;
+#endif
 
     /* We are responsible for dropping references
      * on threads entering their last yield */

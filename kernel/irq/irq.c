@@ -153,9 +153,12 @@ void isr_standard_entry(irq_t vector, struct irq_registers *irq_regs) {
 
     if (!scheduler_preemption_disabled(TOPC_NONE) &&
         scheduler_mark_self_needs_resched(false)) {
+
+#ifdef DEBUG_THREAD
         struct thread *curr = thread_get_current();
         if (curr)
             curr->preemptions++;
+#endif
 
         enforce(old != IRQL_DISPATCH_LEVEL);
         scheduler_yield();

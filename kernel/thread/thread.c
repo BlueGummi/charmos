@@ -64,8 +64,6 @@ void thread_init_thread_ids(void) {
     locked_list_init(&global.thread_list, LOCKED_LIST_INIT_IRQ_DISABLE);
 }
 
-APC_EVENT_CREATE(thread_exit_apc_event, "THREAD_EXIT");
-
 void thread_exit(void) {
     thread_exit_with_status(0);
 }
@@ -167,25 +165,16 @@ void thread_free_stack(struct thread *thread) {
     vas_free(stacks_space, stack_real_virt, (pages + 1) * PAGE_SIZE);
 }
 
-static void thread_init_event_reasons(
-    struct thread_event_reason reasons[THREAD_EVENT_RINGBUFFER_CAPACITY]) {
-    for (size_t i = 0; i < THREAD_EVENT_RINGBUFFER_CAPACITY; i++) {
-        reasons[i].associated_reason.reason = THREAD_EVENT_REASON_NONE;
-        reasons[i].associated_reason.cycle = 0;
-        reasons[i].reason = THREAD_EVENT_REASON_NONE;
-        reasons[i].cycle = 0;
-        reasons[i].timestamp = 0;
-    }
-}
-
 static void thread_init_activity_data(struct thread *thread) {
-    struct thread_activity_data *data = thread->activity_data;
-    data->block_reasons_head = 0;
-    data->sleep_reasons_head = 0;
-    data->wake_reasons_head = 0;
-    thread_init_event_reasons(thread->activity_data->block_reasons);
-    thread_init_event_reasons(thread->activity_data->wake_reasons);
-    thread_init_event_reasons(thread->activity_data->sleep_reasons);
+    struct thread_activity_data *data = &thread->activity_data;
+    data->wait_start_ms = 0;
+    data->head = 0;
+    data->active_wait_reason = THREAD_EVENT_REASON_NONE;
+    for (size_t i = 0; i < THREAD_EVENT_RINGBUFFER_CAPACITY; i++) {
+        data->events[i].duration_ms = 0;
+        data->events[i].wait_reason = THREAD_EVENT_REASON_NONE;
+        data->events[i].wake_reason = THREAD_EVENT_REASON_NONE;
+    }
 }
 
 static struct thread *thread_init(struct thread *thread,
@@ -193,7 +182,7 @@ static struct thread *thread_init(struct thread *thread,
                                   struct thread_create_params *params) {
     thread_init_activity_data(thread);
     thread_lock_chk_init(thread);
-    memset(thread->activity_stats, 0, sizeof(struct thread_activity_stats));
+    memset(&thread->activity_stats, 0, sizeof(struct thread_activity_stats));
 
     uint64_t stack_top =
         (uint64_t) params->stack_internal + params->stack_pages * PAGE_SIZE;
@@ -201,7 +190,11 @@ static struct thread *thread_init(struct thread *thread,
     thread->private = params->private;
 
     thread->entry = entry;
+
+#ifdef DEBUG_THREAD
     thread->creation_time_ms = time_get_ms();
+#endif
+
     thread->stack_size = params->stack_pages * PAGE_SIZE;
     thread->regs.rsp = stack_top;
     atomic_init(&thread->migrate_to, -1);
@@ -248,9 +241,6 @@ static struct thread *thread_init(struct thread *thread,
     for (size_t i = 0; i < APC_TYPE_COUNT; i++)
         apc_queue_init(&thread->apc_head[i]);
 
-    apc_queue_init(&thread->event_apcs);
-    apc_queue_init(&thread->to_exec_event_apcs);
-
     list_node_init(&thread->rq_list_node);
     list_node_init(&thread->wq_list_node);
     list_node_init(&thread->rcu_list_node);
@@ -276,16 +266,9 @@ struct thread *thread_create_full(char *name, thread_entry_fn_t entry,
         goto err;
 
     params->stack_internal = stack;
-    new_thread->activity_data = vnew(new_thread->activity_data, ALLOC_ZERO);
-    if (cc_unlikely(!new_thread->activity_data))
-        goto err;
 
     new_thread->turnstile = turnstile_create();
     if (cc_unlikely(!new_thread->turnstile))
-        goto err;
-
-    new_thread->activity_stats = vnew(new_thread->activity_stats, ALLOC_ZERO);
-    if (cc_unlikely(!new_thread->activity_stats))
         goto err;
 
     cpu_mask_init(&new_thread->allowed_cpus, global.core_count);
@@ -301,6 +284,7 @@ struct thread *thread_create_full(char *name, thread_entry_fn_t entry,
     if (!new_thread->name)
         goto err;
 
+#ifdef DEBUG_THREAD
     struct log_site_options opts = {
         .name = new_thread->name,
         .dump_opts = LOG_DUMP_DEFAULT,
@@ -314,6 +298,8 @@ struct thread *thread_create_full(char *name, thread_entry_fn_t entry,
         goto err;
 
     new_thread->log_handle = LOG_HANDLE_DEFAULT;
+#endif
+
     va_copy(args_copy, args);
     vsnprintf(new_thread->name, needed, name, args_copy);
     va_end(args_copy);
@@ -326,8 +312,6 @@ err:
 
     vfree(new_thread->turnstile);
     vfree(new_thread->name);
-    vfree(new_thread->activity_data);
-    vfree(new_thread->activity_stats);
     thread_free_stack(new_thread);
     tid_free(global_tid_space, new_thread->id);
     vfree(new_thread);
@@ -377,13 +361,15 @@ struct thread *thread_spawn_internal(thread_entry_fn_t entry,
 
 void thread_free(struct thread *t) {
     tid_free(global_tid_space, t->id);
-    vfree(t->activity_data);
-    vfree(t->activity_stats);
     vfree(t->name);
     vfree(t->turnstile);
     apc_rundown_thread(t);
     thread_free_stack(t);
+
+#ifdef DEBUG_THREAD
     log_site_putref(t->log_site);
+#endif
+
     vfree(t);
 }
 
