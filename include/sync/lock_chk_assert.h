@@ -17,28 +17,26 @@
  * this callsite */
 
 #define LOCK_CHK_ASSERT_HELD_1(l)                                              \
-    _Generic((l),                                                              \
-        struct spinlock *: spinlock_assert_held_full,                          \
-        struct qspinlock *: qspin_assert_held_full,                            \
-        struct mutex *: mutex_assert_held_full,                                \
-        struct mutex_simple *: mutex_simple_assert_held_full)(                 \
+    cc_generic((l), struct spinlock * : spinlock_assert_held_full,             \
+               struct qspinlock * : qspin_assert_held_full,                    \
+               struct mutex * : mutex_assert_held_full,                        \
+               struct mutex_simple * : mutex_simple_assert_held_full)(         \
         (l), LOCK_CHK_SITE_HERE())
 
 #define LOCK_CHK_ASSERT_HELD_2(l, mode)                                        \
-    _Generic((l), struct rwlock *: rwlock_assert_held_full)(                   \
+    cc_generic((l), struct rwlock * : rwlock_assert_held_full)(                \
         (l), (mode), LOCK_CHK_SITE_HERE())
 
 #define LOCK_CHK_ASSERT_HELD(...) PP_CALL(LOCK_CHK_ASSERT_HELD, __VA_ARGS__)
 
 /* Inverse of above */
 #define LOCK_CHK_ASSERT_NOT_HELD(l)                                            \
-    _Generic((l),                                                              \
-        struct spinlock *: spinlock_assert_not_held_full,                      \
-        struct qspinlock *: qspin_assert_not_held_full,                        \
-        struct mutex *: mutex_assert_not_held_full,                            \
-        struct mutex_simple *: mutex_simple_assert_not_held_full,              \
-        struct rwlock *: rwlock_assert_not_held_full)((l),                     \
-                                                      LOCK_CHK_SITE_HERE())
+    cc_generic((l), struct spinlock * : spinlock_assert_not_held_full,         \
+               struct qspinlock * : qspin_assert_not_held_full,                \
+               struct mutex * : mutex_assert_not_held_full,                    \
+               struct mutex_simple * : mutex_simple_assert_not_held_full,      \
+               struct rwlock * : rwlock_assert_not_held_full)(                 \
+        (l), LOCK_CHK_SITE_HERE())
 
 #define LOCK_CHK_ASSERT_HELD_STATE(l, m)                                       \
     do {                                                                       \

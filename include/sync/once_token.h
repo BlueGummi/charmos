@@ -29,7 +29,7 @@
     ({                                                                         \
         __auto_type __ot_tok = (tok);                                          \
         once_token_typecheck_internal_bool(__ot_tok);                          \
-        static_assert(_Generic((__ot_tok->state), bool: 1, default: 0),        \
+        static_assert(cc_generic((__ot_tok->state), bool : 1, default : 0),    \
                       "once_token_init_1 requires a boolean token");           \
         atomic_init(&__ot_tok->state, false);                                  \
     })
@@ -72,7 +72,7 @@
 #define once_token_claim_2(tok, out)                                           \
     ({                                                                         \
         once_token_typecheck_internal_bool(tok);                               \
-        static_assert(_Generic(((tok)->state), bool: 1, default: 0),           \
+        static_assert(cc_generic(((tok)->state), bool : 1, default : 0),       \
                       "once_token_claim_1 argument requires a boolean token"); \
         once_token_claim_4(tok, false, true, out);                             \
     })
@@ -86,7 +86,7 @@
     ({                                                                         \
         __auto_type __ot_tok = (tok);                                          \
         once_token_typecheck_internal_bool(__ot_tok);                          \
-        static_assert(_Generic((__ot_tok->state), bool: 1, default: 0),        \
+        static_assert(cc_generic((__ot_tok->state), bool : 1, default : 0),    \
                       "once_token_claimed_1 requires a boolean token");        \
                                                                                \
         atomic_load_acq(&__ot_tok->state);                                     \
@@ -108,7 +108,7 @@
     ({                                                                         \
         __auto_type __ot_tok = (tok);                                          \
         once_token_typecheck_internal_bool(__ot_tok);                          \
-        static_assert(_Generic((__ot_tok->state), bool: 1, default: 0),        \
+        static_assert(cc_generic((__ot_tok->state), bool : 1, default : 0),    \
                       "once_token_reset_1 requires a boolean token");          \
         atomic_store_release(&__ot_tok->state, false);                         \
     })

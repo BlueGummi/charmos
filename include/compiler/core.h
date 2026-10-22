@@ -7,6 +7,12 @@
 
 /* ==== cc_ Attributes, Markers, and Compiler Directives ==== */
 #define cc_align_as(x) _Alignas(x)
+#define cc_alignof(x) _Alignof(x)
+#define cc_generic(...) _Generic(__VA_ARGS__)
+
+/* clang-format off */
+#define cc_bitfield_barrier(t) t:0
+/* clang-format on */
 
 #define cc_code_init /* Nothing for now, TODO: */
 
@@ -289,7 +295,8 @@
     static_assert(sizeof(type) == (size), "sizeof(" #type ") != " #size)
 
 #define ct_assert_align(type, align)                                           \
-    static_assert(_Alignof(type) == (align), "alignof(" #type ") != " #align)
+    static_assert(cc_alignof(type) == (align), "alignof(" #type ") "           \
+                                               "!= " #align)
 
 #define ct_assert_offset(type, member, offset)                                 \
     static_assert(__builtin_offsetof(type, member) == (offset),                \

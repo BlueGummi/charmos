@@ -24,24 +24,16 @@ enum type_enum {
 };
 
 #define TYPE_TO_ENUM(X)                                                        \
-    _Generic((X),                                                              \
-        int8_t: TYPE_INT8,                                                     \
-        uint8_t: TYPE_UINT8,                                                   \
-        int16_t: TYPE_INT16,                                                   \
-        uint16_t: TYPE_UINT16,                                                 \
-        int32_t: TYPE_INT32,                                                   \
-        uint32_t: TYPE_UINT32,                                                 \
-        int64_t: TYPE_INT64,                                                   \
-        uint64_t: TYPE_UINT64,                                                 \
-        float: TYPE_FLOAT32,                                                   \
-        double: TYPE_FLOAT64,                                                  \
-        bool: TYPE_BOOL,                                                       \
-        default: _Generic((void *) (X),                                        \
-            void *: TYPE_POINTER,                                              \
-            const void *: TYPE_POINTER,                                        \
-            volatile void *: TYPE_POINTER,                                     \
-            const volatile void *: TYPE_POINTER,                               \
-            default: TYPE_UNKNOWN))
+    cc_generic((X), int8_t : TYPE_INT8, uint8_t : TYPE_UINT8,                  \
+               int16_t : TYPE_INT16, uint16_t : TYPE_UINT16,                   \
+               int32_t : TYPE_INT32, uint32_t : TYPE_UINT32,                   \
+               int64_t : TYPE_INT64, uint64_t : TYPE_UINT64,                   \
+               float : TYPE_FLOAT32, double : TYPE_FLOAT64, bool : TYPE_BOOL,  \
+               default : cc_generic((void *) (X), void * : TYPE_POINTER,       \
+                                    const void * : TYPE_POINTER,               \
+                                    volatile void * : TYPE_POINTER,            \
+                                    const volatile void * : TYPE_POINTER,      \
+                                    default : TYPE_UNKNOWN))
 
 static inline size_t type_enum_width(enum type_enum type) {
     switch (type) {

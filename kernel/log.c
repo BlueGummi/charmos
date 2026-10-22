@@ -589,12 +589,12 @@ void log_site_free(struct log_site *site) {
     locked_list_del(&log_global.list, &site->list);
     vfree(site->rb.slots);
     vfree(site->name);
-    vfree_aligned(site, _Alignof(struct log_site));
+    vfree_aligned(site, cc_alignof(struct log_site));
 }
 
 struct log_site *log_site_create(struct log_site_options opts) {
     struct log_site *ret = valloc_aligned(
-        sizeof(struct log_site), _Alignof(struct log_site), ALLOC_ZERO);
+        sizeof(struct log_site), cc_alignof(struct log_site), ALLOC_ZERO);
     if (!ret)
         return NULL;
 
@@ -630,7 +630,7 @@ err:
         vfree(ret->name);
     }
 
-    vfree_aligned(ret, _Alignof(struct log_site));
+    vfree_aligned(ret, cc_alignof(struct log_site));
     return NULL;
 }
 

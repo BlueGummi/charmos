@@ -40,7 +40,7 @@ struct vfs_mount;
 
 #define VFS_MODE_TYPE_MASK 0xF000U
 
-// clang-format off
+/* clang-format off */
 enum vfs_node_flags : uint32_t {
     VFS_NODE_NONE        = 0x0000, // No flags
     VFS_NODE_MOUNTPOINT  = 0x0001, // This node is a mountpoint
@@ -58,7 +58,7 @@ enum vfs_node_flags : uint32_t {
     VFS_NODE_IN_USE      = 0x0800, // Open count > 0 (used internally)
     VFS_NODE_DIRSYNC     = 0x1000,
 };
-// clang-format on
+/* clang-format on */
 
 enum vfs_open_opts : uint32_t {
     VFS_OPEN_READ = 0x01,  // Open for reading

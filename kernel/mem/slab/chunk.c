@@ -223,7 +223,7 @@ void slab_chunks_init(struct slab_chunks *sc, struct slab_cache *parent) {
 
     struct fixed_size_range_attributes attrs = {
         .obj_size = sizeof(struct slab_chunk) + sc->bitmap_bytes,
-        .obj_align = _Alignof(struct slab_chunk),
+        .obj_align = cc_alignof(struct slab_chunk),
         .init_obj = NULL,
         .deinit_obj = NULL,
         .bootstrap_mode = false,

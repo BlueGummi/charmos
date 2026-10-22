@@ -39,7 +39,7 @@ LINKER_SECTION_EXTERN(struct pertopo_descriptor, pertopo_desc);
         __pertopo_desc_##name_ = {                                             \
             .name = #name_,                                                    \
             .size = sizeof(typeof(type_)),                                     \
-            .align = _Alignof(typeof(type_)),                                  \
+            .align = cc_alignof(typeof(type_)),                                \
             .pertopo_ptrs = NULL,                                              \
             .level = level_,                                                   \
             .constructor = __pertopo_ctor_##name_,                             \

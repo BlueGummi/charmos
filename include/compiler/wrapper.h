@@ -10,36 +10,34 @@
 #define cw_alloc(...) PP_CALL2(cw_alloc, __VA_ARGS__)
 
 #define cw_popcount(x)                                                         \
-    _Generic((x),                                                              \
-        unsigned char: ci_popcount((unsigned int) (x)),                        \
-        signed char: ci_popcount((unsigned int) (unsigned char) (x)),          \
-        char: ci_popcount((unsigned int) (unsigned char) (x)),                 \
-        unsigned short: ci_popcount((unsigned int) (x)),                       \
-        short: ci_popcount((unsigned int) (unsigned short) (x)),               \
-        unsigned int: ci_popcount(x),                                          \
-        int: ci_popcount((unsigned int) (x)),                                  \
-        unsigned long: ci_popcountl(x),                                        \
-        long: ci_popcountl((unsigned long) (x)),                               \
-        unsigned long long: ci_popcountll(x),                                  \
-        long long: ci_popcountll((unsigned long long) (x)),                    \
-        default: ci_popcountll((unsigned long long) (x)))
+    cc_generic((x), unsigned char : ci_popcount((unsigned int) (x)),           \
+               signed char : ci_popcount((unsigned int) (unsigned char) (x)),  \
+               char : ci_popcount((unsigned int) (unsigned char) (x)),         \
+               unsigned short : ci_popcount((unsigned int) (x)),               \
+               short : ci_popcount((unsigned int) (unsigned short) (x)),       \
+               unsigned int : ci_popcount(x),                                  \
+               int : ci_popcount((unsigned int) (x)),                          \
+               unsigned long : ci_popcountl(x),                                \
+               long : ci_popcountl((unsigned long) (x)),                       \
+               unsigned long long : ci_popcountll(x),                          \
+               long long : ci_popcountll((unsigned long long) (x)),            \
+               default : ci_popcountll((unsigned long long) (x)))
 
 #define cw_bswap16(x) ci_bswap16(x)
 #define cw_bswap32(x) ci_bswap32(x)
 #define cw_bswap64(x) ci_bswap64(x)
 
 #define cw_bswap(x)                                                            \
-    _Generic((x),                                                              \
-        uint16_t: ci_bswap16(x),                                               \
-        int16_t: (int16_t) ci_bswap16((uint16_t) (x)),                         \
-        uint32_t: ci_bswap32(x),                                               \
-        int32_t: (int32_t) ci_bswap32((uint32_t) (x)),                         \
-        uint64_t: ci_bswap64(x),                                               \
-        int64_t: (int64_t) ci_bswap64((uint64_t) (x)),                         \
-        default: (sizeof(x) == 2   ? ci_bswap16((uint16_t) (x))                \
-                  : sizeof(x) == 4 ? ci_bswap32((uint32_t) (x))                \
-                  : sizeof(x) == 8 ? ci_bswap64((uint64_t) (x))                \
-                                   : (x)))
+    cc_generic((x), uint16_t : ci_bswap16(x),                                  \
+               int16_t : (int16_t) ci_bswap16((uint16_t) (x)),                 \
+               uint32_t : ci_bswap32(x),                                       \
+               int32_t : (int32_t) ci_bswap32((uint32_t) (x)),                 \
+               uint64_t : ci_bswap64(x),                                       \
+               int64_t : (int64_t) ci_bswap64((uint64_t) (x)),                 \
+               default : (sizeof(x) == 2   ? ci_bswap16((uint16_t) (x))        \
+                          : sizeof(x) == 4 ? ci_bswap32((uint32_t) (x))        \
+                          : sizeof(x) == 8 ? ci_bswap64((uint64_t) (x))        \
+                                           : (x)))
 
 /*
  * Count Leading Zeros
@@ -130,19 +128,17 @@
     })
 
 #define cw_parity(x)                                                           \
-    _Generic((x),                                                              \
-        unsigned char: ci_parity((unsigned int) (x)),                          \
-        signed char: ci_parity((unsigned int) (unsigned char) (x)),            \
-        char: ci_parity((unsigned int) (unsigned char) (x)),                   \
-        unsigned short: ci_parity((unsigned int) (x)),                         \
-        short: ci_parity((unsigned int) (unsigned short) (x)),                 \
-        unsigned int: ci_parity(x),                                            \
-        int: ci_parity((unsigned int) (x)),                                    \
-        unsigned long: ci_parityl(x),                                          \
-        long: ci_parityl((unsigned long) (x)),                                 \
-        unsigned long long: ci_parityll(x),                                    \
-        long long: ci_parityll((unsigned long long) (x)),                      \
-        default: ci_parityll((unsigned long long) (x)))
+    cc_generic(                                                                \
+        (x), unsigned char : ci_parity((unsigned int) (x)),                    \
+        signed char : ci_parity((unsigned int) (unsigned char) (x)),           \
+        char : ci_parity((unsigned int) (unsigned char) (x)),                  \
+        unsigned short : ci_parity((unsigned int) (x)),                        \
+        short : ci_parity((unsigned int) (unsigned short) (x)),                \
+        unsigned int : ci_parity(x), int : ci_parity((unsigned int) (x)),      \
+        unsigned long : ci_parityl(x), long : ci_parityl((unsigned long) (x)), \
+        unsigned long long : ci_parityll(x),                                   \
+        long long : ci_parityll((unsigned long long) (x)),                     \
+        default : ci_parityll((unsigned long long) (x)))
 
 #define cw_rol(x, n)                                                           \
     ({                                                                         \

@@ -25,10 +25,8 @@ panic_impl_code_only(const char *file, int line, const char *func,
                 _panic_0)
 
 #define _panic_fn(a, code_fn)                                                  \
-    _Generic((a),                                                              \
-        char *: panic_impl_msg,                                                \
-        const char *: panic_impl_msg,                                          \
-        default: code_fn)
+    cc_generic((a), char * : panic_impl_msg, const char * : panic_impl_msg,    \
+               default : code_fn)
 
 /* panic() */
 #define _panic_0()                                                             \

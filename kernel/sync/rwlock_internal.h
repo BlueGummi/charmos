@@ -18,7 +18,7 @@ enum rwlock_bits : uintptr_t {
 #define RWLOCK_BACKOFF_JITTER_PCT 10 /* 10% variation of base backoff */
 
 #define RWLOCK_PRIO_CEIL_MASK (0x6)
-#define RWLOCK_GET_PRIO_CEIL(lword)                                            \
+#define RWLOCK_GET_MAX_PRIO(lword)                                             \
     (((lword) & RWLOCK_PRIO_CEIL_MASK) >> RWLOCK_PRIO_CEIL_SHIFT)
 #define RWLOCK_READER_COUNT_MASK (~0ULL << 5)
 #define RWLOCK_OWNER_MASK (~0x1FULL)

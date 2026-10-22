@@ -35,7 +35,7 @@ LINKER_SECTION_EXTERN(struct percpu_descriptor, percpu_desc);
         __percpu_desc_##name_ = {                                              \
             .name = #name_,                                                    \
             .size = sizeof(typeof(type_)),                                     \
-            .align = _Alignof(typeof(type_)),                                  \
+            .align = cc_alignof(typeof(type_)),                                \
             .percpu_ptrs = NULL,                                               \
             .constructor = __percpu_ctor_##name_,                              \
             .ready = false,                                                    \

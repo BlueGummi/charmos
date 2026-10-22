@@ -35,7 +35,7 @@ LINKER_SECTION_EXTERN(struct perdomain_descriptor, perdomain_desc);
         __perdomain_desc_##name_ = {                                           \
             .name = #name_,                                                    \
             .size = sizeof(typeof(type_)),                                     \
-            .align = _Alignof(typeof(type_)),                                  \
+            .align = cc_alignof(typeof(type_)),                                \
             .perdomain_ptrs = NULL,                                            \
             .constructor = __perdomain_ctor_##name_,                           \
             .ready = false,                                                    \

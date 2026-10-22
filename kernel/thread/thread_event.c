@@ -268,11 +268,15 @@ void thread_add_sleep_reason(struct thread *t, thread_act_reason_t reason) {
     t->activity_data.active_wait_reason = reason;
 }
 
+/* NOTE: these two are UNSAFE to call outside of initializing threads.
+ *
+ * TODO: implement lock nest tracking and whatnot to perform base prio
+ * changes, since much of locking depends on base prios */
 void thread_set_timesharing(struct thread *t) {
     enum irql pirql = spin_lock_high(&t->pi_lock);
 
     t->base_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
-    thread_recompute_prio_class_locked(t);
+    cc_ignore(thread_recompute_prio_class_locked(t));
 
     spin_unlock(&t->pi_lock, pirql);
 }
@@ -281,7 +285,7 @@ void thread_set_background(struct thread *t) {
     enum irql pirql = spin_lock_high(&t->pi_lock);
 
     t->base_prio_class = THREAD_PRIO_CLASS_BACKGROUND;
-    thread_recompute_prio_class_locked(t);
+    cc_ignore(thread_recompute_prio_class_locked(t));
 
     spin_unlock(&t->pi_lock, pirql);
 }

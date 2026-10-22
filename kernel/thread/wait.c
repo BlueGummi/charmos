@@ -248,6 +248,7 @@ struct thread_wait_result thread_wait_complete(void) {
                                                 .reason =
                                                     t->wait_completion_reason};
             finish_locked(t);
+            wroost_post_wait(t);
             spin_unlock(&t->wait_lock, irql);
             return result;
         }

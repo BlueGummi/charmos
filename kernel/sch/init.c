@@ -48,10 +48,12 @@ void scheduler_init(void) {
     if (!global.schedulers)
         panic("Could not allocate scheduler pointer array");
 
+    wroost_init();
     size_t i;
     for_each_cpu_id(i) {
         struct scheduler *s = nofail_vnew(s, ALLOC_ZERO);
 
+        wroost_scheduler_init(s);
         spinlock_init(&s->lock, LOCK_UNCHKD);
         rbt_init(&s->thread_rbt, scheduler_thread_get_data,
                  scheduler_cmp_threads);

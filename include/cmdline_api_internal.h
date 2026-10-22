@@ -27,16 +27,10 @@ struct cpu_mask;
 /* ========== Type Enum ========== */
 
 #define CMDLINE_STRICT_TYPE_ENUM(var)                                          \
-    _Generic((var),                                                            \
-        bool: TYPE_BOOL,                                                       \
-        int8_t: TYPE_INT8,                                                     \
-        uint8_t: TYPE_UINT8,                                                   \
-        int16_t: TYPE_INT16,                                                   \
-        uint16_t: TYPE_UINT16,                                                 \
-        int32_t: TYPE_INT32,                                                   \
-        uint32_t: TYPE_UINT32,                                                 \
-        int64_t: TYPE_INT64,                                                   \
-        uint64_t: TYPE_UINT64)
+    cc_generic(                                                                \
+        (var), bool : TYPE_BOOL, int8_t : TYPE_INT8, uint8_t : TYPE_UINT8,     \
+        int16_t : TYPE_INT16, uint16_t : TYPE_UINT16, int32_t : TYPE_INT32,    \
+        uint32_t : TYPE_UINT32, int64_t : TYPE_INT64, uint64_t : TYPE_UINT64)
 
 /* ========== Child Tuple Encodings ========== */
 

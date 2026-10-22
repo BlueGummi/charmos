@@ -42,10 +42,8 @@
                   _enforce_n, _enforce_n, _enforce_1, _enforce_0)
 
 #define _enforce_fn(a, code_fn)                                                \
-    _Generic((a),                                                              \
-        char *: enforce_impl_msg,                                              \
-        const char *: enforce_impl_msg,                                        \
-        default: code_fn)
+    cc_generic((a), char * : enforce_impl_msg,                                 \
+               const char * : enforce_impl_msg, default : code_fn)
 
 #define _enforce_ctx(prefix, x)                                                \
     __FILE__, __LINE__, __func__, prefix, _enforce_msg(x)

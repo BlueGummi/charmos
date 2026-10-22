@@ -140,12 +140,12 @@ static inline void cpu_mask_fill(struct cpu_mask *m) {
     bitmap_fill(m->bits, CPU_MASK_BITS);
 }
 
-#define cpu_mask_active_bits()                                                 \
+#define cpu_mask_active_bits                                                   \
     (global.core_count && global.core_count <= CPU_MASK_BITS                   \
          ? global.core_count                                                   \
          : CPU_MASK_BITS)
 
-#define cpu_mask_set_all(m) bitmap_fill((m)->bits, cpu_mask_active_bits())
+#define cpu_mask_set_all(m) bitmap_fill((m)->bits, cpu_mask_active_bits)
 
 static inline void cpu_mask_set_range(struct cpu_mask *m, size_t start,
                                       size_t len) {
@@ -232,32 +232,30 @@ static inline size_t cpu_mask_next_clear(const struct cpu_mask *m,
 
 #define for_each_cpu(cpu, mask_ptr)                                            \
     for ((cpu) =                                                               \
-             bitmap_find_first_set((mask_ptr)->bits, cpu_mask_active_bits());  \
-         (cpu) < cpu_mask_active_bits();                                       \
-         (cpu) = bitmap_find_next_bit((mask_ptr)->bits,                        \
-                                      cpu_mask_active_bits(), (cpu) + 1))
+             bitmap_find_first_set((mask_ptr)->bits, cpu_mask_active_bits);    \
+         (cpu) < cpu_mask_active_bits;                                         \
+         (cpu) = bitmap_find_next_bit((mask_ptr)->bits, cpu_mask_active_bits,  \
+                                      (cpu) + 1))
 
 #define cpu_mask_for_each(iter, mask)                                          \
-    for (iter = 0; iter < cpu_mask_active_bits(); iter++)                      \
+    for (iter = 0; iter < cpu_mask_active_bits; iter++)                        \
         if (bitmap_test((mask).bits, iter))
 
 #define cpu_mask_for_each_atomic(iter, mask)                                   \
-    for (iter = 0; iter < cpu_mask_active_bits(); iter++)                      \
+    for (iter = 0; iter < cpu_mask_active_bits; iter++)                        \
         if (bitmap_atomic_test((mask).bits, iter))
 
 #define cpu_mask_for_each_clear(iter, mask)                                    \
-    for (iter = 0; iter < cpu_mask_active_bits(); iter++)                      \
+    for (iter = 0; iter < cpu_mask_active_bits; iter++)                        \
         if (!bitmap_test((mask).bits, iter))
 
 #define cpu_mask_for_all(iter, mask)                                           \
-    for (iter = 0; iter < cpu_mask_active_bits(); iter++)
+    for (iter = 0; iter < cpu_mask_active_bits; iter++)
 
 #define cpu_mask_for_each_in(iter, mask, start, end)                           \
-    for (iter = (start); iter < cpu_mask_active_bits() && iter <= (end);       \
-         iter++)                                                               \
+    for (iter = (start); iter < cpu_mask_active_bits && iter <= (end); iter++) \
         if (bitmap_test((mask).bits, iter))
 
 #define cpu_mask_for_each_clear_in(iter, mask, start, end)                     \
-    for (iter = (start); iter < cpu_mask_active_bits() && iter <= (end);       \
-         iter++)                                                               \
+    for (iter = (start); iter < cpu_mask_active_bits && iter <= (end); iter++) \
         if (!bitmap_test((mask).bits, iter))

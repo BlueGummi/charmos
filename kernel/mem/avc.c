@@ -5,9 +5,9 @@
 #include <mem/vma_range.h>
 #include <smp/perdomain.h>
 
-FIXED_SIZE_RANGE_PERDOMAIN_DEFINE(avc,
-                                  .obj_size = sizeof(struct anon_vma_chain),
-                                  .obj_align = _Alignof(struct anon_vma_chain));
+FIXED_SIZE_RANGE_PERDOMAIN_DEFINE(
+    avc, .obj_size = sizeof(struct anon_vma_chain),
+    .obj_align = cc_alignof(struct anon_vma_chain));
 
 struct anon_vma_chain *avc_alloc() {
     return FSR_PERDOMAIN_ALLOC(avc);

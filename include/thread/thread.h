@@ -291,7 +291,7 @@ struct thread {
     /* Also protected by pi_lock, perceived_prio_class = max(base_prio_class,
      * highest class with a boost). remember to
      * thread_recompute_prio_class_locked after changing things */
-    uint16_t class_boosts[THREAD_PRIO_CLASS_COUNT];
+    uint8_t class_floors[THREAD_PRIO_CLASS_COUNT];
     bool io_class_boost; /* has an URGENT boost*/
 
     /* Activity data */
@@ -462,13 +462,25 @@ void thread_migrate(struct thread *t, size_t dest_core);
 void thread_boost_self(enum thread_prio_class class);
 void thread_unboost_self(enum thread_prio_class class);
 
-void thread_io_boost_locked(struct thread *t);
+struct wroost_kicks cc_warn_unused_result
+thread_io_boost_locked(struct thread *t);
 void thread_io_unboost_self(void);
 
 void thread_enqueue(struct thread *t);
 void thread_enqueue_on_core(struct thread *t, uint64_t core_id);
 
-void thread_recompute_prio_class_locked(struct thread *t);
+struct wroost_kicks cc_warn_unused_result
+thread_recompute_prio_class_locked(struct thread *t);
+
+/* Dry run: see what the new prio would be, don't set anything */
+enum thread_prio_class
+thread_recompute_prio_class_dry_locked(struct thread *t,
+                                       enum thread_prio_class *old_out,
+                                       enum thread_prio_class *new_out);
+
+void thread_recompute_prio_class_raw_locked(struct thread *t,
+                                            enum thread_prio_class *old_out,
+                                            enum thread_prio_class *new_out);
 
 bool thread_inherit_priority(struct thread *boosted, struct thread *from,
                              struct thread_class_donation *d);

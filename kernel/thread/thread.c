@@ -201,7 +201,7 @@ static struct thread *thread_init(struct thread *thread,
     thread->base_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
     thread->niceness = 0;
     thread->perceived_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
-    memset(thread->class_boosts, 0, sizeof(thread->class_boosts));
+    memset(thread->class_floors, 0, sizeof(thread->class_floors));
     thread->io_class_boost = false;
     atomic_init(&thread->state, THREAD_STATE_READY);
     thread->regs.r12 = (uint64_t) entry;

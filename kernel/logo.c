@@ -1,4 +1,4 @@
-// clang-format off
+/* clang-format off */
 
 const char *OS_LOGO = 
 
@@ -84,4 +84,4 @@ const char *OS_LOGO_PANIC_CENTERED =
 "                                 cccccccccccc          \n"
 ;
 
-// clang-format on
+/* clang-format on */

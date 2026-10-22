@@ -553,7 +553,7 @@ typedef _Atomic ptrdiff_t atomic_ptrdiff_t;
 
 #define ca_cacheline_member(T, name)                                           \
     struct {                                                                   \
-        uint8_t ca_pre_##name[CA_CACHELINE_SIZE - _Alignof(T)];                \
+        uint8_t ca_pre_##name[CA_CACHELINE_SIZE - cc_alignof(T)];              \
         union {                                                                \
             T name;                                                            \
             uint8_t ca_post_##name[CA_CACHELINE_SIZE];                         \

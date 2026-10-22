@@ -269,5 +269,7 @@ void scheduler_complete_object_wait(struct thread *t,
                                     enum thread_resume_reason reason);
 
 void scheduler_resume_for_apc(struct thread *t);
-void thread_class_inc_locked(struct thread *t, enum thread_prio_class class);
-void thread_class_dec_locked(struct thread *t, enum thread_prio_class class);
+void thread_class_floor_inc_locked(struct thread *t,
+                                   enum thread_prio_class class);
+void thread_class_floor_dec_locked(struct thread *t,
+                                   enum thread_prio_class class);

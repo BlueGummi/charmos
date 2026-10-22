@@ -11,7 +11,7 @@
 
 FIXED_SIZE_RANGE_PERDOMAIN_DEFINE(vma_range,
                                   .obj_size = sizeof(struct vma_range),
-                                  .obj_align = _Alignof(struct vma_range));
+                                  .obj_align = cc_alignof(struct vma_range));
 
 void vma_range_init(struct vma_range *vma_range, struct mm *mm, vaddr_t start,
                     vaddr_t end, enum vma_range_protection prot) {

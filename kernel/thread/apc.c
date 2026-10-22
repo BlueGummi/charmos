@@ -347,13 +347,6 @@ void apc_rundown_thread(struct thread *t) {
     }
 }
 
-static void apc_execute_event(struct apc *a) {
-    enforce(apc_state_load(a) == APC_STATE_QUEUED);
-    atomic_store_release(&a->state, APC_STATE_EXECUTING);
-    apc_execute(a);
-    atomic_store_release(&a->state, APC_STATE_QUEUED);
-}
-
 void apc_disable_special() {
     thread_get_current()->special_apc_disable++;
 }

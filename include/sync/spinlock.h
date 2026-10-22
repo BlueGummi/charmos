@@ -593,7 +593,7 @@ static inline bool spinlock_locked(struct spinlock *lock) {
 }
 
 /* A raw check to make sure it is locked, but could be by anyone */
-#define SPINLOCK_ASSERT_LOCKED(l)                                              \
+#define SPINLOCK_ASSERT_HELD_RAW(l)                                            \
     enforce(spinlock_locked(l), "spinlock not locked")
 
 static inline void spinlock_set_chk_flags(struct spinlock *lock,
@@ -616,7 +616,7 @@ static inline void spinlock_assert_held_full(struct spinlock *lock,
     if (spinlock_assert_held_deep(lock, /*want_held=*/true, site))
         return;
 
-    SPINLOCK_ASSERT_LOCKED(lock);
+    SPINLOCK_ASSERT_HELD_RAW(lock);
 }
 
 static inline void

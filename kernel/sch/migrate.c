@@ -9,12 +9,13 @@
  * and we ALWAYS acquire thread
  * locks AFTER any scheduler locks! */
 
-void thread_post_migrate(struct thread *t, size_t old_cpu, size_t new_cpu) {
+void thread_post_migrate(struct thread *t, cpu_id_t old_cpu, cpu_id_t new_cpu) {
     /* assert that both scheduler/runqueue locks are held,
      * migrate relevant things */
     SPINLOCK_ASSERT_HELD(&global.schedulers[old_cpu]->lock);
     SPINLOCK_ASSERT_HELD(&global.schedulers[new_cpu]->lock);
     climb_post_migrate_hook(t, old_cpu, new_cpu);
+    wroost_post_migrate_hook(t, old_cpu, new_cpu);
 }
 
 void thread_migrate(struct thread *t, size_t dest_core) TSA_NO_ANALYSIS {

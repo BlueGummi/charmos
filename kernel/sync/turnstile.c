@@ -416,6 +416,7 @@ static void turnstile_block_on(struct turnstile *ts, size_t queue_num) {
 
     atomic_store_rlx(&curr->blocked_ts, ts);
 
+    wroost_pre_wait(curr);
     thread_wait_prepare_one(&ts->wait, ts->lock_obj,
                             THREAD_WAIT_UNINTERRUPTIBLE,
                             THREAD_BLOCK_REASON_MANUAL);

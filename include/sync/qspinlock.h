@@ -420,9 +420,9 @@ static inline bool qspin_is_locked(const struct qspinlock *lock) {
     return (atomic_load_rlx(&lock->val) & Q_SPIN_LOCKED_MASK) != 0;
 }
 
-/* Same deal as SPINLOCK_ASSERT_LOCKED, just checks the bit,
+/* Same deal as SPINLOCK_ASSERT_HELD_RAW, just checks the bit,
  * but that doesn't say anything about thread ownership */
-#define QSPINLOCK_ASSERT_LOCKED(l)                                             \
+#define QSPINLOCK_ASSERT_HELD_RAW(l)                                           \
     enforce(qspin_is_locked(l), "qspinlock not locked")
 
 static inline cc_warn_unused_result bool
@@ -680,7 +680,7 @@ static inline void qspin_assert_held_full(struct qspinlock *lock,
     if (qspinlock_assert_held_deep(lock, /*want_held=*/true, site))
         return;
 
-    QSPINLOCK_ASSERT_LOCKED(lock);
+    QSPINLOCK_ASSERT_HELD_RAW(lock);
 }
 
 static inline void

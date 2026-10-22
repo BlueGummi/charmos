@@ -216,7 +216,7 @@ static void arena_init(struct vas_arena *arena, bool is_global) {
     }
     struct fixed_size_range_attributes attrs = {
         .obj_size = sizeof(struct vas_segment),
-        .obj_align = _Alignof(struct vas_segment),
+        .obj_align = cc_alignof(struct vas_segment),
         .bootstrap_mode = true,
     };
     fixed_size_range_init(&arena->fsr, &attrs);

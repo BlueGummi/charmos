@@ -38,6 +38,7 @@ static void resume_thread(struct thread *t, enum thread_resume_reason reason,
     /* Force reschedule OUTSIDE of any runqueue locks to avoid deadlocking */
     struct scheduler *to_force_resched = NULL;
 
+    struct wroost_kicks kicks = {0};
     struct scheduler *best = scheduler_select_best_for_thread(t);
     struct scheduler *last;
     thread_lock_thread_and_rq(t, best, &last, &lirql, &birql);
@@ -80,7 +81,7 @@ static void resume_thread(struct thread *t, enum thread_resume_reason reason,
         thread_apply_wake_boost(t);
 
         if (reason == THREAD_WAKE_REASON_BLOCKING_IO)
-            thread_io_boost_locked(t);
+            kicks = thread_io_boost_locked(t);
     }
 
     bool queuable =
@@ -107,6 +108,8 @@ end:
 
     if (to_force_resched)
         scheduler_force_resched(to_force_resched);
+
+    wroost_kick(&kicks);
 }
 
 void scheduler_complete_object_wait(struct thread *t,

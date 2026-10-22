@@ -211,25 +211,24 @@ struct cmdline_flag {
     PP_OVERLOAD(_CMDLINE_CHILDREN_MAP, __VA_ARGS__)(parent_n, __VA_ARGS__)
 
 #define CMDLINE_EXTRACT(val, var)                                              \
-    _Generic(&(var),                                                           \
-        bool *: cmdline_extract_bool((val), (bool *) &(var)),                  \
-        uint64_t *: cmdline_extract_u64((val), (uint64_t *) &(var)),           \
-        int64_t *: cmdline_extract_i64((val), (int64_t *) &(var)),             \
-        uint32_t *: cmdline_extract_u32((val), (uint32_t *) &(var)),           \
-        int32_t *: cmdline_extract_i32((val), (int32_t *) &(var)),             \
-        uint16_t *: cmdline_extract_u16((val), (uint16_t *) &(var)),           \
-        int16_t *: cmdline_extract_i16((val), (int16_t *) &(var)),             \
-        uint8_t *: cmdline_extract_u8((val), (uint8_t *) &(var)),              \
-        int8_t *: cmdline_extract_i8((val), (int8_t *) &(var)),                \
-        struct cmdline_range *: cmdline_extract_range(                         \
-            (val), (struct cmdline_range *) &(var)),                           \
-        char **: cmdline_extract_string((val), (char **) &(var)),              \
-        struct cpu_mask *: cmdline_extract_cpu_mask(                           \
-            (val), (struct cpu_mask *) &(var)),                                \
-        struct cmdline_list *: cmdline_extract_list(                           \
-            (val), (struct cmdline_list *) &(var)),                            \
-        const char **: cmdline_extract_const_string((val),                     \
-                                                    (const char **) &(var)))
+    cc_generic(&(var), bool * : cmdline_extract_bool((val), (bool *) &(var)),  \
+               uint64_t * : cmdline_extract_u64((val), (uint64_t *) &(var)),   \
+               int64_t * : cmdline_extract_i64((val), (int64_t *) &(var)),     \
+               uint32_t * : cmdline_extract_u32((val), (uint32_t *) &(var)),   \
+               int32_t * : cmdline_extract_i32((val), (int32_t *) &(var)),     \
+               uint16_t * : cmdline_extract_u16((val), (uint16_t *) &(var)),   \
+               int16_t * : cmdline_extract_i16((val), (int16_t *) &(var)),     \
+               uint8_t * : cmdline_extract_u8((val), (uint8_t *) &(var)),      \
+               int8_t * : cmdline_extract_i8((val), (int8_t *) &(var)),        \
+               struct cmdline_range * : cmdline_extract_range(                 \
+                   (val), (struct cmdline_range *) &(var)),                    \
+               char ** : cmdline_extract_string((val), (char **) &(var)),      \
+               struct cpu_mask * : cmdline_extract_cpu_mask(                   \
+                   (val), (struct cpu_mask *) &(var)),                         \
+               struct cmdline_list * : cmdline_extract_list(                   \
+                   (val), (struct cmdline_list *) &(var)),                     \
+               const char ** : cmdline_extract_const_string(                   \
+                   (val), (const char **) &(var)))
 
 #define CMDLINE_EXTRACT_LIST(list, type, out_buf, max_count, parse_fn)         \
     ({                                                                         \

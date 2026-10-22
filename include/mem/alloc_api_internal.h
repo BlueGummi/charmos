@@ -34,12 +34,9 @@
     static_assert(                                                             \
         __builtin_types_compatible_p(__typeof_unqual__(p), typeof(&*(p))),     \
         "vnew: target must be a pointer lvalue, not an array");                \
-    static_assert(!_Generic((p),                                               \
-                      void *: 1,                                               \
-                      const void *: 1,                                         \
-                      volatile void *: 1,                                      \
-                      const volatile void *: 1,                                \
-                      default: 0),                                             \
+    static_assert(!cc_generic((p), void * : 1, const void * : 1,               \
+                              volatile void * : 1, const volatile void * : 1,  \
+                              default : 0),                                    \
                   "vnew: void pointer target, use valloc() with a size")
 
 #define vnew(p, ...)                                                           \

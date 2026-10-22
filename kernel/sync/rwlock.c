@@ -1,6 +1,7 @@
 #include <console/panic.h>
 #include <math/min_max.h>
 #include <sch/sched.h>
+#include <sch/wroost.h>
 #include <sync/rcu.h>
 #include <sync/turnstile.h>
 #include <thread/thread.h>
@@ -168,7 +169,9 @@ void rwlock_init_chk_full(struct rwlock *lock, enum thread_prio_class ceiling,
 }
 
 /* This prevents a lock that cannot possibly have a lower reader
- * from going through the dance of hunting down CPUs to IPI */
+ * from going through the dance of hunting down CPUs to IPI
+ *
+ * TODO: use this */
 static bool rwlock_has_lower_readers_than(struct rwlock *lock,
                                           enum thread_prio_class prio) {
     /* This is called from the writer's context, once the
@@ -189,6 +192,10 @@ static bool rwlock_has_lower_readers_than(struct rwlock *lock,
  * threads get enqueued, however, we do need to remember that there
  * are only "safe states" that allow it to change, like lock_nesting == 0.
  *
+ * Furthermore, this likely needs to be generic and extrapolate across
+ * mutexes and whatnot... Perhaps what we will actually do is completely
+ * get rid of this idea of a "base priority" and make ONLY the counters
+ * contribute to a perceived priority and thus the problem is solved (??).
  */
 void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
                   enum lock_subclass subclass,
@@ -218,25 +225,20 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
 #endif
 
     uintptr_t lword = RWLOCK_READ_LOCK_WORD(lock);
-    enforce(RWLOCK_GET_PRIO_CEIL(lword) != 0 &&
-            "rwlock prio ceiling cannot be 0 (background)");
+
+    /* We are using this as a potential
+     * reserved state for special rwlocks */
+    enforce(RWLOCK_GET_MAX_PRIO(lword) != 0 && "rwlock max prio cannot be 0");
 
     struct thread *curr = thread_get_current();
     enum thread_prio_class base_class = curr->base_prio_class;
+    wroost_pre_acquire(lock, acq_type);
+    if (acq_type == RWLOCK_READ)
+        enforce(curr->base_prio_class <= RWLOCK_GET_MAX_PRIO(lword));
 
     /* fastpath */
-    if (rwlock_try_lock(lock, curr, acq_type, base_class)) {
-        if (acq_type == RWLOCK_READ)
-            thread_boost_self(RWLOCK_GET_PRIO_CEIL(lword));
-
-#ifdef DEBUG_LOCK_CHK
-        if (checked_deep)
-            lock_chk_acqd(&token);
-#endif
-
-        crash_unwind_enter_rwlock(lock);
-        return;
-    }
+    if (rwlock_try_lock(lock, curr, acq_type, base_class))
+        goto out;
 
     uintptr_t old, new;
 
@@ -305,8 +307,6 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
 
         /* make sure we've set the lock bits */
         enforce(RWLOCK_READ_LOCK_WORD(lock) & wait_bits);
-        enforce(RWLOCK_GET_PRIO_CEIL(lword) &&
-                "rwlock prio ceiling cannot be 0 (background)");
 
         struct thread *owner = rwlock_getref_owner(lock);
         if (owner) {
@@ -320,16 +320,17 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
         break;
     }
 
+out:
+
     /* make sure nothing funny happened */
     enforce(rwlock_locked_with_type(lock, acq_type));
-
-    if (acq_type == RWLOCK_READ)
-        thread_boost_self(RWLOCK_GET_PRIO_CEIL(lword));
 
 #ifdef DEBUG_LOCK_CHK
     if (checked_deep)
         lock_chk_acqd(&token);
 #endif
+
+    wroost_post_acquire(lock, acq_type);
 
     crash_unwind_enter_rwlock(lock);
 }
@@ -504,10 +505,9 @@ void rw_unlock_full(struct rwlock *lock,
         lock_chk_reld(&token);
 #endif /* DEBUG_LOCK_CHK */
 
-    crash_unwind_exit_rwlock(lock);
+    wroost_post_release(lock, is_writer ? RWLOCK_WRITE : RWLOCK_READ);
 
-    if (!is_writer)
-        thread_unboost_self(RWLOCK_GET_PRIO_CEIL(lock_word));
+    crash_unwind_exit_rwlock(lock);
 }
 
 bool rwlock_locked(struct rwlock *lock, enum rwlock_acquire_type type) {

@@ -20,7 +20,7 @@
                   PP_STRINGIZE(type) " is not " #bytes " bytes")
 
 #define dv_align_full(type, bytes, ...)                                        \
-    static_assert(_Alignof(type) == (bytes),                                   \
+    static_assert(cc_alignof(type) == (bytes),                                 \
                   PP_STRINGIZE(type) " is not " #bytes "-byte aligned")
 
 #define dv_field_full(type, member_type, member, offset, ...)                  \

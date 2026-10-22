@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <sync/lock_chk_types.h>
 #include <sync/lock_general.h>
+#include <sync/rwlock_types.h>
 #include <thread/thread_types.h>
 #include <tsa.h>
 
@@ -47,11 +48,6 @@ struct TSA_CAPABILITY("rwlock") rwlock {
 #ifdef DEBUG_LOCK_CHK
     struct lock_chk_lock chk;
 #endif /* DEBUG_LOCK_CHK */
-};
-
-enum rwlock_acquire_type {
-    RWLOCK_READ = 0,
-    RWLOCK_WRITE = 1,
 };
 
 void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type type,

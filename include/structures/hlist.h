@@ -75,12 +75,20 @@ static inline struct hlist_node *hlist_pop_head(struct hlist_head *h) {
 
 #define hlist_entry(ptr, type, member) container_of(ptr, type, member)
 
-#define hlist_for_each_entry(pos, head, member)                                \
-    for (pos = hlist_entry((head)->first, typeof(*pos), member); pos;          \
-         pos = hlist_entry(pos->member.next, typeof(*pos), member))
-
 #define hlist_entry_safe(ptr, type, member)                                    \
     ({                                                                         \
         __auto_type __hlist_ptr = (ptr);                                       \
         __hlist_ptr ? hlist_entry(__hlist_ptr, type, member) : NULL;           \
     })
+
+#define hlist_for_each_entry(pos, head, member)                                \
+    for (pos = hlist_entry_safe((head)->first, typeof(*pos), member); pos;     \
+         pos = hlist_entry_safe(pos->member.next, typeof(*pos), member))
+
+#define hlist_for_each_entry_safe(pos, n, head, member)                        \
+    for (pos = hlist_entry_safe((head)->first, typeof(*pos), member);          \
+         pos && ({                                                             \
+             n = pos->member.next;                                             \
+             1;                                                                \
+         });                                                                   \
+         pos = hlist_entry_safe(n, typeof(*pos), member))

@@ -42,7 +42,7 @@ enum timer_base_type {
  * resulting in this hierarchy (wide table, so we turn clang-format off):
  */
 
-// clang-format off
+/* clang-format off */
 
 /*
  * Level Offset        Granularity                     Range
@@ -58,7 +58,7 @@ enum timer_base_type {
  *   9   576 68,719,476,736 us (~19h) 274,877,906,944 us - 4,398,046,511,103 us (~3d    - ~50d)
  */
 
-// clang-format on
+/* clang-format on */
 
 /* Otherwise there won't be enough room in `timer_flags` */
 static_assert(TIMER_WHEEL_SIZE <= 1024);

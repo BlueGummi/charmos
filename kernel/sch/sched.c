@@ -332,6 +332,11 @@ static inline void context_switch(struct thread *curr, struct thread *next) {
         smp_core_scheduler()->drop_last_ref = curr;
     }
 
+    /* PERF: If this reader was stolen, that's fine, since the post migration
+     * hook would run and add it to our CPU, but it's rather redundant
+     * to add a thread and immediately remove it from wroost_percpu_data */
+    wroost_switch_in(next);
+
     if (just_load) {
         load_context(&next->regs);
     } else {
@@ -348,6 +353,8 @@ void schedule(void) TSA_NO_ANALYSIS {
 
     struct thread *curr = sched->current;
     struct thread *next = NULL;
+
+    wroost_switch_out(curr);
 
     /* if this returns false, the thread was not migrated
      * anywhere and we're responsible for acquiring our lock
@@ -422,6 +429,8 @@ void scheduler_switch_in(void) TSA_NO_ANALYSIS {
     cpu_id_t i;
     cpu_mask_for_each(i, us->deferred_resched_mask)
         scheduler_force_resched(global.schedulers[i]);
+
+    wroost_scheduler_switch_in_hook();
 
     cpu_mask_clear_all(&us->deferred_resched_mask);
 

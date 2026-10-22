@@ -112,7 +112,7 @@
 
 #define BITFLAG_RANGE(lo, hi) BR_EVAL(BR_RANGE_GENERATE_I(lo, hi))
 
-// clang-format off
+/* clang-format off */
 
 #define BR_MASK_BIT(type, idx) (((type) 1) << (idx))
 
@@ -149,7 +149,7 @@
 #define BR_MASK_31(type, x, ...) (BR_MASK_BIT(type, x) | BR_MASK_30(type, __VA_ARGS__))
 #define BR_MASK_32(type, x, ...) (BR_MASK_BIT(type, x) | BR_MASK_31(type, __VA_ARGS__))
 
-// clang-format on
+/* clang-format on */
 
 #define BR_MAKE_MASK_IMPL(type, ...)                                           \
     PP_OVERLOAD(BR_MASK, __VA_ARGS__)(type, __VA_ARGS__)
