@@ -996,7 +996,8 @@ void wroost_init(void) {
     wroost_global.fine_index_bits = BITS_NEEDED(
         (wroost_global.hash_table.bucket_count / WROOST_THREAD_COUNTERS) - 1);
 
-    wroost_global.fine_offset_mask = (1 << wroost_global.fine_index_bits) - 1;
+    wroost_global.fine_offset_mask =
+        (1ULL << wroost_global.fine_index_bits) - 1;
 }
 
 void wroost_scheduler_init(struct scheduler *sched) {
