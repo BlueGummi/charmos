@@ -529,7 +529,7 @@ restart: /* Every time `kicks` happens to have THIS CPU in its mask,
                     }
                 }
 
-                wroost_counter_t val;
+                wroost_counter_t cc_unused val;
                 wroost_id_t i;
                 wroost_for_each_set_ctr(val, i, wtd->counters,
                                         WROOST_THREAD_COUNTERS) {

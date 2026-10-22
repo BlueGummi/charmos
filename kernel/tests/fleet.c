@@ -217,8 +217,8 @@ static bool test_fleet_attach(struct test_fleet *f, struct test_conc_worker *w,
 struct test_conc_worker *
 test_fleet_spawn_opts(struct test_fleet *f, const char *role,
                       test_worker_fn body,
-                      const struct test_fleet_worker_opts *opts) {
-    void *arg = opts ? opts->arg : NULL;
+                      const struct test_fleet_worker_opts opts) {
+    void *arg = opts.arg;
     struct test_conc_worker *w = test_fleet_claim(f, role, body, arg);
     if (!w)
         return NULL;
@@ -227,13 +227,11 @@ test_fleet_spawn_opts(struct test_fleet *f, const char *role,
     enum thread_prio_class prio_class = THREAD_PRIO_CLASS_TIMESHARE;
     cpu_id_t core_id = CPU_ID_MAX;
 
-    if (opts) {
-        if (opts->flags)
-            flags |= opts->flags;
-        if (opts->prio_class)
-            prio_class = opts->prio_class;
-        core_id = opts->core_id;
-    }
+    if (opts.flags)
+        flags |= opts.flags;
+    if (opts.prio_class)
+        prio_class = opts.prio_class;
+    core_id = opts.core_id;
 
     if (core_id != CPU_ID_MAX) {
         struct thread *t = thread_create(
@@ -264,7 +262,7 @@ struct test_conc_worker *test_fleet_spawn(struct test_fleet *f,
                                           const char *role, test_worker_fn body,
                                           void *arg) {
     return test_fleet_spawn_opts(f, role, body,
-                                 &(struct test_fleet_worker_opts){
+                                 (struct test_fleet_worker_opts){
                                      .arg = arg,
                                      .core_id = CPU_ID_MAX,
                                  });
@@ -275,7 +273,7 @@ struct test_conc_worker *test_fleet_spawn_on_core(struct test_fleet *f,
                                                   test_worker_fn body,
                                                   void *arg, cpu_id_t core_id) {
     return test_fleet_spawn_opts(f, role, body,
-                                 &(struct test_fleet_worker_opts){
+                                 (struct test_fleet_worker_opts){
                                      .arg = arg,
                                      .core_id = core_id,
                                  });

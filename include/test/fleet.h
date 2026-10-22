@@ -121,7 +121,7 @@ struct test_conc_worker *test_fleet_spawn(struct test_fleet *f,
 struct test_conc_worker *
 test_fleet_spawn_opts(struct test_fleet *f, const char *role,
                       test_worker_fn body,
-                      const struct test_fleet_worker_opts *opts);
+                      const struct test_fleet_worker_opts opts);
 
 #define test_fleet_worker_opts_with_defaults(...)                              \
     cc_wno_override_init_expr(struct test_fleet_worker_opts,                   \
@@ -130,7 +130,7 @@ test_fleet_spawn_opts(struct test_fleet *f, const char *role,
 
 #define test_fleet_spawn_opt(f, role, body, ...)                               \
     test_fleet_spawn_opts((f), (role), (body),                                 \
-                          &test_fleet_worker_opts_with_defaults(__VA_ARGS__))
+                          test_fleet_worker_opts_with_defaults(__VA_ARGS__))
 
 /* Look up a worker thread by its role name */
 struct thread *test_fleet_worker_thread(struct test_fleet *f, const char *role);
