@@ -1,5 +1,6 @@
 /* @title: Test Assertion Macros */
 #pragma once
+#include <asm.h>
 #include <compiler/core.h>
 #include <err.h>
 #include <math/bit.h>
@@ -7,6 +8,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <time/time.h>
 
 /* We expect
  * - test_err(fmt, ...)
@@ -508,5 +510,51 @@ cc_analyzer_noreturn static inline void test_assert_void_failed(void) {}
                               (unsigned long long) (uint64_t) (_wa),           \
                               (unsigned long long) (uint64_t) (_wb));          \
             goto label;                                                        \
+        }                                                                      \
+    } while (0)
+
+#define TEST_ASSERT_POLL(cond, timeout_ms)                                     \
+    do {                                                                       \
+        time_ms_t _poll_start = time_get_ms();                                 \
+        time_ms_t _poll_timeout = (timeout_ms);                                \
+        while (!(cond)) {                                                      \
+            if (time_get_ms() - _poll_start >= _poll_timeout) {                \
+                test_err("assert poll \"%s\" timed out after %lu ms", #cond,   \
+                         (unsigned long) _poll_timeout);                       \
+                return test_assert_failed(#cond " timed out");                 \
+            }                                                                  \
+            cpu_pause();                                                       \
+        }                                                                      \
+    } while (0)
+
+#define TEST_WORKER_POLL(fleet, cond, timeout_ms)                              \
+    do {                                                                       \
+        time_ms_t _poll_start = time_get_ms();                                 \
+        time_ms_t _poll_timeout = (timeout_ms);                                \
+        while (!(cond)) {                                                      \
+            if (test_fleet_must_stop(fleet) ||                                 \
+                time_get_ms() - _poll_start >= _poll_timeout) {                \
+                test_fleet_report((fleet), __RELFILE__, __LINE__,              \
+                                  "poll \"%s\" timed out after %lu ms", #cond, \
+                                  (unsigned long) _poll_timeout);              \
+                return false;                                                  \
+            }                                                                  \
+            cpu_pause();                                                       \
+        }                                                                      \
+    } while (0)
+
+#define TEST_WORKER_POLL_GOTO(fleet, cond, timeout_ms, label)                  \
+    do {                                                                       \
+        time_ms_t _poll_start = time_get_ms();                                 \
+        time_ms_t _poll_timeout = (timeout_ms);                                \
+        while (!(cond)) {                                                      \
+            if (test_fleet_must_stop(fleet) ||                                 \
+                time_get_ms() - _poll_start >= _poll_timeout) {                \
+                test_fleet_report((fleet), __RELFILE__, __LINE__,              \
+                                  "poll \"%s\" timed out after %lu ms", #cond, \
+                                  (unsigned long) _poll_timeout);              \
+                goto label;                                                    \
+            }                                                                  \
+            cpu_pause();                                                       \
         }                                                                      \
     } while (0)

@@ -198,9 +198,9 @@ static struct thread *thread_init(struct thread *thread,
     thread->stack_size = params->stack_pages * PAGE_SIZE;
     thread->regs.rsp = stack_top;
     atomic_init(&thread->migrate_to, -1);
-    thread->base_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
+    thread->base_prio_class = params->base_prio_class;
     thread->niceness = 0;
-    thread->perceived_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
+    thread->perceived_prio_class = params->base_prio_class;
     memset(thread->class_floors, 0, sizeof(thread->class_floors));
     thread->io_class_boost = false;
     atomic_init(&thread->state, THREAD_STATE_READY);

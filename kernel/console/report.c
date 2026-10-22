@@ -939,7 +939,7 @@ void report_panes_begin(struct report_panes *panes, uint32_t n,
     uint32_t sum = 0;
     uint16_t used = 0;
 
-    CLAMP(n, UINT32_C(1), REPORT_PANES_MAX);
+    n = CLAMP(n, UINT32_C(1), REPORT_PANES_MAX);
 
     panes->n = (uint8_t) n;
     panes->stacked = false;

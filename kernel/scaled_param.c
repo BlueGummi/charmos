@@ -23,7 +23,7 @@ static size_t geom_interp(size_t a, size_t b, fx32_32_t t) {
     fx32_32_t result = fx_exp(fx_add(ln_a, fx_mul(t, fx_sub(ln_b, ln_a))));
 
     int64_t val = fx_to_int(result);
-    CLAMP(val, lower, upper);
+    val = CLAMP(val, lower, upper);
     return (size_t) val;
 }
 
@@ -40,7 +40,7 @@ static size_t linear_interp(size_t a, size_t b, fx32_32_t t) {
     int64_t upper = (int64_t) b;
     fx32_32_t span = fx_from_int(upper - lower);
     int64_t val = fx_to_int(fx_add(fx_from_int(lower), fx_mul(t, span)));
-    CLAMP(val, lower, upper);
+    val = CLAMP(val, lower, upper);
     return (size_t) val;
 }
 

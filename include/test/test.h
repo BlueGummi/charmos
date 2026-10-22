@@ -3,6 +3,7 @@
 #include <cmdline.h>
 #include <compiler/core.h>
 #include <compiler/diagnostic.h>
+#include <compiler/wrapper.h>
 #include <console/printf.h>
 #include <err.h>
 #include <fs/detect.h>
@@ -20,6 +21,14 @@
 typedef void (*test_fn_t)(void);
 struct test_context;
 struct test_fleet;
+struct thread;
+struct thread_create_params;
+
+#define TEST_MAX_HELPERS 8
+
+struct test_alloc_node {
+    struct test_alloc_node *next;
+};
 
 enum test_tier {
     TEST_TIER_SMOKE,
@@ -208,7 +217,31 @@ struct test_context {
 
     /* Allocated by the runner */
     struct test_fleet *fleet;
+
+    /* Framework-owned allocations, freed at test teardown */
+    struct test_alloc_node *allocs;
+
+    /* Runner-managed auxiliary threads, joined at test teardown */
+    struct thread *helpers[TEST_MAX_HELPERS];
+    size_t helper_count;
 };
+
+void *test_alloc(struct test_context *ctx, size_t size) cw_alloc(2);
+
+struct thread *test_spawn_internal(struct test_context *ctx,
+                                   void (*entry)(void *),
+                                   const struct thread_create_params *params,
+                                   const char *name);
+
+#define test_spawn(ctx, name, entry, ...)                                      \
+    test_spawn_internal((ctx), (entry),                                        \
+                        &(struct thread_create_params)                         \
+                            thread_params_with_defaults(__VA_ARGS__),          \
+                        PP_UNPAREN(name))
+
+cpu_id_t test_core(size_t index);
+
+bool test_context_teardown(struct test_context *ctx);
 
 struct test_verdict {
     enum test_result result;

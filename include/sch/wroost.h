@@ -50,8 +50,9 @@
 #define WROOST_COUNTER_MAX 0x3
 #define WROOST_COUNTER_MASK 0x3
 
-#define WROOST_DEFAULT_BUCKET_COUNT 256
-#define WROOST_BUCKET_COUNT_MAX 65536
+#define WROOST_MIN_BUCKET_COUNT 256U
+#define WROOST_MAX_BUCKET_COUNT 32768U
+#define WROOST_BUCKETS_PER_CPU_MULT 16U
 #define WROOST_THREAD_COUNTERS 32
 #define WROOST_FINE_ENTRY_COUNT 4
 #define WROOST_FINE_VALID_MASK ((1U << WROOST_FINE_ENTRY_COUNT) - 1U)
@@ -94,6 +95,7 @@ enum wroost_state {
 };
 
 struct wroost_kicks {
+    bool need_kicks;
     struct cpu_mask cpus;
     wroost_id_t lock_id;
 };
@@ -129,6 +131,21 @@ struct wroost_percpu_data {
     /* Since thread_map is guaranteed to only have single lock readers */
     struct hlist_head multi_lock_readers;
     atomic(bitmap_word_t) * pending_bitmap;
+
+    /* These primarily serve the purpose of implementing multi-hop.
+     *
+     * In the DPC, some readers are also writers, and upon a priority change,
+     * they will also need to go bother relevant readers. However, this all
+     * happens deep down in the scheduler lock, so DPCs can't be
+     * arbitrarily sent (deadlock). Thus, we merge all the CPU masks into
+     * a single one, and set bits in in_dpc_deferred_ids. The idea
+     * is that merging all of this together means that we may
+     * unnecessarily IPI some CPUs, but we will never have a false negative,
+     * and in the common case, this won't be that bad since only a lock
+     * or two of this kind will be held */
+    bitmap_word_t *in_dpc_deferred_ids; /* Bits represent lock IDs */
+    struct cpu_mask in_dpc_deferred_cpus;
+
     struct dpc boost_dpc;
     struct cpu_mask dpc_enqueue_deferred;
     wroost_id_t writer_lock_id; /* So we know what to set for deferred DPCS */

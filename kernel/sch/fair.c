@@ -211,7 +211,7 @@ void thread_apply_wake_boost(struct thread *t) {
     delta_change64 += jitter_for_thread();
 
     int64_t new_delta = (int64_t) t->dynamic_delta + delta_change64;
-    CLAMP(new_delta, -THREAD_DELTA_MAX, THREAD_DELTA_MAX);
+    new_delta = CLAMP(new_delta, -THREAD_DELTA_MAX, THREAD_DELTA_MAX);
 
     t->dynamic_delta = (int32_t) new_delta;
 
@@ -243,7 +243,7 @@ void thread_apply_cpu_penalty(struct thread *t) {
         int64_t scaled_delta =
             penalty * t->weight / MAX(t->weight, THREAD_WEIGHT_MIN);
 
-        CLAMP(scaled_delta, -THREAD_DELTA_MAX, THREAD_DELTA_MAX);
+        scaled_delta = CLAMP(scaled_delta, -THREAD_DELTA_MAX, THREAD_DELTA_MAX);
         t->dynamic_delta -= scaled_delta;
     }
 
@@ -280,7 +280,7 @@ void thread_update_effective_priority(struct thread *t) {
     int64_t eff = avg + t->dynamic_delta;
     int64_t eff_min = min;
     int64_t eff_max = max;
-    CLAMP(eff, eff_min, eff_max);
+    eff = CLAMP(eff, eff_min, eff_max);
 
     t->activity_score = (thread_prio_t) eff;
     t->virtual_runtime_left = thread_virtual_runtime_left(t);
@@ -290,7 +290,7 @@ void thread_update_effective_priority(struct thread *t) {
 static uint64_t compute_period(struct scheduler *s) {
     uint64_t load = s->total_thread_count;
     uint64_t period = BASE_PERIOD_MS + (load * 2); /* Linear growth */
-    CLAMP(period, MIN_PERIOD_MS, MAX_PERIOD_MS);
+    period = CLAMP(period, MIN_PERIOD_MS, MAX_PERIOD_MS);
     return period;
 }
 
@@ -300,7 +300,7 @@ static uint64_t map_activity_score(uint64_t score) {
     const uint64_t slice_delta = THREAD_SLICE_MAX - THREAD_SLICE_MIN;
     const uint64_t score_range = max_score - min_score;
 
-    CLAMP(score, min_score, max_score);
+    score = CLAMP(score, min_score, max_score);
 
     uint64_t score_delta = score - min_score;
 
@@ -322,7 +322,7 @@ static uint64_t thread_derive_slice_count(struct thread *t) {
 
     int64_t result = (int64_t) base + adjust;
 
-    CLAMP(result, THREAD_SLICE_MIN, THREAD_SLICE_MAX);
+    result = CLAMP(result, THREAD_SLICE_MIN, THREAD_SLICE_MAX);
 
     return (uint64_t) result;
 }

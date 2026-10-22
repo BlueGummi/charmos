@@ -87,7 +87,7 @@ struct counting_bloom_filter *cbf_create(size_t capacity,
         fx_mul(fx_div(fx_from_int(num_counters), fx_from_int(capacity)), ln2)));
 
     num_counters = MAX(num_counters, CBF_COUNTERS_MIN);
-    CLAMP(num_hashes, CBF_HASHES_MIN, CBF_HASHES_MAX);
+    num_hashes = CLAMP(num_hashes, CBF_HASHES_MIN, CBF_HASHES_MAX);
     num_counters = ALIGN_UP(num_counters, 2);
 
     struct counting_bloom_filter *cbf = vnew(cbf);

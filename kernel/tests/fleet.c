@@ -13,10 +13,87 @@
 
 #ifdef TEST_ENABLED
 
-struct test_fleet_alloc {
-    struct test_fleet_alloc *next;
-    /* payload */
-};
+cpu_id_t test_core(size_t index) {
+    size_t count = global.core_count ? global.core_count : 1;
+    return (cpu_id_t) (index % count);
+}
+
+void *test_alloc(struct test_context *ctx, size_t size) {
+    if (!ctx)
+        return NULL;
+
+    struct test_alloc_node *a = valloc(sizeof(*a) + size, ALLOC_ZERO);
+    if (!a)
+        return NULL;
+
+    a->next = ctx->allocs;
+    ctx->allocs = a;
+    return (void *) (a + 1);
+}
+
+static void test_alloc_teardown(struct test_context *ctx) {
+    if (!ctx)
+        return;
+
+    struct test_alloc_node *a = ctx->allocs;
+    while (a) {
+        struct test_alloc_node *next = a->next;
+        vfree(a);
+        a = next;
+    }
+    ctx->allocs = NULL;
+}
+
+void *test_fleet_alloc(struct test_fleet *f, size_t size) {
+    return (f && f->ctx) ? test_alloc(f->ctx, size) : NULL;
+}
+
+struct thread *test_spawn_internal(struct test_context *ctx,
+                                   void (*entry)(void *),
+                                   const struct thread_create_params *params,
+                                   const char *name) {
+    if (!ctx)
+        return NULL;
+
+    if (ctx->helper_count >= TEST_MAX_HELPERS) {
+        test_err("test_spawn: exceeded TEST_MAX_HELPERS (%d)",
+                 TEST_MAX_HELPERS);
+        return NULL;
+    }
+
+    struct thread_create_params p =
+        params ? *params : (struct thread_create_params){0};
+    p.joinable = true;
+
+    struct thread *t = thread_spawn_internal(entry, p, "%s", name);
+    if (!t)
+        return NULL;
+
+    enforce(thread_getref(t));
+    ctx->helpers[ctx->helper_count++] = t;
+    return t;
+}
+
+static bool test_helpers_teardown(struct test_context *ctx) {
+    if (!ctx || ctx->helper_count == 0)
+        return false;
+
+    bool leaked = false;
+    for (size_t i = 0; i < ctx->helper_count; i++) {
+        struct thread *t = ctx->helpers[i];
+        if (!t)
+            continue;
+        ctx->helpers[i] = NULL;
+        if (!(thread_get_flags(t) & THREAD_FLAG_JOINED)) {
+            leaked = true;
+            thread_alert(t);
+            thread_join(t);
+        }
+        thread_putref(t);
+    }
+    ctx->helper_count = 0;
+    return leaked;
+}
 
 struct test_run_on_core_ctx {
     void (*fn)(void *);
@@ -137,43 +214,84 @@ static bool test_fleet_attach(struct test_fleet *f, struct test_conc_worker *w,
     return true;
 }
 
-struct test_conc_worker *test_fleet_spawn(struct test_fleet *f,
-                                          const char *role, test_worker_fn body,
-                                          void *arg) {
+struct test_conc_worker *
+test_fleet_spawn_opts(struct test_fleet *f, const char *role,
+                      test_worker_fn body,
+                      const struct test_fleet_worker_opts *opts) {
+    void *arg = opts ? opts->arg : NULL;
     struct test_conc_worker *w = test_fleet_claim(f, role, body, arg);
     if (!w)
         return NULL;
 
+    enum thread_flags flags = f->opts.pin ? THREAD_FLAG_PINNED : 0;
+    enum thread_prio_class prio_class = THREAD_PRIO_CLASS_TIMESHARE;
+    cpu_id_t core_id = CPU_ID_MAX;
+
+    if (opts) {
+        if (opts->flags)
+            flags |= opts->flags;
+        if (opts->prio_class)
+            prio_class = opts->prio_class;
+        core_id = opts->core_id;
+    }
+
+    if (core_id != CPU_ID_MAX) {
+        struct thread *t = thread_create(
+            ("test_%s_%zu", role, w->index), test_fleet_worker_main, .arg = w,
+            .joinable = true, .allowed_cpus = cpu_mask_of(core_id),
+            .flags = flags | THREAD_FLAG_PINNED, .base_prio_class = prio_class);
+        if (!t) {
+            f->spawn_failed = true;
+            f->count--;
+            f->conc.worker_count = f->count;
+            return NULL;
+        }
+
+        enforce(thread_getref(t));
+        atomic_store_release(&w->th, t);
+        thread_enqueue_on_core(t, core_id);
+        return w;
+    }
+
     struct thread *t = thread_spawn(
         ("test_%s_%zu", role, w->index), test_fleet_worker_main, .arg = w,
-        .joinable = true, .flags = f->opts.pin ? THREAD_FLAG_PINNED : 0);
+        .joinable = true, .flags = flags, .base_prio_class = prio_class);
 
     return test_fleet_attach(f, w, t) ? w : NULL;
+}
+
+struct test_conc_worker *test_fleet_spawn(struct test_fleet *f,
+                                          const char *role, test_worker_fn body,
+                                          void *arg) {
+    return test_fleet_spawn_opts(f, role, body,
+                                 &(struct test_fleet_worker_opts){
+                                     .arg = arg,
+                                     .core_id = CPU_ID_MAX,
+                                 });
 }
 
 struct test_conc_worker *test_fleet_spawn_on_core(struct test_fleet *f,
                                                   const char *role,
                                                   test_worker_fn body,
                                                   void *arg, cpu_id_t core_id) {
-    struct test_conc_worker *w = test_fleet_claim(f, role, body, arg);
-    if (!w)
+    return test_fleet_spawn_opts(f, role, body,
+                                 &(struct test_fleet_worker_opts){
+                                     .arg = arg,
+                                     .core_id = core_id,
+                                 });
+}
+
+struct thread *test_fleet_worker_thread(struct test_fleet *f,
+                                        const char *role) {
+    if (!f || !role)
         return NULL;
 
-    struct thread *t = thread_create(
-        ("test_%s_%zu", role, w->index), test_fleet_worker_main, .arg = w,
-        .joinable = true, .allowed_cpus = cpu_mask_of(core_id),
-        .flags = THREAD_FLAG_PINNED);
-    if (!t) {
-        f->spawn_failed = true;
-        f->count--;
-        f->conc.worker_count = f->count;
-        return NULL;
+    for (size_t i = 0; i < f->count; i++) {
+        if (f->workers[i].role && strcmp(f->workers[i].role, role) == 0)
+            return atomic_load_acq(&f->workers[i].th);
     }
 
-    enforce(thread_getref(t));
-    atomic_store_release(&w->th, t);
-    thread_enqueue_on_core(t, core_id);
-    return w;
+    return NULL;
 }
 
 size_t test_fleet_spawn_per_core(struct test_fleet *f, const char *role,
@@ -348,26 +466,6 @@ static void test_fleet_thread_putref(struct test_fleet *f) {
     atomic_store_release(&f->conc.active, false);
 }
 
-void *test_fleet_alloc(struct test_fleet *f, size_t size) {
-    struct test_fleet_alloc *a = valloc(sizeof(*a) + size, ALLOC_ZERO);
-    if (!a)
-        return NULL;
-
-    a->next = f->allocs;
-    f->allocs = a;
-    return (void *) (a + 1);
-}
-
-static void test_fleet_free_allocs(struct test_fleet *f) {
-    struct test_fleet_alloc *a = f->allocs;
-    while (a) {
-        struct test_fleet_alloc *next = a->next;
-        vfree(a);
-        a = next;
-    }
-    f->allocs = NULL;
-}
-
 struct test_verdict test_fleet_join(struct test_fleet *f) {
     if (!atomic_load_acq(&f->conc.active))
         test_fleet_start_all(f);
@@ -422,9 +520,18 @@ bool test_fleet_teardown(struct test_context *ctx) {
         test_fleet_thread_putref(f);
     }
 
-    test_fleet_free_allocs(f);
     vfree(f);
     return leaked;
+}
+
+bool test_context_teardown(struct test_context *ctx) {
+    if (!ctx)
+        return false;
+
+    bool leaked_fleet = test_fleet_teardown(ctx);
+    bool leaked_helpers = test_helpers_teardown(ctx);
+    test_alloc_teardown(ctx);
+    return leaked_fleet || leaked_helpers;
 }
 
 static void test_run_on_core_main(void *arg) {

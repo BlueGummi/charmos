@@ -678,10 +678,10 @@ static void test_group_run(struct test_group *tg) {
                     verdict = t->func(&tctx);
                 }
 
-                if (test_fleet_teardown(&tctx) &&
+                if (test_context_teardown(&tctx) &&
                     verdict.result != TEST_RESULT_FAILED) {
                     verdict = TEST_FAIL("test returned without joining its "
-                                        "fleet");
+                                        "threads");
                 }
                 singular_verdict = verdict;
                 verdicts[run_times] = verdict;

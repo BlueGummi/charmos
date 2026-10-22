@@ -18,17 +18,17 @@
         __abs_result;                                                          \
     })
 
-#define CLAMP(var_, min_, max_)                                                \
-    do {                                                                       \
-        __auto_type __cl_p = &(var_);                                          \
+#define CLAMP(val_, min_, max_)                                                \
+    ({                                                                         \
+        __auto_type __cl_val = (val_);                                         \
         __auto_type __cl_lo = (min_);                                          \
         __auto_type __cl_hi = (max_);                                          \
-        typedef ct_common_type_2(*__cl_p, __cl_lo) __cl_t1;                    \
+        typedef ct_common_type_2(__cl_val, __cl_lo) __cl_t1;                   \
         typedef ct_common_type_2((__cl_t1) 0, __cl_hi) __cl_t;                 \
-        ct_typecheck_widenable_to((__cl_t) 0, var_);                           \
+        ct_typecheck_widenable_to((__cl_t) 0, val_);                           \
         ct_typecheck_widenable_to((__cl_t) 0, min_);                           \
         ct_typecheck_widenable_to((__cl_t) 0, max_);                           \
-        __cl_t __cl_v = (__cl_t) * __cl_p;                                     \
+        __cl_t __cl_v = (__cl_t) __cl_val;                                     \
         __cl_t __cl_l = (__cl_t) __cl_lo;                                      \
         __cl_t __cl_h = (__cl_t) __cl_hi;                                      \
         (void) enforce(__cl_l <= __cl_h);                                      \
@@ -36,9 +36,8 @@
             __cl_v = __cl_h;                                                   \
         if (__cl_v < __cl_l)                                                   \
             __cl_v = __cl_l;                                                   \
-        (void) enforce((__cl_t) (typeof(*__cl_p)) __cl_v == __cl_v);           \
-        *__cl_p = (typeof(*__cl_p)) __cl_v;                                    \
-    } while (0)
+        (__cl_t) __cl_v;                                                       \
+    })
 
 #define _MIN_1(a) (a)
 

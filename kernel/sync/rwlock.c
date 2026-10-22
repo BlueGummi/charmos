@@ -233,8 +233,7 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
     struct thread *curr = thread_get_current();
     enum thread_prio_class base_class = curr->base_prio_class;
     wroost_pre_acquire(lock, acq_type);
-    if (acq_type == RWLOCK_READ)
-        enforce(curr->base_prio_class <= RWLOCK_GET_MAX_PRIO(lword));
+    enforce(curr->perceived_prio_class <= RWLOCK_GET_MAX_PRIO(lword));
 
     /* fastpath */
     if (rwlock_try_lock(lock, curr, acq_type, base_class))

@@ -173,7 +173,7 @@ static void bar_progress_render(struct bar_progress *progress) {
     size_t total = progress->total;
 
     size_t width = term_size().cols / 3;
-    CLAMP(width, BAR_MIN_COLS, BAR_MAX_COLS);
+    width = CLAMP(width, BAR_MIN_COLS, BAR_MAX_COLS);
 
     size_t filled = total ? (width * done) / total : width;
     size_t pct = total ? (100 * done) / total : 100;

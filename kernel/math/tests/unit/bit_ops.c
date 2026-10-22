@@ -290,12 +290,12 @@ TEST_DEFINE_UNIT(bit_ops, common_domain_range_and_clamp) {
 
     uint32_t narrow = 500;
     uint64_t ceiling = 100;
-    CLAMP(narrow, 0, ceiling);
+    narrow = CLAMP(narrow, 0, ceiling);
     TEST_ASSERT_EQ(narrow, 100);
     TEST_ASSERT_EQ(sizeof(narrow), sizeof(uint32_t));
 
     int32_t delta = -80;
-    CLAMP(delta, -20, 20);
+    delta = CLAMP(delta, -20, 20);
     TEST_ASSERT_EQ(delta, -20);
 
     return TEST_SUCCESS;

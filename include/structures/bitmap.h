@@ -35,11 +35,11 @@ typedef uint64_t bitmap_word_t;
 #define BITMAP_BIT_MASK(bit) ((bitmap_word_t) BIT(BITMAP_BIT_OFFSET(bit)))
 
 #define bitmap_for_each_bit_set(bit, map, nbits)                               \
-    for (size_t bit = 0; bit < (nbits); bit++)                                 \
+    for (bit = 0; bit < (nbits); bit++)                                        \
         if (bitmap_test((map), (bit)))
 
 #define bitmap_for_each_bit_unset(bit, map, nbits)                             \
-    for (size_t bit = 0; bit < (nbits); bit++)                                 \
+    for (bit = 0; bit < (nbits); bit++)                                        \
         if (!bitmap_test((map), (bit)))
 
 static inline void bitmap_set(bitmap_word_t *map, size_t bit) {

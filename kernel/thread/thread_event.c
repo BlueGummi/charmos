@@ -204,7 +204,7 @@ void thread_add_wake_reason(struct thread *t, thread_act_reason_t reason) {
     if (wait_reason != THREAD_EVENT_REASON_NONE) {
         /* Explicitly truncate and cut off the high bits to save some space */
         uint32_t elapsed_32 = (uint32_t) now - d->wait_start_ms;
-        CLAMP(clamped, 0, UINT16_MAX);
+        clamped = CLAMP(elapsed_32, 0, UINT16_MAX);
 
         time_ms_t start = now > elapsed_32 ? now - elapsed_32 : 0;
         bool is_sleep =

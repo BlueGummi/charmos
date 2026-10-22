@@ -91,7 +91,7 @@ static int32_t climb_pressure_to_boost_target(climb_pressure_t p) {
 
     int32_t level = fx_to_int(fx_mul(shaped, FX(CLIMB_BOOST_LEVEL_MAX)));
 
-    CLAMP(level, 0, CLIMB_BOOST_LEVEL_MAX);
+    level = CLAMP(level, 0, CLIMB_BOOST_LEVEL_MAX);
     return level;
 }
 TEST_EXPORT(climb_pressure_to_boost_target);
@@ -414,7 +414,7 @@ static struct climb_budget climb_budget_from_summary(struct climb_summary *s) {
         fx_to_int(fx_mul(s->total_pressure_ewma, fx_from_int(boost_scale)));
 
     int32_t max = s->nthreads * CLIMB_BOOST_LEVELS;
-    CLAMP(b.max_boost_levels, CLIMB_MIN_GLOBAL_BOOST, max);
+    b.max_boost_levels = CLAMP(b.max_boost_levels, CLIMB_MIN_GLOBAL_BOOST, max);
 
     b.remaining = b.max_boost_levels;
     return b;

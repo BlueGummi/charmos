@@ -584,7 +584,7 @@ void timer_base_reprogram_hardware(cpu_id_t cpu) {
     time_ns_t delta_ns =
         (next_us > now_us) ? US_TO_NS(next_us - now_us) : ced->min_delta_ns;
 
-    CLAMP(delta_ns, ced->min_delta_ns, ced->max_delta_ns);
+    delta_ns = CLAMP(delta_ns, ced->min_delta_ns, ced->max_delta_ns);
     ced->set_next_event(ced, delta_ns);
     irql_lower(outer);
 }

@@ -128,6 +128,7 @@ enum thread_activity_class {
 };
 
 struct thread_create_params {
+    enum thread_prio_class base_prio_class;
     enum thread_flags flags;
 
     size_t stack_pages;
@@ -707,7 +708,8 @@ static inline enum thread_wait_type thread_get_wait_type(struct thread *t) {
 #define THREAD_CREATE_PARAMS_DEFAULTS                                          \
     .stack_pages = (THREAD_STACK_SIZE / PAGE_SIZE), .on_cpu = CPU_ID_MAX,      \
     .joinable = false, .allowed_cpus = CPU_MASK_INIT_ALL, .arg = NULL,         \
-    .private = NULL, .stack_internal = NULL, .flags = 0
+    .private = NULL, .stack_internal = NULL, .flags = 0,                       \
+    .base_prio_class = THREAD_PRIO_CLASS_TIMESHARE
 
 #define thread_params_with_defaults(...)                                       \
     cc_wno_override_init_expr(                                                 \
