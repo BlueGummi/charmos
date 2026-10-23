@@ -434,11 +434,13 @@ static struct wroost_kicks boost_thread_in_dpc(struct scheduler *sched,
      * NOTE: scheduler_remove_thread_locked does not change the
      * perceived_prio_class, so a removal and re-insertion is fine */
     if (old != new) {
-        scheduler_remove_thread_locked(sched, t);
+        if (thread_get_state(t) == THREAD_STATE_READY)
+            scheduler_remove_thread_locked(sched, t);
 
         t->perceived_prio_class = new;
 
-        scheduler_add_thread_locked(sched, t);
+        if (thread_get_state(t) == THREAD_STATE_READY)
+            scheduler_add_thread_locked(sched, t);
     }
 
     spin_unlock(&t->pi_lock, irql);
