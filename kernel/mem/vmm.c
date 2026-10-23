@@ -157,7 +157,7 @@ static void enqueue_pt_free(paddr_t phys) {
     struct pt_deferred_free *n =
         (struct pt_deferred_free *) hhdm_paddr_to_ptr(phys);
 
-    uint64_t e = atomic_inc_return_acq_rel(&global.pt_epoch);
+    uint64_t e = atomic_inc_return_new_acq_rel(&global.pt_epoch);
     n->phys = phys;
     n->epoch = e;
 

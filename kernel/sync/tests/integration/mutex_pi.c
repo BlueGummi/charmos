@@ -59,12 +59,12 @@ TEST_DEFINE_INTEGRATION(mutex, pi_boost) {
     atomic_store(&pi_done, 0);
 
     cpu_id_t cpu = 1;
-    pi_ts = thread_create("pi_ts", pi_ts_thread, .joinable = true,
-                          .flags = THREAD_FLAG_PINNED);
-    pi_rt = thread_create("pi_rt", pi_rt_thread, .joinable = true,
-                          .flags = THREAD_FLAG_PINNED);
-    pi_dum = thread_create("pi_dum", pi_dummy, .joinable = true,
-                           .flags = THREAD_FLAG_PINNED);
+    pi_ts =
+        thread_create("pi_ts", pi_ts_thread, .joinable = true, .pinned = true);
+    pi_rt =
+        thread_create("pi_rt", pi_rt_thread, .joinable = true, .pinned = true);
+    pi_dum =
+        thread_create("pi_dum", pi_dummy, .joinable = true, .pinned = true);
     pi_rt->base_prio_class = THREAD_PRIO_CLASS_REALTIME;
     pi_rt->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;
     pi_dum->base_prio_class = THREAD_PRIO_CLASS_REALTIME;
@@ -146,12 +146,12 @@ TEST_DEFINE_INTEGRATION(mutex, pi_chain, .min_cores = 2) {
 
     cpu_id_t cpu = 1;
 
-    pi_ts2 = thread_create("pi_ts2", pi_chain_ts2, .joinable = true,
-                           .flags = THREAD_FLAG_PINNED);
-    pi_ts1 = thread_create("pi_ts1", pi_chain_ts1, .joinable = true,
-                           .flags = THREAD_FLAG_PINNED);
-    pi_rt2 = thread_create("pi_rt2", pi_chain_rt, .joinable = true,
-                           .flags = THREAD_FLAG_PINNED);
+    pi_ts2 =
+        thread_create("pi_ts2", pi_chain_ts2, .joinable = true, .pinned = true);
+    pi_ts1 =
+        thread_create("pi_ts1", pi_chain_ts1, .joinable = true, .pinned = true);
+    pi_rt2 =
+        thread_create("pi_rt2", pi_chain_rt, .joinable = true, .pinned = true);
 
     pi_rt2->base_prio_class = THREAD_PRIO_CLASS_REALTIME;
     pi_rt2->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;
@@ -217,12 +217,12 @@ TEST_DEFINE_INTEGRATION(mutex, pi_multi_waiters,
 
     cpu_id_t cpu = 1;
 
-    struct thread *ts = thread_create("pi_ts", pi_multi_ts, .joinable = true,
-                                      .flags = THREAD_FLAG_PINNED);
+    struct thread *ts =
+        thread_create("pi_ts", pi_multi_ts, .joinable = true, .pinned = true);
     struct thread *rt[8];
     for (size_t i = 0; i < num_rt; i++) {
         rt[i] = thread_create("pi_rt", pi_multi_rt, .joinable = true,
-                              .flags = THREAD_FLAG_PINNED);
+                              .pinned = true);
         rt[i]->base_prio_class = THREAD_PRIO_CLASS_REALTIME;
         rt[i]->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;
     }
@@ -282,10 +282,10 @@ TEST_DEFINE_INTEGRATION(mutex, pi_revert, .min_cores = 2) {
 
     cpu_id_t cpu = 1;
 
-    struct thread *ts = thread_create("pi_ts", pi_revert_ts, .joinable = true,
-                                      .flags = THREAD_FLAG_PINNED);
-    struct thread *rt = thread_create("pi_rt", pi_revert_rt, .joinable = true,
-                                      .flags = THREAD_FLAG_PINNED);
+    struct thread *ts =
+        thread_create("pi_ts", pi_revert_ts, .joinable = true, .pinned = true);
+    struct thread *rt =
+        thread_create("pi_rt", pi_revert_rt, .joinable = true, .pinned = true);
 
     rt->base_prio_class = THREAD_PRIO_CLASS_REALTIME;
     rt->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;
@@ -367,15 +367,12 @@ TEST_DEFINE_INTEGRATION(mutex, pi_out_of_order_unlock, .min_cores = 2) {
 
     cpu_id_t cpu = 1;
 
-    struct thread *ts =
-        thread_create("pi_ooo_ts", pi_ooo_owner, .joinable = true,
-                      .flags = THREAD_FLAG_PINNED);
-    struct thread *rt =
-        thread_create("pi_ooo_rt", pi_ooo_waiter_l1, .joinable = true,
-                      .flags = THREAD_FLAG_PINNED);
-    struct thread *urg =
-        thread_create("pi_ooo_urg", pi_ooo_waiter_l2, .joinable = true,
-                      .flags = THREAD_FLAG_PINNED);
+    struct thread *ts = thread_create("pi_ooo_ts", pi_ooo_owner,
+                                      .joinable = true, .pinned = true);
+    struct thread *rt = thread_create("pi_ooo_rt", pi_ooo_waiter_l1,
+                                      .joinable = true, .pinned = true);
+    struct thread *urg = thread_create("pi_ooo_urg", pi_ooo_waiter_l2,
+                                       .joinable = true, .pinned = true);
 
     rt->base_prio_class = THREAD_PRIO_CLASS_REALTIME;
     rt->perceived_prio_class = THREAD_PRIO_CLASS_REALTIME;

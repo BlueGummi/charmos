@@ -100,6 +100,19 @@ struct wroost_kicks {
     wroost_id_t lock_id;
 };
 
+struct wroost_process_result {
+    bool restart;
+
+    /* seen_data marks the lock IDs that the code has already
+     * processed, at the bitmap word granularity. This is so
+     * that if the pending process needs to restart, it
+     * remains aware of what had already been processed, so
+     * it can merge it with potentially new bits
+     * and re-check and boost (since restart happens
+     * due to a writer boosting a reader on calling CPU) */
+    bitmap_word_t *seen_data;
+};
+
 /* Protected by scheduler->lock */
 struct wroost_percpu_data {
     atomic(enum wroost_state) state;
@@ -130,7 +143,24 @@ struct wroost_percpu_data {
 
     /* Since thread_map is guaranteed to only have single lock readers */
     struct hlist_head multi_lock_readers;
+
+    /* Readers that happen to be blocked on a turnstile go here. This is
+     * because such readers need to propagate their priorities, which
+     * cannot happen under sched->lock, but can under wroost_lock (and
+     * that is the sole purpose that lock actually exists).
+     *
+     * Readers enter blocked_ts_readers on switch-out,
+     * and exit it on switch-in, both of which cannot happen during
+     * the DPC that iterates through this.
+     *
+     * Migrations are not a concern here because these threads do not
+     * exist in the runqueues, and there is thus no way to have
+     * obtained them for a migration. These threads must also
+     * be woken on the CPU that they went to sleep on for this reason. */
+    struct hlist_head blocked_ts_readers;
     atomic(bitmap_word_t) * pending_bitmap;
+
+    struct wroost_process_result process_result;
 
     /* These primarily serve the purpose of implementing multi-hop.
      *
@@ -213,6 +243,7 @@ struct wroost_thread_data {
     /* Whether this wroost_thread_data has
      * contributed to the thread's class_floors */
     bool contributed_floor : 1; /* Set by scheduler */
+    bool in_blocked_ts_list : 1;
 
     /* TODO: use this to implement the optimization of knowing
      * the readers cannot be of lower priority */
@@ -263,6 +294,8 @@ void wroost_post_wait(struct thread *curr);
 void wroost_post_migrate_hook(struct thread *t, cpu_id_t from, cpu_id_t to);
 
 size_t wroost_kick(struct wroost_kicks *kicks);
+bool wroost_merge_kicks(struct wroost_percpu_data *pcd,
+                        struct wroost_kicks *kicks);
 
 struct wroost_kicks cc_warn_unused_result
 wroost_post_prio_change_locked(struct thread *t, enum thread_prio_class old,

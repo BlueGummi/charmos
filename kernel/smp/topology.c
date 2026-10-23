@@ -562,8 +562,7 @@ bool topology_contract_verify(struct topology_contract c) {
             valid = valid || irql_get() >= IRQL_DISPATCH_LEVEL;
 
         if (caller & TOPC_PINNED && irq_not_in_interrupt()) {
-            valid = valid || (thread_get_flags(thread_get_current()) &
-                              THREAD_FLAG_PINNED);
+            valid = valid || thread_is_pinned(thread_get_current());
             if (!valid) {
                 /* This is where scope actually means something,
                  * we check that the thread's allowed_cpus ∈ scope_cpus */

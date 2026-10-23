@@ -338,27 +338,31 @@ typedef _Atomic ptrdiff_t atomic_ptrdiff_t;
 #define atomic_dec_2(ptr, mo) atomic_fetch_sub_checked_internal((ptr), 1, (mo))
 #define atomic_dec(...) atomic_call_internal(atomic_dec, __VA_ARGS__)
 
-#define atomic_inc_return_1(ptr) atomic_inc_return_2((ptr), mo_seq_cst)
-#define atomic_inc_return_2(ptr, mo)                                           \
+#define atomic_inc_return_new_1(ptr) atomic_inc_return_new_2((ptr), mo_seq_cst)
+#define atomic_inc_return_new_2(ptr, mo)                                       \
     (atomic_fetch_add_checked_internal((ptr), 1, (mo)) + 1)
-#define atomic_inc_return(...)                                                 \
-    atomic_call_internal(atomic_inc_return, __VA_ARGS__)
+#define atomic_inc_return_new(...)                                             \
+    atomic_call_internal(atomic_inc_return_new, __VA_ARGS__)
 
-#define atomic_dec_return_1(ptr) atomic_dec_return_2((ptr), mo_seq_cst)
-#define atomic_dec_return_2(ptr, mo)                                           \
+#define atomic_dec_return_new_1(ptr) atomic_dec_return_new_2((ptr), mo_seq_cst)
+#define atomic_dec_return_new_2(ptr, mo)                                       \
     (atomic_fetch_sub_checked_internal((ptr), 1, (mo)) - 1)
-#define atomic_dec_return(...)                                                 \
-    atomic_call_internal(atomic_dec_return, __VA_ARGS__)
+#define atomic_dec_return_new(...)                                             \
+    atomic_call_internal(atomic_dec_return_new, __VA_ARGS__)
 
-#define atomic_inc_return_rlx(ptr) atomic_inc_return((ptr), mo_rlx)
-#define atomic_inc_return_acq(ptr) atomic_inc_return((ptr), mo_acquire)
-#define atomic_inc_return_release(ptr) atomic_inc_return((ptr), mo_release)
-#define atomic_inc_return_acq_rel(ptr) atomic_inc_return((ptr), mo_acq_rel)
+#define atomic_inc_return_new_rlx(ptr) atomic_inc_return_new((ptr), mo_rlx)
+#define atomic_inc_return_new_acq(ptr) atomic_inc_return_new((ptr), mo_acquire)
+#define atomic_inc_return_new_release(ptr)                                     \
+    atomic_inc_return_new((ptr), mo_release)
+#define atomic_inc_return_new_acq_rel(ptr)                                     \
+    atomic_inc_return_new((ptr), mo_acq_rel)
 
-#define atomic_dec_return_rlx(ptr) atomic_dec_return((ptr), mo_rlx)
-#define atomic_dec_return_acq(ptr) atomic_dec_return((ptr), mo_acquire)
-#define atomic_dec_return_release(ptr) atomic_dec_return((ptr), mo_release)
-#define atomic_dec_return_acq_rel(ptr) atomic_dec_return((ptr), mo_acq_rel)
+#define atomic_dec_return_new_rlx(ptr) atomic_dec_return_new((ptr), mo_rlx)
+#define atomic_dec_return_new_acq(ptr) atomic_dec_return_new((ptr), mo_acquire)
+#define atomic_dec_return_new_release(ptr)                                     \
+    atomic_dec_return_new((ptr), mo_release)
+#define atomic_dec_return_new_acq_rel(ptr)                                     \
+    atomic_dec_return_new((ptr), mo_acq_rel)
 
 #define atomic_dec_and_test(ptr)                                               \
     (atomic_fetch_sub_checked_internal((ptr), 1, mo_acq_rel) == 1)

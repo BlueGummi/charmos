@@ -195,6 +195,9 @@ static struct thread *thread_init(struct thread *thread,
     thread->creation_time_ms = time_get_ms();
 #endif
 
+    if (params->pinned)
+        atomic_init(&thread->pinned_depth, 1);
+
     thread->stack_size = params->stack_pages * PAGE_SIZE;
     thread->regs.rsp = stack_top;
     atomic_init(&thread->migrate_to, -1);

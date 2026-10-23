@@ -125,19 +125,17 @@ out:
 }
 
 TEST_DEFINE_UNIT(lock_chk, assert_not_held_cross_thread_mutex) {
-    struct test_fleet *fleet = test_fleet_init(ctx, NULL);
-    TEST_ASSERT_NONNULL(fleet);
+    struct test_fleet *fleet = test_fleet_init(ctx);
 
-    struct cross_thread_fix *fix = test_fleet_alloc(fleet, sizeof(*fix));
-    TEST_ASSERT_NONNULL(fix);
+    struct cross_thread_fix *fix = test_new(fix);
 
     mutex_init_chk(&fix->lock, LOCK_CHK_CLASS(assert_cross_thread_class),
                    LOCK_CHKD_FULL);
     test_latch_init(&fix->held);
     test_latch_init(&fix->release);
 
-    TEST_ASSERT_NONNULL(test_fleet_spawn(fleet, "cross_thread",
-                                         assert_cross_thread_worker, fix));
+    test_fleet_spawn(fleet, "cross_thread", assert_cross_thread_worker,
+                     .arg = fix);
     test_fleet_start_all(fleet);
 
     /* Every assert below can return early */

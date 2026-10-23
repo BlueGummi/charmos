@@ -141,6 +141,7 @@ struct thread_create_params {
 
     cpu_id_t on_cpu; /* Default: CPU_ID_MAX */
 
+    bool pinned;
     bool joinable;
 
     void *private;
@@ -226,6 +227,7 @@ struct thread {
     time_ms_t run_start_time; /* When did we start running */
 
     /* Who is allowed to run us? */
+    atomic_uint32_t pinned_depth;
     struct cpu_mask allowed_cpus;
     atomic_int64_t migrate_to; /* -1 if no migration target */
 
@@ -484,7 +486,8 @@ void thread_recompute_prio_class_raw_locked(struct thread *t,
                                             enum thread_prio_class *new_out);
 
 bool thread_inherit_priority(struct thread *boosted, struct thread *from,
-                             struct thread_class_donation *d);
+                             struct thread_class_donation *d,
+                             struct wroost_kicks *kicks_out);
 
 void thread_donate_class(struct thread *boosted, enum thread_prio_class class,
                          struct thread_class_donation *d);
@@ -605,12 +608,20 @@ static inline void thread_set_flags(struct thread *t, enum thread_flags new) {
     atomic_store(&t->flags, new);
 }
 
-static inline bool thread_pin(struct thread *t) {
-    return atomic_fetch_or(&t->flags, THREAD_FLAG_PINNED) & THREAD_FLAG_PINNED;
+static inline uint32_t thread_pin(struct thread *t) {
+    uint32_t old = atomic_inc(&t->pinned_depth);
+    enforce(old != UINT32_MAX);
+    return old;
 }
 
-static inline void thread_unpin(struct thread *t) {
-    atomic_fetch_and(&t->flags, ~THREAD_FLAG_PINNED);
+static inline uint32_t thread_unpin(struct thread *t) {
+    uint32_t old = atomic_dec(&t->pinned_depth);
+    enforce(old != 0);
+    return old;
+}
+
+static inline bool thread_is_pinned(struct thread *t) {
+    return atomic_load(&t->pinned_depth) > 0;
 }
 
 static inline enum thread_flags thread_or_flags(struct thread *t,
@@ -707,8 +718,8 @@ static inline enum thread_wait_type thread_get_wait_type(struct thread *t) {
 
 #define THREAD_CREATE_PARAMS_DEFAULTS                                          \
     .stack_pages = (THREAD_STACK_SIZE / PAGE_SIZE), .on_cpu = CPU_ID_MAX,      \
-    .joinable = false, .allowed_cpus = CPU_MASK_INIT_ALL, .arg = NULL,         \
-    .private = NULL, .stack_internal = NULL, .flags = 0,                       \
+    .joinable = false, .pinned = false, .allowed_cpus = CPU_MASK_INIT_ALL,     \
+    .arg = NULL, .private = NULL, .stack_internal = NULL, .flags = 0,          \
     .base_prio_class = THREAD_PRIO_CLASS_TIMESHARE
 
 #define thread_params_with_defaults(...)                                       \

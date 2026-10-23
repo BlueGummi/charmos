@@ -11,7 +11,7 @@
 #include "internal.h"
 
 bool scheduler_can_take_thread(size_t core, struct thread *target) {
-    if (thread_get_flags(target) & THREAD_FLAG_PINNED)
+    if (thread_is_pinned(target))
         return false;
 
     if (!cpu_mask_test(&target->allowed_cpus, core))

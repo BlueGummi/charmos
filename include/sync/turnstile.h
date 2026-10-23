@@ -9,6 +9,7 @@
 #define TURNSTILE_READER_QUEUE 1
 #define TURNSTILE_NUM_QUEUES 2
 
+struct wroost_percpu_data;
 enum turnstile_state {
     TURNSTILE_STATE_UNUSED, /* we are unused by anything... */
 
@@ -73,6 +74,11 @@ void turnstile_unlock(void *obj, enum irql irql);
 void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,
                     enum irql lock_irql);
 
+/* Returns whether the caller pcd needs to re-check threads
+ * because somewhere down the PI chain, someone wanted to
+ * bother the caller pcd (also merges kicks into pcd) */
+bool turnstile_propagate_wroost(struct wroost_percpu_data *pcd,
+                                struct thread *t);
 void turnstile_wake_handoff(struct turnstile *ts, size_t queue,
                             enum irql lock_irql);
 size_t turnstile_get_waiter_count(void *lock_obj);

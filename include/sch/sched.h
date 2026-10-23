@@ -48,6 +48,7 @@ struct scheduler {
     struct thread *drop_last_ref;
     struct timer tick;
 
+    struct spinlock wroost_lock;
     struct wroost_percpu_data *wroost_data;
 
     /* Thread count at each prio */

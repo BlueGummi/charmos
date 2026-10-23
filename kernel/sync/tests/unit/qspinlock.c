@@ -74,16 +74,14 @@ static bool qspinlock_contention_worker(struct test_fleet *f,
 }
 
 TEST_DEFINE_INTEGRATION(qspinlock, contended_handoff, .min_cores = 2) {
-    struct test_fleet *fleet = test_fleet_init(ctx, NULL);
-    TEST_ASSERT_NONNULL(fleet);
+    struct test_fleet *fleet = test_fleet_init(ctx);
 
-    struct qspin_contention_fix *fix = test_fleet_alloc(fleet, sizeof(*fix));
-    TEST_ASSERT_NONNULL(fix);
+    struct qspin_contention_fix *fix = test_new(fix);
     fix->lock = (struct qspinlock) QSPINLOCK_INIT;
 
     for (size_t i = 0; i < QSPINLOCK_CONTENTION_THREADS; i++)
-        TEST_ASSERT_NONNULL(test_fleet_spawn(fleet, "qspin_contend",
-                                             qspinlock_contention_worker, fix));
+        test_fleet_spawn(fleet, "qspin_contend", qspinlock_contention_worker,
+                         .arg = fix);
 
     test_fleet_start_all(fleet);
 

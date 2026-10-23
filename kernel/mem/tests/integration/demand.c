@@ -57,9 +57,9 @@ static void dp_spawn(struct thread **t, size_t nthreads, struct dp_worker *w,
                      bool single_core) {
     for (size_t i = 0; i < nthreads; i++) {
         uint64_t core = single_core ? 0 : (i % global.core_count);
-        t[i] = enforce(thread_spawn(
-            "dp_hammer", dp_hammer, .arg = w, .on_cpu = core, .joinable = true,
-            .flags = single_core ? THREAD_FLAG_PINNED : 0));
+        t[i] = enforce(thread_spawn("dp_hammer", dp_hammer, .arg = w,
+                                    .on_cpu = core, .joinable = true,
+                                    .pinned = single_core));
     }
 }
 

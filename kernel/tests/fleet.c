@@ -19,12 +19,17 @@ cpu_id_t test_core(size_t index) {
 }
 
 void *test_alloc(struct test_context *ctx, size_t size) {
-    if (!ctx)
-        return NULL;
+    if (cc_unlikely(!ctx))
+        panic("test_alloc: NULL test_context");
 
-    struct test_alloc_node *a = valloc(sizeof(*a) + size, ALLOC_ZERO);
-    if (!a)
-        return NULL;
+    size_t total;
+    if (cc_unlikely(
+            ci_add_overflow(sizeof(struct test_alloc_node), size, &total)))
+        panic("test_alloc: allocation size overflow (%zu bytes)", size);
+
+    struct test_alloc_node *a = valloc(total, ALLOC_ZERO);
+    if (cc_unlikely(!a))
+        panic("test_alloc: OOM (%zu bytes)", size);
 
     a->next = ctx->allocs;
     ctx->allocs = a;
@@ -45,7 +50,9 @@ static void test_alloc_teardown(struct test_context *ctx) {
 }
 
 void *test_fleet_alloc(struct test_fleet *f, size_t size) {
-    return (f && f->ctx) ? test_alloc(f->ctx, size) : NULL;
+    if (cc_unlikely(!f || !f->ctx))
+        panic("test_fleet_alloc: NULL fleet or context");
+    return test_alloc(f->ctx, size);
 }
 
 struct thread *test_spawn_internal(struct test_context *ctx,
@@ -148,15 +155,18 @@ static void test_fleet_deadline(struct timer *timer) {
     panic("test fleet did not drain within deadline");
 }
 
-struct test_fleet *test_fleet_init(struct test_context *ctx,
-                                   const struct test_fleet_opts *opts) {
+struct test_fleet *test_fleet_init_full(struct test_context *ctx,
+                                        const struct test_fleet_opts opts) {
+    if (cc_unlikely(!ctx))
+        panic("test_fleet_init: NULL test_context");
+
     struct test_fleet *f = vnew(f, ALLOC_ZERO);
-    if (!f)
-        return NULL;
+    if (cc_unlikely(!f))
+        panic("test_fleet_init: OOM");
 
     once_token_init(&f->failed);
     f->ctx = ctx;
-    f->opts = opts ? *opts : (struct test_fleet_opts){0};
+    f->opts = opts;
 
     if (!f->opts.soft_ms)
         f->opts.soft_ms = TEST_FLEET_SOFT_MS;
@@ -166,8 +176,7 @@ struct test_fleet *test_fleet_init(struct test_context *ctx,
 
     test_conc_init(&f->conc, f->workers, 0);
 
-    if (ctx)
-        ctx->fleet = f;
+    ctx->fleet = f;
 
     return f;
 }
@@ -215,7 +224,7 @@ static bool test_fleet_attach(struct test_fleet *f, struct test_conc_worker *w,
 }
 
 struct test_conc_worker *
-test_fleet_spawn_opts(struct test_fleet *f, const char *role,
+test_fleet_spawn_full(struct test_fleet *f, const char *role,
                       test_worker_fn body,
                       const struct test_fleet_worker_opts opts) {
     void *arg = opts.arg;
@@ -223,21 +232,18 @@ test_fleet_spawn_opts(struct test_fleet *f, const char *role,
     if (!w)
         return NULL;
 
-    enum thread_flags flags = f->opts.pin ? THREAD_FLAG_PINNED : 0;
-    enum thread_prio_class prio_class = THREAD_PRIO_CLASS_TIMESHARE;
+    enum thread_flags flags = opts.flags;
+    enum thread_prio_class prio_class = opts.prio_class;
     cpu_id_t core_id = CPU_ID_MAX;
 
-    if (opts.flags)
-        flags |= opts.flags;
-    if (opts.prio_class)
-        prio_class = opts.prio_class;
     core_id = opts.core_id;
 
     if (core_id != CPU_ID_MAX) {
         struct thread *t = thread_create(
             ("test_%s_%zu", role, w->index), test_fleet_worker_main, .arg = w,
             .joinable = true, .allowed_cpus = cpu_mask_of(core_id),
-            .flags = flags | THREAD_FLAG_PINNED, .base_prio_class = prio_class);
+            .flags = flags, .pinned = f->opts.pin || opts.pinned,
+            .base_prio_class = prio_class);
         if (!t) {
             f->spawn_failed = true;
             f->count--;
@@ -256,27 +262,6 @@ test_fleet_spawn_opts(struct test_fleet *f, const char *role,
         .joinable = true, .flags = flags, .base_prio_class = prio_class);
 
     return test_fleet_attach(f, w, t) ? w : NULL;
-}
-
-struct test_conc_worker *test_fleet_spawn(struct test_fleet *f,
-                                          const char *role, test_worker_fn body,
-                                          void *arg) {
-    return test_fleet_spawn_opts(f, role, body,
-                                 (struct test_fleet_worker_opts){
-                                     .arg = arg,
-                                     .core_id = CPU_ID_MAX,
-                                 });
-}
-
-struct test_conc_worker *test_fleet_spawn_on_core(struct test_fleet *f,
-                                                  const char *role,
-                                                  test_worker_fn body,
-                                                  void *arg, cpu_id_t core_id) {
-    return test_fleet_spawn_opts(f, role, body,
-                                 (struct test_fleet_worker_opts){
-                                     .arg = arg,
-                                     .core_id = core_id,
-                                 });
 }
 
 struct thread *test_fleet_worker_thread(struct test_fleet *f,
@@ -299,7 +284,8 @@ size_t test_fleet_spawn_per_core(struct test_fleet *f, const char *role,
 
     for (size_t rep = 0; rep < per_core; rep++) {
         for (size_t cpu = 0; cpu < global.core_count; cpu++) {
-            if (!test_fleet_spawn_on_core(f, role, body, arg, cpu))
+            if (!test_fleet_spawn(f, role, body, .arg = arg, .core_id = cpu,
+                                  .pinned = true))
                 return spawned;
             spawned++;
         }
@@ -340,9 +326,8 @@ size_t test_fleet_spawn_perturbers(struct test_fleet *f,
         const struct test_perturb_desc *desc = test_perturb_lookup(*name);
         enforce(desc, "no such perturber");
 
-        if (!test_fleet_spawn(f, desc->name, test_fleet_perturb_body,
-                              (void *) desc))
-            break;
+        test_fleet_spawn(f, desc->name, test_fleet_perturb_body,
+                         .arg = (void *) desc);
         spawned++;
     }
 
@@ -547,8 +532,8 @@ bool test_run_on_core(cpu_id_t core_id, void (*fn)(void *), void *arg) {
 
     struct thread *t = thread_spawn(
         ("test_on_core_%zu", core_id), test_run_on_core_main, .arg = &c,
-        .joinable = true, .allowed_cpus = cpu_mask_of(core_id),
-        .flags = THREAD_FLAG_PINNED, .on_cpu = core_id);
+        .joinable = true, .allowed_cpus = cpu_mask_of(core_id), .pinned = true,
+        .on_cpu = core_id);
     if (!t)
         return false;
 

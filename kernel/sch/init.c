@@ -53,8 +53,8 @@ void scheduler_init(void) {
     for_each_cpu_id(i) {
         struct scheduler *s = nofail_vnew(s, ALLOC_ZERO);
 
-        wroost_scheduler_init(s);
         spinlock_init(&s->lock, LOCK_UNCHKD);
+        spinlock_init(&s->wroost_lock);
         rbt_init(&s->thread_rbt, scheduler_thread_get_data,
                  scheduler_cmp_threads);
         rbt_init(&s->completed_rbt, scheduler_thread_get_data,
@@ -72,19 +72,19 @@ void scheduler_init(void) {
         s->tick.func = scheduler_tick;
         s->tick.flags =
             TIMER_FLAG_IRQ | TIMER_FLAG_CPU(s->core_id) | TIMER_FLAG_PINNED;
-        struct thread *idle_thread =
-            thread_create(("idle_thread_%zu", i), scheduler_idle_main,
-                          .flags = THREAD_FLAG_PINNED);
+        struct thread *idle_thread = thread_create(
+            ("idle_thread_%zu", i), scheduler_idle_main, .pinned = true);
         atomic_store_rlx(&idle_thread->state, THREAD_STATE_IDLE_THREAD);
         s->idle_thread = idle_thread;
 
+        wroost_scheduler_init(s);
         list_head_init(&s->rt_threads);
         list_head_init(&s->urgent_threads);
         list_head_init(&s->bg_threads);
 
         if (!i) {
-            struct thread *t = thread_create("main_thread", k_sch_main,
-                                             .flags = THREAD_FLAG_PINNED);
+            struct thread *t =
+                thread_create("main_thread", k_sch_main, .pinned = true);
             scheduler_add_thread(s, t);
         }
 

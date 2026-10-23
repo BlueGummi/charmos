@@ -31,9 +31,10 @@ struct test_fleet_alloc;
 
 /* Options for spawning individual workers in a fleet */
 struct test_fleet_worker_opts {
+    bool pinned;
     void *arg;
-    cpu_id_t core_id;                  /* CPU_ID_MAX = unpinned */
-    enum thread_prio_class prio_class; /* 0 = THREAD_PRIO_CLASS_TIMESHARE */
+    cpu_id_t core_id; /* CPU_ID_MAX = unpinned */
+    enum thread_prio_class prio_class;
     enum thread_flags flags;
 };
 
@@ -108,38 +109,41 @@ struct test_fleet {
                         * an allocation fails (unfortunate) */
 };
 
-struct test_fleet *test_fleet_init(struct test_context *ctx,
-                                   const struct test_fleet_opts *opts);
+struct test_fleet *test_fleet_init_full(struct test_context *ctx,
+                                        const struct test_fleet_opts opts);
+
+#define test_fleet_opts_with_defaults(...)                                     \
+    cc_wno_override_init_expr(                                                 \
+        struct test_fleet_opts,                                                \
+        ((struct test_fleet_opts) {.soft_ms = TEST_FLEET_SOFT_MS,              \
+                                   .drain_ms = TEST_FLEET_DRAIN_MS,            \
+                                   ##__VA_ARGS__}))
+
+#define test_fleet_init(ctx, ...)                                              \
+    test_fleet_init_full((ctx), test_fleet_opts_with_defaults(__VA_ARGS__))
 
 void *test_fleet_alloc(struct test_fleet *f, size_t size) cw_alloc(2);
 
-struct test_conc_worker *test_fleet_spawn(struct test_fleet *f,
-                                          const char *role, test_worker_fn body,
-                                          void *arg);
-
 /* Spawn with custom worker options (affinity, priority class, flags) */
 struct test_conc_worker *
-test_fleet_spawn_opts(struct test_fleet *f, const char *role,
+test_fleet_spawn_full(struct test_fleet *f, const char *role,
                       test_worker_fn body,
                       const struct test_fleet_worker_opts opts);
 
 #define test_fleet_worker_opts_with_defaults(...)                              \
     cc_wno_override_init_expr(struct test_fleet_worker_opts,                   \
                               ((struct test_fleet_worker_opts) {               \
-                                  .core_id = CPU_ID_MAX, ##__VA_ARGS__}))
+                                  .core_id = CPU_ID_MAX,                       \
+                                  .prio_class = THREAD_PRIO_CLASS_TIMESHARE,   \
+                                  .pinned = false,                             \
+                                  ##__VA_ARGS__}))
 
-#define test_fleet_spawn_opt(f, role, body, ...)                               \
-    test_fleet_spawn_opts((f), (role), (body),                                 \
+#define test_fleet_spawn(f, role, body, ...)                                   \
+    test_fleet_spawn_full((f), (role), (body),                                 \
                           test_fleet_worker_opts_with_defaults(__VA_ARGS__))
 
 /* Look up a worker thread by its role name */
 struct thread *test_fleet_worker_thread(struct test_fleet *f, const char *role);
-
-/* Whole fleet on one CPU */
-struct test_conc_worker *test_fleet_spawn_on_core(struct test_fleet *f,
-                                                  const char *role,
-                                                  test_worker_fn body,
-                                                  void *arg, cpu_id_t core_id);
 
 /* Spawn N many per CPU */
 size_t test_fleet_spawn_per_core(struct test_fleet *f, const char *role,

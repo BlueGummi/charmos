@@ -263,7 +263,8 @@ static struct core *setup_cpu(uint64_t cpu) {
 }
 
 static inline void set_core_awake(void) {
-    if (atomic_inc_return_acq_rel(&cores_awake) == (global.core_count - 1)) {
+    if (atomic_inc_return_new_acq_rel(&cores_awake) ==
+        (global.core_count - 1)) {
         bootstage_advance(BOOTSTAGE_MID_MP);
     }
 }

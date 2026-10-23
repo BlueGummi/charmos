@@ -29,12 +29,9 @@ static bool many_worker(struct test_fleet *f, struct test_conc_worker *w) {
 }
 
 TEST_DEFINE_INTEGRATION(mutex, mt_many_waiters, TEST_INTENSITY(2, 10, 32)) {
-    struct test_fleet_opts opts = {.pin = true};
-    struct test_fleet *fleet = test_fleet_init(ctx, &opts);
-    TEST_ASSERT_NONNULL(fleet);
+    struct test_fleet *fleet = test_fleet_init(ctx, .pin = true);
 
-    struct many_waiter_fix *fix = test_fleet_alloc(fleet, sizeof(*fix));
-    TEST_ASSERT_NONNULL(fix);
+    struct many_waiter_fix *fix = test_new(fix);
     mutex_init(&fix->lock);
 
     size_t num_waiters = ctx->intensity_val ? ctx->intensity_val : 10;
@@ -42,7 +39,7 @@ TEST_DEFINE_INTEGRATION(mutex, mt_many_waiters, TEST_INTENSITY(2, 10, 32)) {
         num_waiters = MUTEX_MANY_WAITER_MAX;
 
     for (size_t i = 0; i < num_waiters; i++)
-        TEST_ASSERT_NONNULL(test_fleet_spawn(fleet, "mw", many_worker, fix));
+        test_fleet_spawn(fleet, "mw", many_worker, .arg = fix);
 
     test_fleet_start_all(fleet);
 
@@ -84,11 +81,9 @@ static bool chaos(struct test_fleet *f, struct test_conc_worker *w) {
 
 static struct test_verdict mt_chaos_run(struct test_context *ctx,
                                         const char *const *noise) {
-    struct test_fleet *fleet = test_fleet_init(ctx, NULL);
-    TEST_ASSERT_NONNULL(fleet);
+    struct test_fleet *fleet = test_fleet_init(ctx);
 
-    struct chaos_fix *fix = test_fleet_alloc(fleet, sizeof(*fix));
-    TEST_ASSERT_NONNULL(fix);
+    struct chaos_fix *fix = test_new(fix);
     mutex_init(&fix->lock);
 
     size_t num_threads = ctx->intensity_val ? ctx->intensity_val : 24;
@@ -96,7 +91,7 @@ static struct test_verdict mt_chaos_run(struct test_context *ctx,
         num_threads = CHAOS_THREAD_MAX;
 
     for (size_t i = 0; i < num_threads; i++)
-        TEST_ASSERT_NONNULL(test_fleet_spawn(fleet, "ch", chaos, fix));
+        test_fleet_spawn(fleet, "ch", chaos, .arg = fix);
 
     if (noise)
         test_fleet_spawn_perturbers(fleet, noise, TEST_PERTURB_VICTIM_ANY);

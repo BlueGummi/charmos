@@ -11,12 +11,10 @@ static void lock_two_parked(void *arg) {
 TEST_DEFINE_INTEGRATION(sched, lock_two_runqueues_irql, .min_cores = 2) {
     completion_init(&lock_two_release, COMPLETION_INIT_NORMAL);
 
-    struct thread *t0 =
-        thread_spawn("lock_two_0", lock_two_parked, .on_cpu = 0,
-                     .flags = THREAD_FLAG_PINNED, .joinable = true);
-    struct thread *t1 =
-        thread_spawn("lock_two_1", lock_two_parked, .on_cpu = 1,
-                     .flags = THREAD_FLAG_PINNED, .joinable = true);
+    struct thread *t0 = thread_spawn("lock_two_0", lock_two_parked, .on_cpu = 0,
+                                     .pinned = true, .joinable = true);
+    struct thread *t1 = thread_spawn("lock_two_1", lock_two_parked, .on_cpu = 1,
+                                     .pinned = true, .joinable = true);
     TEST_ASSERT_NONNULL(t0);
     TEST_ASSERT_NONNULL(t1);
 

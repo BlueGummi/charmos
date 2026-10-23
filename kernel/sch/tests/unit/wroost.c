@@ -46,21 +46,23 @@ static bool basic_writer(struct test_fleet *f, struct test_conc_worker *w) {
 }
 
 TEST_DEFINE_UNIT(wroost, basic_boost, .min_cores = 2) {
-    struct test_fleet *fleet = test_fleet_init(ctx, NULL);
-    TEST_ASSERT_NONNULL(fleet);
+    struct test_fleet *fleet = test_fleet_init(ctx);
 
-    struct wroost_fixture *fix = test_alloc(ctx, sizeof(*fix));
-    TEST_ASSERT_NONNULL(fix);
+    struct wroost_fixture *fix = test_new(fix);
 
     rwlock_init(&fix->lock, THREAD_PRIO_CLASS_REALTIME);
     test_latch_init(&fix->reader_started);
 
-    TEST_ASSERT_NONNULL(test_fleet_spawn_opt(
-        fleet, "reader", basic_reader, .core_id = test_core(0), .arg = fix));
-    TEST_ASSERT_NONNULL(test_fleet_spawn_opt(
-        fleet, "writer", basic_writer, .core_id = test_core(1),
-        .prio_class = THREAD_PRIO_CLASS_REALTIME, .arg = fix));
+    test_fleet_spawn(fleet, "reader", basic_reader, .core_id = test_core(0),
+                     .arg = fix);
+
+    test_fleet_spawn(fleet, "writer", basic_writer, .core_id = test_core(1),
+                     .prio_class = THREAD_PRIO_CLASS_REALTIME, .arg = fix);
 
     test_fleet_start_all(fleet);
     return test_fleet_join(fleet);
+}
+
+TEST_DEFINE_UNIT(wroost, propagate_boost, .min_cores = 3) {
+    return TEST_SUCCESS;
 }

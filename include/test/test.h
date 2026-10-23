@@ -228,6 +228,22 @@ struct test_context {
 
 void *test_alloc(struct test_context *ctx, size_t size) cw_alloc(2);
 
+/* int *x = test_new(x); */
+#define TEST_NEW_CHECK(p)                                                      \
+    static_assert(                                                             \
+        __builtin_types_compatible_p(__typeof_unqual__(p), typeof(&*(p))),     \
+        "test_new: target must be a pointer lvalue, not an array");            \
+    static_assert(                                                             \
+        !cc_generic((p), void * : 1, const void * : 1, volatile void * : 1,    \
+                    const volatile void * : 1, default : 0),                   \
+        "test_new: void pointer target, use test_alloc() with a size")
+
+#define test_new(p)                                                            \
+    ({                                                                         \
+        TEST_NEW_CHECK(p);                                                     \
+        (VNEW_PTR(p)) test_alloc(ctx, sizeof(*(p)));                           \
+    })
+
 struct thread *test_spawn_internal(struct test_context *ctx,
                                    void (*entry)(void *),
                                    const struct thread_create_params *params,

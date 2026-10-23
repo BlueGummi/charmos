@@ -6,8 +6,8 @@
 static struct thread *vas_worker_on(size_t cpu, void (*entry)(void *),
                                     void *arg) {
     return thread_spawn("vas_worker", entry, .arg = arg, .joinable = true,
-                        .allowed_cpus = cpu_mask_of(cpu),
-                        .flags = THREAD_FLAG_PINNED, .on_cpu = cpu);
+                        .allowed_cpus = cpu_mask_of(cpu), .pinned = true,
+                        .on_cpu = cpu);
 }
 
 struct handoff {

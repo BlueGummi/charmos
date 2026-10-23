@@ -8,7 +8,7 @@
 #include <sync/turnstile.h>
 #include <thread/thread.h>
 
-/* LOCK ORDERING: chain -> thread.wait_lock ->
+/* LOCK ORDERING: wroost_lock -> chain -> thread.wait_lock ->
  * header / runqueues -> thread lock -> pi_lock */
 
 SLAB_SIZE_REGISTER_FOR_STRUCT(turnstile, SLAB_OBJ_ALIGN_DEFAULT);
@@ -286,16 +286,24 @@ void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,
 
     ts->owner = NULL;
 
-    /* yo, wake up */
+    struct thread *to_wake, *tmp;
+    struct list_head wake_list;
+    list_head_init(&wake_list);
+
     while (num_threads-- > 0) {
         /* wake the one of highest priority */
-        struct thread *to_wake = turnstile_dequeue_first(ts, queue);
+        to_wake = turnstile_dequeue_first(ts, queue);
+        list_head_push_back(&wake_list, &to_wake->wq_list_node);
+    }
+
+    turnstile_hash_chain_unlock(chain, lock_irql);
+
+    list_for_each_entry_safe(to_wake, tmp, &wake_list, wq_list_node) {
+        list_node_delete(&to_wake->wq_list_node);
         enforce(
             thread_wait_satisfy(&to_wake->wait_blocks[THREAD_WAIT_BLOCK_SYNC],
                                 THREAD_WAKE_REASON_BLOCKING_MANUAL, NULL));
     }
-
-    turnstile_hash_chain_unlock(chain, lock_irql);
 }
 
 static enum thread_prio_class turnstile_waiter_class(struct rbt_node *n) {
@@ -343,15 +351,85 @@ void turnstile_wake_handoff(struct turnstile *ts, size_t queue,
 
     struct thread *to_wake = turnstile_dequeue_first(ts, queue);
     enforce(to_wake == new_owner);
-    enforce(thread_wait_satisfy(&to_wake->wait_blocks[THREAD_WAIT_BLOCK_SYNC],
-                                THREAD_WAKE_REASON_BLOCKING_MANUAL, NULL));
 
     turnstile_hash_chain_unlock(chain, lock_irql);
+
+    enforce(thread_wait_satisfy(&to_wake->wait_blocks[THREAD_WAIT_BLOCK_SYNC],
+                                THREAD_WAKE_REASON_BLOCKING_MANUAL, NULL));
 }
 
 void turnstile_unlock(void *obj, enum irql irql) {
     struct turnstile_hash_chain *chain = turnstile_chain_for(obj);
     turnstile_hash_chain_unlock(chain, irql);
+}
+
+bool turnstile_propagate_wroost(struct wroost_percpu_data *pcd,
+                                struct thread *t) {
+    struct turnstile_hash_chain *chain = NULL;
+    enum irql irql = IRQL_NONE;
+    struct thread *waiter = t;
+    int bother_self = 0;
+
+    rcu_read_lock();
+
+    while (true) {
+        struct turnstile_wait_snapshot next_wait, cur_wait;
+
+        if (!turnstile_snapshot_wait(waiter, &next_wait))
+            break;
+
+        /* TODO: I should add debug stuff to this */
+        struct turnstile_hash_chain *next_chain =
+            turnstile_chain_for(next_wait.lock_obj);
+
+        if (next_chain != chain) {
+            if (chain)
+                turnstile_hash_chain_unlock(chain, irql);
+
+            chain = next_chain;
+            irql = turnstile_hash_chain_lock(chain);
+        }
+
+        /* Look it up again */
+        struct turnstile *cur_ts =
+            turnstile_lookup_internal(next_wait.lock_obj);
+
+        bool ts_valid = cur_ts && cur_ts == next_wait.ts;
+        bool snapshot = turnstile_snapshot_wait(waiter, &cur_wait);
+        bool curr_valid = snapshot && cur_wait.ts == cur_ts &&
+                          cur_wait.lock_obj == next_wait.lock_obj &&
+                          cur_wait.epoch == next_wait.epoch;
+
+        if (!ts_valid || !curr_valid)
+            break;
+
+        turnstile_requeue_waiter(cur_ts, waiter);
+
+        /* TODO: thread_inherit_priority and wroost integration */
+        struct thread *owner = cur_ts->owner;
+        if (!owner)
+            break;
+
+        struct wroost_kicks kicks = {0};
+
+        /* Technically we only need to wroost_merge_kicks
+         * IFF thread_inherit_priority succeeds, because on failure, no
+         * PI happened, but merging regardless is harmless */
+        bool inherited =
+            thread_inherit_priority(owner, waiter, &cur_ts->pi, &kicks);
+        bother_self += wroost_merge_kicks(pcd, &kicks);
+        if (!inherited)
+            break;
+
+        waiter = owner;
+    }
+
+    if (chain)
+        turnstile_hash_chain_unlock(chain, irql);
+
+    rcu_read_unlock();
+
+    return bother_self > 0;
 }
 
 static enum irql
@@ -370,10 +448,11 @@ turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
         if (!owner)
             break;
 
-        if (!thread_inherit_priority(owner, boosting_from, &cur_ts->pi))
+        if (!thread_inherit_priority(owner, boosting_from, &cur_ts->pi,
+                                     /* kicks_out = */ NULL))
             break;
 
-        struct turnstile_wait_snapshot next_wait, current_wait;
+        struct turnstile_wait_snapshot next_wait, cur_wait;
         if (!turnstile_snapshot_wait(owner, &next_wait))
             break;
 
@@ -390,9 +469,9 @@ turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
         cur_ts = turnstile_lookup_internal(next_wait.lock_obj);
 
         bool ts_valid = cur_ts == next_wait.ts;
-        bool snapshot = turnstile_snapshot_wait(owner, &current_wait);
-        bool curr_valid = snapshot && current_wait.ts == cur_ts &&
-                          current_wait.epoch == next_wait.epoch;
+        bool snapshot = turnstile_snapshot_wait(owner, &cur_wait);
+        bool curr_valid = snapshot && cur_wait.ts == cur_ts &&
+                          cur_wait.epoch == next_wait.epoch;
 
         if (!ts_valid || !curr_valid)
             break;
@@ -414,6 +493,7 @@ turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
 static void turnstile_block_on(struct turnstile *ts, size_t queue_num) {
     struct thread *curr = thread_get_current();
 
+    enforce(!atomic_load_acq(&curr->blocked_ts));
     atomic_store_release(&curr->blocked_ts, ts);
 
     wroost_pre_wait(curr);

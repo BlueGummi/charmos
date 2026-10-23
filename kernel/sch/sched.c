@@ -332,11 +332,6 @@ static inline void context_switch(struct thread *curr, struct thread *next) {
         smp_core_scheduler()->drop_last_ref = curr;
     }
 
-    /* PERF: If this reader was stolen, that's fine, since the post migration
-     * hook would run and add it to our CPU, but it's rather redundant
-     * to add a thread and immediately remove it from wroost_percpu_data */
-    wroost_switch_in(next);
-
     if (just_load) {
         load_context(&next->regs);
     } else {
@@ -354,7 +349,13 @@ void schedule(void) TSA_NO_ANALYSIS {
     struct thread *curr = sched->current;
     struct thread *next = NULL;
 
+    enum irql wirql = spin_lock_high(&sched->wroost_lock);
+    enum irql sirql = spin_lock_high(&sched->lock);
+
     wroost_switch_out(curr);
+
+    spin_unlock(&sched->lock, sirql);
+    spin_unlock(&sched->wroost_lock, wirql);
 
     /* if this returns false, the thread was not migrated
      * anywhere and we're responsible for acquiring our lock
@@ -406,6 +407,7 @@ void schedule(void) TSA_NO_ANALYSIS {
 void scheduler_switch_in(void) TSA_NO_ANALYSIS {
     struct scheduler *us = smp_core_scheduler();
     struct scheduler *other = us->other_locked;
+    struct thread *curr = thread_get_current();
     us->other_locked = NULL;
 
     enforce(us != other);
@@ -429,6 +431,17 @@ void scheduler_switch_in(void) TSA_NO_ANALYSIS {
     cpu_id_t i;
     cpu_mask_for_each(i, us->deferred_resched_mask)
         scheduler_force_resched(global.schedulers[i]);
+
+    enum irql wirql = spin_lock_high(&us->wroost_lock);
+    enum irql sirql = spin_lock_high(&us->lock);
+
+    /* PERF: If this reader was stolen, that's fine, since the post migration
+     * hook would run and add it to our CPU, but it's rather redundant
+     * to add a thread and immediately remove it from wroost_percpu_data */
+    wroost_switch_in(curr);
+
+    spin_unlock(&us->lock, sirql);
+    spin_unlock(&us->wroost_lock, wirql);
 
     wroost_scheduler_switch_in_hook();
 

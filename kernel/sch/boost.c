@@ -116,50 +116,11 @@ static void thread_donation_drop_locked(struct thread_class_donation *d) {
         }                                                                      \
     } while (0)
 
-/* max_boost becomes BG on last unlock */
-static enum thread_prio_class
-booster_class(struct thread *booster,
-              struct wroost_kicks *kicks) TSA_NO_ANALYSIS {
-    struct wroost_thread_data *wtd = &booster->wroost_data;
-    if (wtd->read_nesting_depth > 0 && wtd->floor < wtd->max_boost) {
-        if (wtd->contributed_floor) {
-            thread_class_floor_inc_locked(booster, wtd->max_boost);
-            thread_class_floor_dec_locked(booster, wtd->floor);
-        } else {
-            wtd->contributed_floor = true;
-            thread_class_floor_inc_locked(booster, wtd->max_boost);
-        }
-
-        wtd->floor = wtd->max_boost;
-
-        enum thread_prio_class old, new;
-        thread_recompute_prio_class_dry_locked(booster, &old, &new);
-
-        *kicks = wroost_post_prio_change_locked(booster, old, new);
-
-        if (old != new) {
-            /* Caller locks */
-            struct scheduler *sched = thread_get_scheduler_unsafe(booster);
-            bool ready;
-            if ((ready = thread_get_state(booster)) == THREAD_STATE_READY)
-                scheduler_remove_thread_locked(sched, booster);
-
-            booster->perceived_prio_class = new;
-
-            if (ready)
-                scheduler_add_thread_locked(sched, booster);
-        }
-    }
-
-    return booster->perceived_prio_class;
-}
-
 static bool scheduler_boost_thread_internal(struct thread *boosted,
                                             struct thread *from,
                                             struct thread_class_donation *d,
-                                            struct wroost_kicks *kicks,
-                                            struct wroost_kicks *kicks2) {
-    if (thread_donation_raise_locked(boosted, d, booster_class(from, kicks2),
+                                            struct wroost_kicks *kicks) {
+    if (thread_donation_raise_locked(boosted, d, from->perceived_prio_class,
                                      kicks))
         goto ok;
 
@@ -191,12 +152,13 @@ ok:
 }
 
 bool thread_inherit_priority(struct thread *boosted, struct thread *from,
-                             struct thread_class_donation *d) TSA_NO_ANALYSIS {
+                             struct thread_class_donation *d,
+                             struct wroost_kicks *kicks_out) TSA_NO_ANALYSIS {
     struct scheduler *sched, *sched2;
     enum irql irql, irql2;
     enum irql birql, firql;
     struct wroost_kicks kicks = {0};
-    struct wroost_kicks kicks2 = {0};
+    struct wroost_kicks *use = kicks_out ? kicks_out : &kicks;
 
     thread_lock_two_runqueues(boosted, from, &sched, &sched2, &irql, &irql2);
 
@@ -207,23 +169,21 @@ bool thread_inherit_priority(struct thread *boosted, struct thread *from,
         /* thread is READY - we remove it from the runqueue and then we
          * re-insert it */
         scheduler_remove_thread_locked(sched, boosted);
-        did_boost =
-            scheduler_boost_thread_internal(boosted, from, d, &kicks, &kicks2);
+        did_boost = scheduler_boost_thread_internal(boosted, from, d, use);
         scheduler_add_thread_locked(sched, boosted);
     } else {
         /* if the thread is off doing anything else (maybe it's blocking, maybe
          * it's running), we go ahead and just boost it. when it is saved those
          * new values will be read and everything will be all splendid */
-        did_boost =
-            scheduler_boost_thread_internal(boosted, from, d, &kicks, &kicks2);
+        did_boost = scheduler_boost_thread_internal(boosted, from, d, use);
     }
 
     thread_unlock_two_pi_locks(boosted, from, &birql, &firql);
 
     scheduler_release_two_locks(sched, sched2, irql, irql2);
 
-    wroost_kick(&kicks);
-    wroost_kick(&kicks2);
+    if (!kicks_out)
+        wroost_kick(&kicks);
 
     return did_boost;
 }

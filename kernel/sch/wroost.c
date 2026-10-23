@@ -3,8 +3,10 @@
 #include <sch/sched.h>
 #include <sch/wroost.h>
 #include <sync/rwlock.h>
+#include <sync/turnstile.h>
 #include <thread/thread.h>
 
+#include "atomic.h"
 #include "internal.h"
 #include "sync/rwlock_internal.h"
 
@@ -365,6 +367,33 @@ static void boost_thread_to(struct thread *t, enum thread_prio_class prio) {
     thread_recompute_prio_class_raw_locked(t, NULL, NULL);
 }
 
+bool wroost_merge_kicks(struct wroost_percpu_data *pcd,
+                        struct wroost_kicks *kicks) {
+    bool bother_self = false;
+    if (kicks->need_kicks) {
+        cpu_mask_or(&pcd->in_dpc_deferred_cpus, &kicks->cpus);
+        bitmap_set(pcd->in_dpc_deferred_ids, kicks->lock_id);
+
+        /* We don't re-enqueue the DPC on ourselves, that's unnecessary
+         * since the DPC itself can simply loop again */
+        cpu_mask_clear(&pcd->in_dpc_deferred_cpus, pcd->id);
+
+        if (cpu_mask_test(&kicks->cpus, pcd->id)) {
+            bother_self = true;
+
+            struct cpu_mask self_mask = CPU_MASK_INIT;
+
+            cpu_mask_set(&self_mask, pcd->id);
+
+            /* Just pend the update on the current CPU */
+            wroost_kick_cpus(&self_mask, kicks->lock_id,
+                             WROOST_KICK_UPDATE_PENDING);
+        }
+    }
+
+    return bother_self;
+}
+
 static struct wroost_kicks boost_thread_in_dpc(struct scheduler *sched,
                                                struct thread *t,
                                                enum thread_prio_class prio) {
@@ -398,23 +427,7 @@ static struct wroost_kicks boost_thread_in_dpc(struct scheduler *sched,
     thread_recompute_prio_class_dry_locked(t, &old, &new);
 
     kicks = wroost_post_prio_change_locked(t, old, new);
-    if (kicks.need_kicks) {
-        cpu_mask_or(&pcd->in_dpc_deferred_cpus, &kicks.cpus);
-        bitmap_set(pcd->in_dpc_deferred_ids, kicks.lock_id);
-
-        /* We don't re-enqueue the DPC on ourselves, that's unnecessary
-         * since the DPC itself can simply loop again */
-        cpu_mask_clear(&pcd->in_dpc_deferred_cpus, sched->core_id);
-
-        if (cpu_mask_test(&kicks.cpus, pcd->id)) {
-            struct cpu_mask self_mask = CPU_MASK_INIT;
-            cpu_mask_set(&self_mask, sched->core_id);
-
-            /* Just pend the update on the current CPU */
-            wroost_kick_cpus(&self_mask, kicks.lock_id,
-                             WROOST_KICK_UPDATE_PENDING);
-        }
-    }
+    wroost_merge_kicks(pcd, &kicks);
 
     /* If this happens, this MUST be because of us.
      *
@@ -471,84 +484,76 @@ static enum thread_prio_class ceil_for_thread(wroost_id_t id,
  *
  * For such threads, the DPC will need to use a CPU mask that
  */
-static void process_pending_bitmap(struct scheduler *self) {
-    enforce(irql_get() == IRQL_DISPATCH_LEVEL);
-
-    struct wroost_percpu_data *pcd = self->wroost_data;
-    bitmap_zero(pcd->in_dpc_deferred_ids,
-                wroost_global.hash_table.bucket_count);
-    cpu_mask_clear_all(&pcd->in_dpc_deferred_cpus);
-
+static bool process_pending_word(struct scheduler *self, size_t w_idx,
+                                 bitmap_word_t pending,
+                                 struct wroost_process_result *result) {
     struct thread *iter;
-    enum irql irql = spin_lock_high(&self->lock);
+    struct wroost_percpu_data *pcd = self->wroost_data;
 
-restart: /* Every time `kicks` happens to have THIS CPU in its mask,
-          * we have to re-scan. This won't infinitely loop because
-          * the mask only becomes set upon a priority change,
-          * and eventually all priority changes will have completed.
-          */
-    for (size_t w = 0; w < BITMAP_WORDS(bucket_count()); w++) {
-        bitmap_word_t pending = atomic_xchg_acq_rel(&pcd->pending_bitmap[w], 0);
+    while (pending) {
+        uint8_t bit = cw_ctz(pending);
+        pending &= pending - 1;
 
-        while (pending) {
-            uint8_t bit = cw_ctz(pending);
-            pending &= pending - 1;
+        wroost_id_t id = (w_idx * BIT_SIZEOF(bitmap_word_t)) | bit;
+        wroost_id_t coarse = id / WROOST_COARSE_FACTOR;
+        struct wroost_kicks kicks = {0};
 
-            wroost_id_t id = (w * BIT_SIZEOF(bitmap_word_t)) | bit;
-            wroost_id_t coarse = id / WROOST_COARSE_FACTOR;
-            struct wroost_kicks kicks = {0};
+        enforce(id < bucket_count());
+        enforce(coarse < WROOST_THREAD_COUNTERS);
 
-            enforce(id < bucket_count());
-            enforce(coarse < WROOST_THREAD_COUNTERS);
+        hlist_for_each_entry(iter, &pcd->thread_map[coarse],
+                             wroost_data.map_node) {
+#ifdef DEBUG_WROOST
+            enforce(!atomic_load_acq(&iter->blocked_ts));
+#endif
+            enum thread_prio_class new = ceil_for_thread(id, iter);
+            kicks = boost_thread_in_dpc(self, iter, new);
+            if (cpu_mask_test(&kicks.cpus, self->core_id))
+                return (result->restart = true);
+        }
 
-            hlist_for_each_entry(iter, &pcd->thread_map[coarse],
-                                 wroost_data.map_node) {
-                enum thread_prio_class new = ceil_for_thread(id, iter);
-                kicks = boost_thread_in_dpc(self, iter, new);
-                if (cpu_mask_test(&kicks.cpus, self->core_id))
-                    goto restart;
+        hlist_for_each_entry(iter, &pcd->multi_lock_readers,
+                             wroost_data.map_node) {
+#ifdef DEBUG_WROOST
+            enforce(!atomic_load_acq(&iter->blocked_ts));
+#endif
+            struct wroost_thread_data *wtd = &iter->wroost_data;
+
+            for (int i = 0; i < WROOST_FINE_ENTRY_COUNT; i++) {
+                struct wroost_fine_entry *ent = &wtd->fine_entries[i];
+
+                /* If we find it in a fine entry, we know this is the only
+                 * occurrence because the fine entries
+                 * cannot contain duplicates */
+                if ((wtd->fine_valid & BIT(i)) && ent->lock_id == id) {
+                    enum thread_prio_class new = ceil_for_thread(id, iter);
+                    kicks = boost_thread_in_dpc(self, iter, new);
+                    if (cpu_mask_test(&kicks.cpus, self->core_id))
+                        return (result->restart = true);
+
+                    goto next;
+                }
             }
 
-            hlist_for_each_entry(iter, &pcd->multi_lock_readers,
-                                 wroost_data.map_node) {
-                struct wroost_thread_data *wtd = &iter->wroost_data;
+            wroost_counter_t cc_unused val;
+            wroost_id_t i;
+            wroost_for_each_set_ctr(val, i, wtd->counters,
+                                    WROOST_THREAD_COUNTERS) {
+                if (i != coarse)
+                    continue;
 
-                for (int i = 0; i < WROOST_FINE_ENTRY_COUNT; i++) {
-                    struct wroost_fine_entry *ent = &wtd->fine_entries[i];
+                wroost_id_t base = i * WROOST_COARSE_FACTOR;
+                enum thread_prio_class to = ceil_for_thread(base, iter);
 
-                    /* If we find it in a fine entry, we know this is the only
-                     * occurrence because the fine entries
-                     * cannot contain duplicates */
-                    if ((wtd->fine_valid & BIT(i)) && ent->lock_id == id) {
-                        enum thread_prio_class new = ceil_for_thread(id, iter);
-                        kicks = boost_thread_in_dpc(self, iter, new);
-                        if (cpu_mask_test(&kicks.cpus, self->core_id))
-                            goto restart;
-
-                        goto next;
-                    }
+                /* We start at one because boost_to already checked 0 */
+                for (wroost_id_t j = 1; j < WROOST_COARSE_FACTOR; j++) {
+                    wroost_id_t lock_id = base + j;
+                    to = MAX(to, ceil_for_thread(lock_id, iter));
                 }
 
-                wroost_counter_t cc_unused val;
-                wroost_id_t i;
-                wroost_for_each_set_ctr(val, i, wtd->counters,
-                                        WROOST_THREAD_COUNTERS) {
-                    if (i != coarse)
-                        continue;
-
-                    wroost_id_t base = i * WROOST_COARSE_FACTOR;
-                    enum thread_prio_class to = ceil_for_thread(base, iter);
-
-                    /* We start at one because boost_to already checked 0 */
-                    for (wroost_id_t j = 1; j < WROOST_COARSE_FACTOR; j++) {
-                        wroost_id_t lock_id = base + j;
-                        to = MAX(to, ceil_for_thread(lock_id, iter));
-                    }
-
-                    kicks = boost_thread_in_dpc(self, iter, to);
-                    if (cpu_mask_test(&kicks.cpus, self->core_id))
-                        goto restart;
-                }
+                kicks = boost_thread_in_dpc(self, iter, to);
+                if (cpu_mask_test(&kicks.cpus, self->core_id))
+                    return (result->restart = true);
             }
 
         next:
@@ -556,11 +561,134 @@ restart: /* Every time `kicks` happens to have THIS CPU in its mask,
         }
     }
 
-    spin_unlock(&self->lock, irql);
+    return false;
+}
 
+static bool process_pending_word_ts(struct scheduler *self, size_t w_idx,
+                                    bitmap_word_t pending,
+                                    struct wroost_process_result *result) {
+    struct thread *iter;
+    struct wroost_percpu_data *pcd = self->wroost_data;
+
+    while (pending) {
+        uint8_t bit = cw_ctz(pending);
+        pending &= pending - 1;
+
+        wroost_id_t id = (w_idx * BIT_SIZEOF(bitmap_word_t)) | bit;
+        wroost_id_t coarse = id / WROOST_COARSE_FACTOR;
+
+        struct wroost_kicks kicks = {0};
+
+        hlist_for_each_entry(iter, &pcd->blocked_ts_readers,
+                             wroost_data.map_node) {
+            struct wroost_thread_data *wtd = &iter->wroost_data;
+
+            for (int i = 0; i < WROOST_FINE_ENTRY_COUNT; i++) {
+                struct wroost_fine_entry *ent = &wtd->fine_entries[i];
+
+                if ((wtd->fine_valid & BIT(i)) && ent->lock_id == id) {
+                    enum thread_prio_class new = ceil_for_thread(id, iter);
+                    kicks = boost_thread_in_dpc(self, iter, new);
+                    if (cpu_mask_test(&kicks.cpus, self->core_id))
+                        return (result->restart = true);
+
+                    if (turnstile_propagate_wroost(pcd, iter))
+                        return (result->restart = true);
+
+                    goto next;
+                }
+            }
+
+            wroost_counter_t cc_unused val;
+            wroost_id_t i;
+            wroost_for_each_set_ctr(val, i, wtd->counters,
+                                    WROOST_THREAD_COUNTERS) {
+                if (i != coarse)
+                    continue;
+
+                wroost_id_t base = i * WROOST_COARSE_FACTOR;
+                enum thread_prio_class to = ceil_for_thread(base, iter);
+
+                for (wroost_id_t j = 1; j < WROOST_COARSE_FACTOR; j++) {
+                    wroost_id_t lock_id = base + j;
+                    to = MAX(to, ceil_for_thread(lock_id, iter));
+                }
+
+                kicks = boost_thread_in_dpc(self, iter, to);
+                if (cpu_mask_test(&kicks.cpus, self->core_id))
+                    return (result->restart = true);
+
+                if (turnstile_propagate_wroost(pcd, iter))
+                    return (result->restart = true);
+            }
+
+        next:
+            continue;
+        }
+    }
+
+    return false;
+}
+
+static void process_pending_bitmap(struct scheduler *self,
+                                   struct wroost_process_result *result) {
+    enforce(irql_get() == IRQL_DISPATCH_LEVEL);
+    enforce(!result->restart);
+
+    struct wroost_percpu_data *pcd = self->wroost_data;
+    bitmap_zero(pcd->in_dpc_deferred_ids, bucket_count());
+    cpu_mask_clear_all(&pcd->in_dpc_deferred_cpus);
+
+    enum irql wirql = spin_lock_high(&self->wroost_lock);
+    enum irql sirql = spin_lock_high(&self->lock);
+
+    for (size_t w = 0; w < BITMAP_WORDS(bucket_count()); w++) {
+        bitmap_word_t pending = atomic_xchg_acq_rel(&pcd->pending_bitmap[w], 0);
+        bitmap_word_t pending_prior = pending;
+
+        pending |= result->seen_data[w];
+
+        result->seen_data[w] = pending_prior;
+
+        if (process_pending_word(self, w, pending, result))
+            goto out_inner;
+    }
+
+    spin_unlock(&self->lock, sirql);
+
+    /* We have to re-check and iterate again under ONLY the wroost_lock.
+     *
+     * This part is for boosting blocked_ts_readers, which needs to
+     * propagate the inheritance up the chain, and thus, requires that
+     * no sched->lock be held (only wroost_lock to protect this state) */
+    for (size_t w = 0; w < BITMAP_WORDS(bucket_count()); w++) {
+        bitmap_word_t new_word =
+            atomic_xchg_acq_rel(&pcd->pending_bitmap[w], 0);
+        bitmap_word_t pending = new_word | result->seen_data[w];
+
+        /* Add the new words to the set here. This is because on
+         * a retry, we start from the beginning again, iterating
+         * over non-blocked threads, so we need to preserve those */
+        result->seen_data[w] |= new_word;
+
+        if (process_pending_word_ts(self, w, pending, result))
+            goto out_outer;
+    }
+
+    spin_unlock(&self->wroost_lock, wirql);
+    return;
+
+out_inner:
+    spin_unlock(&self->lock, sirql);
+
+out_outer:
+    spin_unlock(&self->wroost_lock, wirql);
+}
+
+static void kick_from_dpc(struct wroost_percpu_data *pcd) {
     /* boost_thread_in_dpc enforces that this doesn't happen. We don't
      * send the DPC on ourselves since we goto restart */
-    enforce(!cpu_mask_test(&pcd->in_dpc_deferred_cpus, self->core_id));
+    enforce(!cpu_mask_test(&pcd->in_dpc_deferred_cpus, pcd->id));
 
     size_t bit;
     bitmap_for_each_bit_set(bit, pcd->in_dpc_deferred_ids,
@@ -582,7 +710,19 @@ static void wroost_dpc(struct dpc_context *dc, void *a, void *b) {
     while (true) {
         atomic_fetch_and(&pcd->state, ~WROOST_DPC_PENDING);
 
-        process_pending_bitmap(self);
+        struct wroost_process_result *result = &pcd->process_result;
+        bitmap_zero(result->seen_data, bucket_count());
+
+        /* Every time `kicks` happens to have THIS CPU in its mask,
+         * we have to re-scan. This won't infinitely loop (hopefully) because
+         * the mask only becomes set upon a priority change,
+         * and eventually all priority changes will have completed.
+         */
+        do {
+            result->restart = false;
+            process_pending_bitmap(self, result);
+            kick_from_dpc(pcd);
+        } while (result->restart);
 
         /* If a writer came about, this CAS fails and we go again */
         enum wroost_state want = WROOST_DPC_ACTIVE;
@@ -861,6 +1001,10 @@ static enum thread_prio_class update_reader(struct wroost_percpu_data *pcd,
      * a counter overflows at read_nesting_depth == 3 */
     size_t found_fine_count = 0;
     wroost_id_t found_coarse = 0;
+    bool blocked_on_ts = atomic_load_acq(&t->blocked_ts);
+
+    if (blocked_on_ts && add)
+        thread_pin(t);
 
     /* Because coarse entries are either fully inside the fine entries or not,
      * we can use this without needing to check the actual coarse entries */
@@ -888,10 +1032,15 @@ static enum thread_prio_class update_reader(struct wroost_percpu_data *pcd,
 
     enforce(found_fine_count <= wtd->read_nesting_depth);
     if (add) {
-        if (wtd->read_nesting_depth == 1) {
-            hlist_add_head(&wtd->map_node, &pcd->thread_map[found_coarse]);
+        if (blocked_on_ts) {
+            hlist_add_head(&wtd->map_node, &pcd->blocked_ts_readers);
+            wtd->in_blocked_ts_list = true;
         } else {
-            hlist_add_head(&wtd->map_node, &pcd->multi_lock_readers);
+            if (wtd->read_nesting_depth == 1) {
+                hlist_add_head(&wtd->map_node, &pcd->thread_map[found_coarse]);
+            } else {
+                hlist_add_head(&wtd->map_node, &pcd->multi_lock_readers);
+            }
         }
     } else {
         hlist_del(&wtd->map_node);
@@ -899,7 +1048,7 @@ static enum thread_prio_class update_reader(struct wroost_percpu_data *pcd,
 
     /* No need to check coarse entries */
     if (found_fine_count == wtd->read_nesting_depth)
-        return boost_to;
+        goto out;
 
     wroost_counter_t val;
     wroost_id_t i;
@@ -920,6 +1069,12 @@ static enum thread_prio_class update_reader(struct wroost_percpu_data *pcd,
             if (add && (p = ceil_for(k, wtd->max_boost, boost_to)) > boost_to)
                 boost_to = p;
         }
+    }
+
+out:
+    if (!add && wtd->in_blocked_ts_list) {
+        thread_unpin(t);
+        wtd->in_blocked_ts_list = false;
     }
 
     return boost_to;
@@ -990,17 +1145,18 @@ void wroost_scheduler_switch_in_hook(void) {
     struct wroost_percpu_data *pcd = smp_core_scheduler()->wroost_data;
     if (wroost_kick_cpus(&pcd->dpc_enqueue_deferred, pcd->writer_lock_id,
                          WROOST_KICK_UPDATE_PENDING | WROOST_KICK_SEND_DPCS)) {
-        pcd->writer_lock_id = 0;
         cpu_mask_clear_all(&pcd->dpc_enqueue_deferred);
     } else {
 #ifdef DEBUG_WROOST
-        enforce(pcd->writer_lock_id == 0);
-
-        /* No bits can be set */
+        /* No bits can be set. writer_lock_id can be any value though, since
+         * it just means that we didn't happen to
+         * encounter any CPUs that need a kick */
         enforce(cpu_mask_first_set(&pcd->dpc_enqueue_deferred) ==
                 CPU_MASK_BITS);
 #endif
     }
+
+    pcd->writer_lock_id = 0;
 }
 
 void wroost_pre_wait(struct thread *curr) {
@@ -1037,7 +1193,11 @@ void wroost_post_migrate_hook(struct thread *t, cpu_id_t from, cpu_id_t to) {
     if (t->wroost_data.read_nesting_depth == 0)
         return;
 
-    update_reader(global.schedulers[from]->wroost_data, t, /* add = */ false);
+    if (atomic_load(&t->blocked_ts))
+        panic("reader with blocked_ts cannot migrate");
+
+    update_reader(global.schedulers[from]->wroost_data, t,
+                  /* add = */ false);
     update_reader(global.schedulers[to]->wroost_data, t, /* add = */ true);
 }
 
@@ -1090,6 +1250,14 @@ void wroost_init(void) {
     wroost_global.hash_table.buckets = nofail_vnews(
         wroost_global.hash_table.buckets, bucket_count, ALLOC_ZERO);
 
+    for (size_t i = 0; i < bucket_count; i++) {
+        struct wroost_bucket *bkt = &wroost_global.hash_table.buckets[i];
+
+        /* Fill it with ones 'URGENT' */
+        bitmap_fill((bitmap_word_t *) bkt->rq_min_prio,
+                    THREAD_PRIO_CLASS_BIT_COUNT * CPU_MASK_BITS);
+    }
+
     wroost_global.fine_index_bits = BITS_NEEDED(
         (wroost_global.hash_table.bucket_count / WROOST_THREAD_COUNTERS) - 1);
 
@@ -1106,6 +1274,10 @@ void wroost_scheduler_init(struct scheduler *sched) {
 
     pcd->pending_bitmap = nofail_vnews(
         pcd->pending_bitmap, BITMAP_WORDS(bucket_count()), ALLOC_ZERO);
+
+    pcd->process_result.seen_data =
+        nofail_vnews(pcd->process_result.seen_data,
+                     BITMAP_WORDS(bucket_count()), ALLOC_ZERO);
 
     pcd->in_dpc_deferred_ids = nofail_vnews(
         pcd->in_dpc_deferred_ids, BITMAP_WORDS(bucket_count()), ALLOC_ZERO);

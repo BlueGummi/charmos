@@ -21,16 +21,13 @@ static bool counting_worker(struct test_fleet *f, struct test_conc_worker *w) {
 
 TEST_DEFINE_INTEGRATION(fleet, spawn_join_clean,
                         TEST_INTENSITY_LINEAR(2, 8, 64, "workers")) {
-    struct test_fleet *fleet = test_fleet_init(ctx, NULL);
-    TEST_ASSERT_NONNULL(fleet);
+    struct test_fleet *fleet = test_fleet_init(ctx);
 
-    struct counting_fix *fix = test_fleet_alloc(fleet, sizeof(*fix));
-    TEST_ASSERT_NONNULL(fix);
+    struct counting_fix *fix = test_new(fix);
 
     size_t n = ctx->intensity_val ? ctx->intensity_val : 8;
     for (size_t i = 0; i < n; i++)
-        TEST_ASSERT_NONNULL(
-            test_fleet_spawn(fleet, "count", counting_worker, fix));
+        test_fleet_spawn(fleet, "count", counting_worker, .arg = fix);
 
     test_fleet_start_all(fleet);
 
@@ -61,15 +58,13 @@ static bool gate_worker(struct test_fleet *f, struct test_conc_worker *w) {
 
 TEST_DEFINE_INTEGRATION(fleet, start_gate_holds,
                         TEST_INTENSITY_LINEAR(2, 16, 64, "workers")) {
-    struct test_fleet *fleet = test_fleet_init(ctx, NULL);
-    TEST_ASSERT_NONNULL(fleet);
+    struct test_fleet *fleet = test_fleet_init(ctx);
 
-    struct gate_fix *fix = test_fleet_alloc(fleet, sizeof(*fix));
-    TEST_ASSERT_NONNULL(fix);
+    struct gate_fix *fix = test_new(fix);
 
     size_t n = ctx->intensity_val ? ctx->intensity_val : 16;
     for (size_t i = 0; i < n; i++)
-        TEST_ASSERT_NONNULL(test_fleet_spawn(fleet, "gate", gate_worker, fix));
+        test_fleet_spawn(fleet, "gate", gate_worker, .arg = fix);
 
     sleep_spin_ms(20);
     TEST_ASSERT_EQ(atomic_load(&fix->ran), 0);
@@ -93,10 +88,9 @@ static bool failing_worker(struct test_fleet *f, struct test_conc_worker *w) {
 }
 
 TEST_DEFINE_INTEGRATION(fleet, worker_failure_folds) {
-    struct test_fleet *fleet = test_fleet_init(ctx, NULL);
-    TEST_ASSERT_NONNULL(fleet);
+    struct test_fleet *fleet = test_fleet_init(ctx);
 
-    TEST_ASSERT_NONNULL(test_fleet_spawn(fleet, "fail", failing_worker, NULL));
+    test_fleet_spawn(fleet, "fail", failing_worker);
     test_fleet_start_all(fleet);
 
     struct test_verdict v = test_fleet_join(fleet);
@@ -128,15 +122,12 @@ out:
 }
 
 TEST_DEFINE_INTEGRATION(fleet, worker_check_releases_lock) {
-    struct test_fleet *fleet = test_fleet_init(ctx, NULL);
-    TEST_ASSERT_NONNULL(fleet);
+    struct test_fleet *fleet = test_fleet_init(ctx);
 
-    struct lock_fix *fix = test_fleet_alloc(fleet, sizeof(*fix));
-    TEST_ASSERT_NONNULL(fix);
+    struct lock_fix *fix = test_new(fix);
     mutex_init(&fix->lock);
 
-    TEST_ASSERT_NONNULL(
-        test_fleet_spawn(fleet, "locker", lock_failing_worker, fix));
+    test_fleet_spawn(fleet, "locker", lock_failing_worker, .arg = fix);
     test_fleet_start_all(fleet);
 
     struct test_verdict v = test_fleet_join(fleet);
@@ -157,13 +148,11 @@ static bool racing_failer(struct test_fleet *f, struct test_conc_worker *w) {
 
 TEST_DEFINE_INTEGRATION(fleet, first_failure_wins,
                         TEST_INTENSITY_LINEAR(2, 16, 64, "workers")) {
-    struct test_fleet *fleet = test_fleet_init(ctx, NULL);
-    TEST_ASSERT_NONNULL(fleet);
+    struct test_fleet *fleet = test_fleet_init(ctx);
 
     size_t n = ctx->intensity_val ? ctx->intensity_val : 16;
     for (size_t i = 0; i < n; i++)
-        TEST_ASSERT_NONNULL(
-            test_fleet_spawn(fleet, "racer", racing_failer, NULL));
+        test_fleet_spawn(fleet, "racer", racing_failer);
 
     test_fleet_start_all(fleet);
     struct test_verdict v = test_fleet_join(fleet);
@@ -194,17 +183,14 @@ static bool canary_worker(struct test_fleet *f, struct test_conc_worker *w) {
 
 TEST_DEFINE_INTEGRATION(fleet, alloc_outlives_body,
                         TEST_INTENSITY_LINEAR(2, 8, 32, "workers")) {
-    struct test_fleet *fleet = test_fleet_init(ctx, NULL);
-    TEST_ASSERT_NONNULL(fleet);
+    struct test_fleet *fleet = test_fleet_init(ctx);
 
-    struct alloc_fix *fix = test_fleet_alloc(fleet, sizeof(*fix));
-    TEST_ASSERT_NONNULL(fix);
+    struct alloc_fix *fix = test_new(fix);
     fix->canary = FLEET_CANARY;
 
     size_t n = ctx->intensity_val ? ctx->intensity_val : 8;
     for (size_t i = 0; i < n; i++)
-        TEST_ASSERT_NONNULL(
-            test_fleet_spawn(fleet, "canary", canary_worker, fix));
+        test_fleet_spawn(fleet, "canary", canary_worker, .arg = fix);
 
     test_fleet_start_all(fleet);
     struct test_verdict v = test_fleet_join(fleet);
@@ -243,18 +229,15 @@ TEST_DEFINE_INTEGRATION(fleet, run_on_core, .min_cores = 2) {
 static bool pinned_worker(struct test_fleet *f, struct test_conc_worker *w) {
     struct affinity_fix *fix = w->arg;
 
-    TEST_WORKER_CHECK(
-        f, (thread_get_flags(thread_get_current()) & THREAD_FLAG_PINNED) != 0);
+    TEST_WORKER_CHECK(f, thread_is_pinned(thread_get_current()));
     atomic_inc(&fix->checked);
     return true;
 }
 
 TEST_DEFINE_INTEGRATION(fleet, spawn_on_core_pins, .min_cores = 2) {
-    struct test_fleet *fleet = test_fleet_init(ctx, NULL);
-    TEST_ASSERT_NONNULL(fleet);
+    struct test_fleet *fleet = test_fleet_init(ctx);
 
-    struct affinity_fix *fix = test_fleet_alloc(fleet, sizeof(*fix));
-    TEST_ASSERT_NONNULL(fix);
+    struct affinity_fix *fix = test_new(fix);
 
     size_t n =
         test_fleet_spawn_per_core(fleet, "pinned", pinned_worker, fix, 1);
